@@ -16,12 +16,6 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "declaration": false,
-    "noEmit": true,
-    "baseUrl": ".",
-    "paths": {
-      "@inigo/shared-config": ["libs/shared-config/src/index.ts"],
-      "@inigo/intervals-icu-client": ["libs/intervals-icu-client/src/index.ts"],
-      "@inigo/intervals-icu-mcp-tools": ["libs/intervals-icu-mcp-tools/src/index.ts"]
-    }
+    "noEmit": true
   }
 }

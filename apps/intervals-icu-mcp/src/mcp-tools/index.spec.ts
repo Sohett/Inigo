@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import type { IntervalsIcuClient } from "@inigo/intervals-icu-client";
+import type { IntervalsIcuClient } from "../client";
 import { registerIntervalsIcuTools, type RegisterToolsOptions } from "./index";
 
 function createMockClient(): IntervalsIcuClient {

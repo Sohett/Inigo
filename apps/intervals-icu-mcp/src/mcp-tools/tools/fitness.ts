@@ -1,5 +1,5 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { IntervalsIcuClient } from "@inigo/intervals-icu-client";
+import type { IntervalsIcuClient } from "../../client";
 import { dateRangeShape, runTool } from "../result";
 
 export function registerFitnessTools(server: McpServer, client: IntervalsIcuClient): void {
