@@ -16,7 +16,7 @@ L'endpoint MCP est exposé sur **`/api/mcp`** et protégé par un bearer token.
 ## Variables d'environnement
 
 Validées au boot par `@inigo/shared-config` (échec explicite si invalide). Copie
-`.env.example` (à la racine) → `.env` et renseigne :
+`.env.example` (racine du repo) → `.env` **dans ce dossier** et renseigne :
 
 | Variable | Rôle |
 |---|---|

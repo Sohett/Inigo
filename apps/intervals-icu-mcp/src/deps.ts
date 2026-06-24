@@ -1,5 +1,5 @@
-import { loadConfig, type Config } from "@inigo/shared-config";
-import { IntervalsIcuClient } from "@inigo/intervals-icu-client";
+import { loadConfig, type Config } from "./config";
+import { IntervalsIcuClient } from "./client";
 
 interface Deps {
   config: Config;

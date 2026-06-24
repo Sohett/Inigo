@@ -5,7 +5,7 @@ const validEnv = {
   INTERVALS_API_KEY: "test-api-key",
   INTERVALS_ATHLETE_ID: "i123456",
   MCP_BEARER_TOKEN: "a-very-long-secret-token-value",
-} satisfies NodeJS.ProcessEnv;
+} satisfies Record<string, string | undefined>;
 
 describe("loadConfig", () => {
   it("parses a valid environment and applies defaults", () => {

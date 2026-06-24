@@ -1,6 +1,6 @@
 import { createMcpHandler, withMcpAuth } from "mcp-handler";
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
-import { registerIntervalsIcuTools } from "@inigo/intervals-icu-mcp-tools";
+import { registerIntervalsIcuTools } from "../../../src/mcp-tools";
 import { getDeps } from "../../../src/deps";
 import { verifyBearerToken } from "../../../src/auth";
 

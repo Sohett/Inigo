@@ -31,7 +31,7 @@ export type Config = z.infer<typeof configSchema>;
  * Throws an aggregated, human-readable error if anything is missing/invalid.
  * Never logs secret values.
  */
-export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
+export function loadConfig(env: Record<string, string | undefined> = process.env): Config {
   const parsed = configSchema.safeParse(env);
   if (!parsed.success) {
     const issues = parsed.error.issues

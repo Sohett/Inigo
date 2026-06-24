@@ -8,18 +8,17 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "nx run-many -t build",
-    "test": "nx run-many -t test",
-    "typecheck": "nx run-many -t typecheck",
-    "lint": "nx run-many -t lint",
-    "verify": "nx run-many -t lint typecheck test",
-    "dev:mcp": "nx dev intervals-icu-mcp"
+    "build": "pnpm -r run build",
+    "test": "pnpm -r run test",
+    "typecheck": "pnpm -r run typecheck",
+    "lint": "pnpm -r run lint",
+    "verify": "pnpm -r run lint && pnpm -r run typecheck && pnpm -r run test",
+    "dev:mcp": "pnpm --filter @inigo/intervals-icu-mcp run dev"
   },
   "devDependencies": {
     "@types/node": "^26.0.0",
     "@vitest/coverage-v8": "^4.1.9",
     "eslint": "^10.5.0",
-    "nx": "^23.0.1",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.62.0",
     "vite-tsconfig-paths": "^6.1.1",

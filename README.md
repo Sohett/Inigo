@@ -9,22 +9,18 @@ services. Le premier service livré expose les données d'entraînement [Interva
 ```
 apps/    # services déployables
   intervals-icu-mcp/   # serveur MCP exposant Intervals.icu — voir son README
-libs/    # packages partagés (@inigo/*)
-  shared-config/            # schéma d'environnement (zod) + loader, transverse
-  intervals-icu-client/     # client REST Intervals.icu typé
-  intervals-icu-mcp-tools/  # définitions des tools MCP
 ```
 
-Outillage : **pnpm** workspaces + **Nx 23**, **TypeScript 5.9** strict, **Vitest 4**.
+Outillage : **pnpm** workspaces, **TypeScript 5.9** strict, **Vitest 4**.
 
 ## Démarrage
 
 Prérequis : **Node ≥ 20** et **pnpm** (`pnpm@10`).
 
 ```bash
-pnpm install                 # installer les dépendances
-cp .env.example .env         # puis renseigner les valeurs (voir le README du service)
-pnpm verify                  # lint + typecheck + test sur tout le monorepo
+pnpm install                                    # installer les dépendances
+cp .env.example apps/intervals-icu-mcp/.env    # puis renseigner les valeurs
+pnpm verify                                     # lint + typecheck + test sur tout le monorepo
 ```
 
 Pour lancer un service en développement, voir son README (ex. `pnpm dev:mcp`).

@@ -8,6 +8,10 @@ est spécifique à Claude Code.
 
 @AGENTS.md
 
+## Commits
+
+- **Jamais de `Co-Authored-By`** dans les messages de commit — ni Claude, ni aucun outil.
+
 ## Spécifique à Claude Code
 
 - **Skill `intervals-icu-api`** : avant d'ajouter, modifier ou vérifier un endpoint

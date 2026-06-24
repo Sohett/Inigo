@@ -1,5 +1,5 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { IntervalsIcuClient } from "@inigo/intervals-icu-client";
+import type { IntervalsIcuClient } from "../../client";
 import { z } from "zod";
 import { dateRangeShape, runTool } from "../result";
 
