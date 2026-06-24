@@ -29,7 +29,7 @@ Pour lancer un service en développement, voir son README (ex. `pnpm dev:mcp`).
 
 | Service | Description | Doc |
 |---|---|---|
-| `intervals-icu-mcp` | Serveur MCP distant exposant Intervals.icu aux agents | [`apps/intervals-icu-mcp/README.md`](apps/intervals-icu-mcp/README.md) |
+| `intervals-icu-mcp` | Serveur MCP distant exposant Intervals.icu aux agents — <https://intervals-icu-mcp.inigo-coach.com> | [`apps/intervals-icu-mcp/README.md`](apps/intervals-icu-mcp/README.md) |
 
 ## Contribuer
 

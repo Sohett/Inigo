@@ -44,7 +44,8 @@ curl -X POST http://localhost:3000/api/mcp \
 
 ## Déploiement & Managed Agents
 
-1. Déployer cette app (ex. **Vercel**) → URL HTTPS publique. Endpoint MCP : `/api/mcp`.
+1. L'app est déployée sur **Vercel** : <https://intervals-icu-mcp.inigo-coach.com>.
+   Endpoint MCP : `https://intervals-icu-mcp.inigo-coach.com/api/mcp`.
    Env requis : `INTERVALS_API_KEY`, `INTERVALS_ATHLETE_ID`, `MCP_BEARER_TOKEN`.
 2. Côté Managed Agents : créer un **vault** `static_bearer` (URL = l'endpoint MCP,
    token = `MCP_BEARER_TOKEN`), puis un **agent** déclarant `mcp_servers` + `mcp_toolset`,
