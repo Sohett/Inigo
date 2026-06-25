@@ -5,6 +5,8 @@ node_modules/
 # Build output
 dist/
 .next/
+.astro/
+.vercel/
 out/
 *.tsbuildinfo
 next-env.d.ts

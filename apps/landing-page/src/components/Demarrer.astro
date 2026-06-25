@@ -1,0 +1,21 @@
+---
+import { LeadForm } from "@/components/lead-form";
+import { form } from "@/content/copy";
+---
+
+<section id="demarrer" class="scroll-mt-20 bg-secondary/40 px-6">
+  <div class="mx-auto max-w-xl py-24 sm:py-32">
+    <div class="reveal text-center">
+      <p class="eyebrow text-encre-soft">{form.eyebrow}</p>
+      <h2 class="mt-5 text-3xl font-bold sm:text-4xl">{form.title}</h2>
+      <p class="mt-4 text-muted-foreground">{form.subtitle}</p>
+    </div>
+
+    <div
+      class="reveal mt-10 rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8"
+      style="--delay:100ms"
+    >
+      <LeadForm client:visible />
+    </div>
+  </div>
+</section>

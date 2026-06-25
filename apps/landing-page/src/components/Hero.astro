@@ -1,0 +1,56 @@
+---
+import PowerCurve from "@/components/PowerCurve.astro";
+import GrainOverlay from "@/components/GrainOverlay.astro";
+import { hero } from "@/content/copy";
+---
+
+<section class="relative bg-background px-6">
+  <div class="mx-auto flex max-w-4xl flex-col items-center pt-28 text-center sm:pt-36">
+    <p class="eyebrow rise-in text-encre-soft" style="--delay:0ms">{hero.eyebrow}</p>
+    <h1
+      class="rise-in mt-6 text-balance font-display font-bold leading-[1.04] tracking-[-0.03em] text-foreground"
+      style="--delay:80ms; font-size:clamp(2.5rem,6vw,4.75rem)"
+    >
+      {hero.title}
+    </h1>
+    <p
+      class="rise-in mt-6 max-w-2xl text-lg leading-relaxed text-muted-foreground"
+      style="--delay:160ms"
+    >
+      {hero.subtitle}
+    </p>
+    <div
+      class="rise-in mt-10 flex flex-col items-center gap-3 sm:flex-row"
+      style="--delay:240ms"
+    >
+      <a
+        href={hero.ctaPrimary.href}
+        class="inline-flex h-12 items-center justify-center rounded-xl bg-encre px-6 text-base font-semibold text-white transition hover:-translate-y-0.5 hover:bg-encre/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-encre focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      >
+        {hero.ctaPrimary.label}
+      </a>
+      <a
+        href={hero.ctaSecondary.href}
+        class="inline-flex h-12 items-center justify-center rounded-xl border border-encre/15 px-6 text-base font-medium text-foreground transition hover:border-encre/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-encre/40"
+      >
+        {hero.ctaSecondary.label}
+      </a>
+    </div>
+  </div>
+
+  {/* Visuel signature : dégradé « aube » + grain + courbe de puissance tracée. */}
+  <div class="mx-auto mt-16 max-w-5xl pb-20 sm:mt-20 sm:pb-28">
+    <div
+      class="rise-in relative isolate aspect-[16/9] overflow-hidden rounded-3xl aube-gradient shadow-[0_24px_80px_-32px_rgba(11,16,38,0.5)] sm:aspect-[16/7]"
+      style="--delay:360ms"
+    >
+      <GrainOverlay id="inigo-grain-hero" opacity={0.12} />
+      <div class="absolute inset-0 text-glacier">
+        <PowerCurve class="h-full w-full" draw drawDelay={560} strokeWidth={2} area />
+      </div>
+      <span class="eyebrow absolute left-5 top-5 text-glacier/70 sm:left-7 sm:top-7">
+        {hero.signature}
+      </span>
+    </div>
+  </div>
+</section>

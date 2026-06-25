@@ -1,0 +1,30 @@
+---
+import { whatsapp } from "@/content/copy";
+---
+
+<section class="scroll-mt-20 bg-background px-6">
+  <div class="mx-auto grid max-w-5xl gap-12 py-24 sm:py-32 lg:grid-cols-2 lg:items-center">
+    <div class="reveal">
+      <p class="eyebrow text-encre-soft">{whatsapp.eyebrow}</p>
+      <h2 class="mt-5 text-3xl font-bold sm:text-4xl">{whatsapp.title}</h2>
+      <p class="mt-6 text-lg leading-relaxed text-muted-foreground">{whatsapp.body}</p>
+    </div>
+
+    <div class="reveal flex flex-col gap-3" style="--delay:120ms">
+      {
+        whatsapp.bubbles.map((bubble) => (
+          <div
+            class:list={[
+              "max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed",
+              bubble.from === "inigo"
+                ? "self-start rounded-bl-sm border border-border bg-card text-card-foreground shadow-sm"
+                : "self-end rounded-br-sm bg-encre text-white",
+            ]}
+          >
+            {bubble.text}
+          </div>
+        ))
+      }
+    </div>
+  </div>
+</section>

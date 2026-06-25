@@ -61,6 +61,21 @@ Les commandes propres à un service (ex. `pnpm dev:mcp`) sont documentées dans 
 - **Validation zod** sur toutes les entrées (schémas d'input) et les réponses d'API externe.
 - **Jamais de secret en clair** dans les logs, les sorties d'outils, ou le repo.
 
+## Méthode de travail (agents)
+
+- **Plan d'abord.** Toute tâche non triviale (3+ étapes ou décision d'archi) commence par
+  un plan. Si ça dérape en cours de route, on s'arrête et on replanifie plutôt que de forcer.
+- **Subagents pour la recherche.** Délègue exploration, recherche de code et analyse
+  parallèle à des subagents pour garder le contexte principal propre — une tâche par subagent.
+- **Vérifier avant de dire « fait ».** Aucune tâche n'est terminée sans preuve qu'elle
+  marche : `pnpm verify` au vert, tests/logs à l'appui. Au moindre doute, compare le
+  comportement avant/après.
+- **Viser l'élégance, sans sur-ingénierie.** Sur un changement non trivial, se demander
+  s'il existe plus simple. Pour un fix évident, ne pas en rajouter.
+- **Bugs : autonome.** Face à un bug (log, erreur, test rouge), remonter à la cause racine
+  et corriger — pas de rustine, pas de besoin de hand-holding.
+- **Impact minimal.** Ne toucher que ce qui est nécessaire ; éviter les régressions.
+
 ## Tests (exigences)
 
 - Tests Vitest co-localisés dans le service (`*.spec.ts`).

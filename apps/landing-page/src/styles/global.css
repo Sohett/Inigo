@@ -1,0 +1,265 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/* Typo « Aube alpine » — self-hostée, pas de requête externe (cf. spec §4) */
+@import "@fontsource-variable/schibsted-grotesk"; /* Display — titres */
+@import "@fontsource-variable/hanken-grotesk"; /* Body — paragraphes, UI */
+@import "@fontsource-variable/geist-mono"; /* Mono/data — eyebrows, numéros */
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+    /* Familles de polices */
+    --font-display: 'Schibsted Grotesk Variable', ui-sans-serif, system-ui, sans-serif;
+    --font-sans: 'Hanken Grotesk Variable', ui-sans-serif, system-ui, sans-serif;
+    --font-heading: var(--font-display);
+    --font-mono: 'Geist Mono Variable', ui-monospace, SFMono-Regular, monospace;
+
+    /* Base claire & épurée — accent encre (le vert pine a été retiré). */
+    --color-canvas: #F7F8FA;      /* fond clair principal (blanc froid, pas de crème AI) */
+    --color-encre: #0E1116;       /* accent fonctionnel : texte, boutons, liens, focus */
+    --color-encre-soft: #3A4252;  /* texte secondaire sur fond clair */
+    --color-ligne: #E2E6EC;       /* hairlines, bordures, cartes */
+
+    /* « Aube alpine » — réservé AU SEUL visuel signature (dégradé), jamais en aplat UI. */
+    --color-nuit: #0B1026;
+    --color-indigo: #1B2150;
+    --color-alpenglow: #EC6A5E;
+    --color-ambre: #F6A560;
+    --color-glacier: #ECEFF4;     /* texte clair posé sur le dégradé signature */
+
+    /* Tokens sémantiques shadcn (résolus depuis :root / .dark ci-dessous) */
+    --color-sidebar-ring: var(--sidebar-ring);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar: var(--sidebar);
+    --color-chart-5: var(--chart-5);
+    --color-chart-4: var(--chart-4);
+    --color-chart-3: var(--chart-3);
+    --color-chart-2: var(--chart-2);
+    --color-chart-1: var(--chart-1);
+    --color-ring: var(--ring);
+    --color-input: var(--input);
+    --color-border: var(--border);
+    --color-destructive: var(--destructive);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--accent);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-muted: var(--muted);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-secondary: var(--secondary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary: var(--primary);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-popover: var(--popover);
+    --color-card-foreground: var(--card-foreground);
+    --color-card: var(--card);
+    --color-foreground: var(--foreground);
+    --color-background: var(--background);
+    --radius-sm: calc(var(--radius) * 0.6);
+    --radius-md: calc(var(--radius) * 0.8);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) * 1.4);
+    --radius-2xl: calc(var(--radius) * 1.8);
+    --radius-3xl: calc(var(--radius) * 2.2);
+    --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* Thème clair & épuré — toute la page (canvas froid, accent encre) */
+:root {
+    --background: #F7F8FA; /* canvas */
+    --foreground: #0E1116; /* encre */
+    --card: #FFFFFF;
+    --card-foreground: #0E1116;
+    --popover: #FFFFFF;
+    --popover-foreground: #0E1116;
+    --primary: #0E1116; /* encre — accent fonctionnel (boutons, CTA) */
+    --primary-foreground: #FFFFFF;
+    --secondary: #EEF1F5;
+    --secondary-foreground: #0E1116;
+    --muted: #EEF1F5;
+    --muted-foreground: #3A4252; /* encre-soft — contraste AA sur clair */
+    --accent: #EEF1F5;
+    --accent-foreground: #0E1116;
+    --destructive: oklch(0.577 0.245 27.325);
+    --border: #E2E6EC; /* ligne */
+    --input: #D7DCE4;
+    --ring: #0E1116; /* anneau de focus encre */
+    --chart-1: #0E1116;
+    --chart-2: #1B2150;
+    --chart-3: #EC6A5E;
+    --chart-4: #F6A560;
+    --chart-5: #8A93A6;
+    --radius: 0.625rem;
+    --sidebar: #FFFFFF;
+    --sidebar-foreground: #0E1116;
+    --sidebar-primary: #0E1116;
+    --sidebar-primary-foreground: #FFFFFF;
+    --sidebar-accent: #EEF1F5;
+    --sidebar-accent-foreground: #0E1116;
+    --sidebar-border: #E2E6EC;
+    --sidebar-ring: #0E1116;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "ss01", "cv01";
+    -webkit-font-smoothing: antialiased;
+  }
+  html {
+    @apply font-sans;
+    scroll-behavior: smooth;
+  }
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+}
+
+@layer components {
+  /* Eyebrow / label « données » (clin d'œil science / Intervals.icu) */
+  .eyebrow {
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-size: 0.75rem;
+    line-height: 1;
+  }
+
+  /* Dégradé « aube alpine » : nuit → indigo + lueur d'horizon ambre/alpenglow.
+     Placeholder swappable : remplacer par l'image montagne+grain de l'équipe d'un seul
+     `background-image: url(...)` quand elle arrive. Réservé au visuel signature. */
+  .aube-gradient {
+    background-color: #0B1026;
+    background-image:
+      radial-gradient(120% 90% at 18% 120%, #F6A560 0%, #EC6A5E 26%, rgba(236, 106, 94, 0) 62%),
+      radial-gradient(90% 70% at 88% 6%, rgba(27, 33, 80, 0.6) 0%, rgba(11, 16, 38, 0) 60%),
+      linear-gradient(120deg, #0B1026 0%, #141A3C 46%, #28215A 78%, #5A2E63 100%);
+  }
+}
+
+/* ───────────────────────── Motion (minimal, délibéré — spec §4) ───────────────────────── */
+
+/* Reveal au scroll : posé via IntersectionObserver (classe .is-visible), une seule fois */
+@keyframes inigo-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Caché uniquement si JS est actif (classe .js posée par Base.astro) → sans JS,
+   le contenu reste visible. */
+html.js .reveal {
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 600ms cubic-bezier(0.16, 1, 0.3, 1), transform 600ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+html.js .reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Entrée du hero au chargement (fade + translate-up, léger stagger via --delay) */
+.rise-in {
+  opacity: 0;
+  animation: inigo-rise 560ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: var(--delay, 0ms);
+}
+
+/* Courbe signature : se trace une fois au chargement (CSS pur → robuste sans JS).
+   pathLength="1000" sur le <path> normalise la longueur, peu importe la géométrie. */
+@keyframes inigo-draw {
+  from { stroke-dashoffset: var(--path-length, 1000); }
+  to { stroke-dashoffset: 0; }
+}
+.draw-stroke {
+  stroke-dasharray: var(--path-length, 1000);
+  animation: inigo-draw 1200ms cubic-bezier(0.45, 0, 0.2, 1) both;
+  animation-delay: var(--draw-delay, 250ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .reveal,
+  .rise-in {
+    opacity: 1 !important;
+    transform: none !important;
+    animation: none !important;
+    transition: none !important;
+  }
+  .draw-stroke {
+    stroke-dashoffset: 0 !important;
+    animation: none !important;
+  }
+}
+
+/* ───────────────────────── Navbar : glass au scroll ───────────────────────── */
+/* Transparente en haut du hero (pas de bande grise) ; verre clair dès qu'on scrolle. */
+.site-header {
+  transition: background-color 250ms ease, border-color 250ms ease, backdrop-filter 250ms ease;
+  border-bottom: 1px solid transparent;
+}
+.site-header.is-scrolled {
+  background-color: color-mix(in oklab, var(--background) 72%, transparent);
+  backdrop-filter: saturate(140%) blur(12px);
+  border-bottom-color: var(--border);
+}
+
+/* ───────────────────────── Input téléphone (react-phone-number-input) ─────────────────────────
+   Le pays vit dans un « trigger » bordé à gauche (drapeau + chevron), le numéro dans
+   l'Input shadcn à droite. Style aligné sur base-nova. */
+.inigo-phone {
+  display: flex;
+  align-items: stretch;
+}
+.inigo-phone .PhoneInputCountry {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 2.75rem; /* = h-11 de l'Input */
+  margin: 0;
+  padding: 0 0.625rem;
+  border: 1px solid var(--input);
+  border-right: 0;
+  border-radius: var(--radius) 0 0 var(--radius);
+  background: var(--background);
+  position: relative;
+}
+.inigo-phone .PhoneInputCountry:focus-within {
+  outline: none;
+  border-color: var(--ring);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--ring) 40%, transparent);
+  z-index: 1;
+}
+.inigo-phone .PhoneInputInput {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+.inigo-phone .PhoneInputCountryIcon {
+  width: 1.45em;
+  height: 1.05em;
+  box-shadow: none;
+  background: transparent;
+}
+.inigo-phone .PhoneInputCountryIcon--border {
+  box-shadow: none;
+  background: transparent;
+}
+.inigo-phone .PhoneInputCountrySelectArrow {
+  width: 0.4em;
+  height: 0.4em;
+  margin-left: 0.1rem;
+  border-style: solid;
+  border-color: var(--muted-foreground);
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+  opacity: 0.7;
+}
