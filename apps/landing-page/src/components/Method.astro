@@ -1,0 +1,25 @@
+---
+import { method } from "@/content/copy";
+---
+
+<section id="methode" class="scroll-mt-20 bg-secondary/40 px-6">
+  <div class="mx-auto max-w-3xl py-24 sm:py-32">
+    <p class="eyebrow reveal text-encre-soft">{method.eyebrow}</p>
+    <h2 class="reveal mt-5 text-3xl font-bold sm:text-4xl">{method.title}</h2>
+
+    {/* Fil conducteur reliant les étapes numérotées. */}
+    <ol class="relative mt-14 space-y-10 border-l border-border pl-8">
+      {
+        method.steps.map((step, index) => (
+          <li class="reveal relative" style={`--delay:${index * 40}ms`}>
+            <span class="absolute -left-[3.125rem] top-0 flex h-9 w-9 items-center justify-center rounded-full border border-border bg-background font-mono text-xs text-encre-soft">
+              {String(index + 1).padStart(2, "0")}
+            </span>
+            <h3 class="font-display text-xl font-semibold">{step.title}</h3>
+            <p class="mt-2 leading-relaxed text-muted-foreground">{step.body}</p>
+          </li>
+        ))
+      }
+    </ol>
+  </div>
+</section>

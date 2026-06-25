@@ -9,6 +9,7 @@ services. Le premier service livré expose les données d'entraînement [Interva
 ```
 apps/    # services déployables
   intervals-icu-mcp/   # serveur MCP exposant Intervals.icu — voir son README
+  landing-page/        # landing page one-page (Astro) qui capte des leads WhatsApp
 ```
 
 Outillage : **pnpm** workspaces, **TypeScript 5.9** strict, **Vitest 4**.
@@ -30,6 +31,7 @@ Pour lancer un service en développement, voir son README (ex. `pnpm dev:mcp`).
 | Service | Description | Doc |
 |---|---|---|
 | `intervals-icu-mcp` | Serveur MCP distant exposant Intervals.icu aux agents — <https://intervals-icu-mcp.inigo-coach.com> | [`apps/intervals-icu-mcp/README.md`](apps/intervals-icu-mcp/README.md) |
+| `landing-page` | Landing page one-page (Astro) — présente le coach et capte un numéro WhatsApp | [`apps/landing-page/README.md`](apps/landing-page/README.md) |
 
 ## Contribuer
 

@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" fill="none">
+  <defs>
+    <linearGradient id="og-base" x1="0" y1="0" x2="1200" y2="630" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0B1026" />
+      <stop offset="0.46" stop-color="#141A3C" />
+      <stop offset="0.78" stop-color="#28215A" />
+      <stop offset="1" stop-color="#5A2E63" />
+    </linearGradient>
+    <radialGradient id="og-glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(210 760) scale(760 470)">
+      <stop offset="0" stop-color="#F6A560" />
+      <stop offset="0.26" stop-color="#EC6A5E" />
+      <stop offset="0.62" stop-color="#EC6A5E" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id="og-curve-fill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ECEFF4" stop-opacity="0.22" />
+      <stop offset="1" stop-color="#ECEFF4" stop-opacity="0" />
+    </linearGradient>
+    <filter id="og-grain" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch" />
+      <feColorMatrix type="saturate" values="0" />
+    </filter>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#og-base)" />
+  <rect width="1200" height="630" fill="url(#og-glow)" />
+
+  <!-- Courbe de puissance signature -->
+  <path d="M0 380 C 250 470 480 530 760 552 C 980 568 1090 575 1200 578 L1200 630 L0 630 Z" fill="url(#og-curve-fill)" />
+  <path d="M0 380 C 250 470 480 530 760 552 C 980 568 1090 575 1200 578" stroke="#ECEFF4" stroke-opacity="0.85" stroke-width="3" stroke-linecap="round" fill="none" />
+
+  <!-- Grain -->
+  <rect width="1200" height="630" filter="url(#og-grain)" opacity="0.08" />
+
+  <!-- Lockup inigo (marque + wordmark v2), blanc -->
+  <g stroke="#ECEFF4" fill="none">
+    <g transform="translate(82,61) scale(0.163) translate(-28,-70)" stroke-width="37" stroke-linecap="round">
+      <line x1="47.5676" y1="393.942" x2="226.799" y2="255.147" />
+      <line x1="272.218" y1="372.599" x2="457.313" y2="89.7823" />
+    </g>
+    <g transform="translate(160,59) scale(0.185)" stroke-width="32">
+      <line x1="31" y1="81.9966" x2="31.0275" y2="243.997" />
+      <line x1="419" y1="11" x2="419" y2="51" />
+      <line x1="31" y1="11" x2="31" y2="51" />
+      <line x1="419" y1="81.9966" x2="419.027" y2="243.997" />
+      <line x1="149.999" y1="144.196" x2="149.019" y2="244.196" />
+      <path d="M280 145C280 70.585 150 70.0822 150 145" />
+      <line x1="280.468" y1="143.892" x2="281" y2="243.894" />
+      <path d="M577.957 226.101C580.454 226.095 665.845 232.729 665.994 176.191" />
+      <path d="M577.724 95.9692C503.31 96.2703 503.333 226.399 578.251 226.096" />
+      <line x1="575.813" y1="95.9369" x2="675.812" y2="95.0009" />
+      <path d="M577.724 285.927C503.309 286.229 503.333 416.4 578.25 416.096" />
+      <line x1="575.813" y1="285.937" x2="675.812" y2="285.001" />
+      <circle cx="830" cy="153" r="69.5" stroke-width="28" />
+    </g>
+  </g>
+
+  <!-- Eyebrow + headline -->
+  <text x="84" y="232" fill="#ECEFF4" fill-opacity="0.66" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="21" letter-spacing="3.4" font-weight="500">COACHING D'ENDURANCE</text>
+  <text x="82" y="318" fill="#ECEFF4" font-family="'Helvetica Neue', Arial, system-ui, sans-serif" font-size="62" font-weight="700" letter-spacing="-1.6">Ton coach d'endurance,</text>
+  <text x="82" y="390" fill="#ECEFF4" font-family="'Helvetica Neue', Arial, system-ui, sans-serif" font-size="62" font-weight="700" letter-spacing="-1.6">sur WhatsApp.</text>
+</svg>

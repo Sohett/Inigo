@@ -1,0 +1,47 @@
+---
+import Base from "@/layouts/Base.astro";
+import SiteHeader from "@/components/SiteHeader.astro";
+import Hero from "@/components/Hero.astro";
+import Coach from "@/components/Coach.astro";
+import Method from "@/components/Method.astro";
+import WhatsApp from "@/components/WhatsApp.astro";
+import Requirements from "@/components/Requirements.astro";
+import Demarrer from "@/components/Demarrer.astro";
+import SiteFooter from "@/components/SiteFooter.astro";
+---
+
+<Base>
+  <SiteHeader />
+  <main id="contenu">
+    <Hero />
+    <Coach />
+    <Method />
+    <WhatsApp />
+    <Requirements />
+    <Demarrer />
+  </main>
+  <SiteFooter />
+</Base>
+
+<script>
+  // Reveal au scroll, une seule fois ; respecte prefers-reduced-motion et l'absence d'IO.
+  const elements = document.querySelectorAll<HTMLElement>(".reveal");
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  if (reduce || !("IntersectionObserver" in window)) {
+    elements.forEach((el) => el.classList.add("is-visible"));
+  } else {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-visible");
+            observer.unobserve(entry.target);
+          }
+        }
+      },
+      { rootMargin: "0px 0px -10% 0px", threshold: 0.1 },
+    );
+    elements.forEach((el) => observer.observe(el));
+  }
+</script>

@@ -13,12 +13,14 @@
     "typecheck": "pnpm -r run typecheck",
     "lint": "pnpm -r run lint",
     "verify": "pnpm -r run lint && pnpm -r run typecheck && pnpm -r run test",
-    "dev:mcp": "pnpm --filter @inigo/intervals-icu-mcp run dev"
+    "dev:mcp": "pnpm --filter @inigo/intervals-icu-mcp run dev",
+    "dev:landing": "pnpm --filter @inigo/landing-page run dev"
   },
   "devDependencies": {
     "@types/node": "^26.0.0",
     "@vitest/coverage-v8": "^4.1.9",
     "eslint": "^10.5.0",
+    "shadcn": "^4.11.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.62.0",
     "vite-tsconfig-paths": "^6.1.1",

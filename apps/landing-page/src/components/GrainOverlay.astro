@@ -1,0 +1,27 @@
+---
+/**
+ * Overlay de grain réutilisable (cf. spec §4) — bruit SVG `feTurbulence`, désaturé,
+ * opacité faible. Pas d'image lourde. À poser dans un parent `relative`.
+ */
+interface Props {
+  class?: string;
+  opacity?: number;
+  /** id unique du filtre si plusieurs grains coexistent sur la page. */
+  id?: string;
+}
+const { class: className, opacity = 0.08, id = "inigo-grain" } = Astro.props;
+---
+
+<div
+  class:list={["pointer-events-none absolute inset-0 overflow-hidden", className]}
+  style={`opacity:${opacity}`}
+  aria-hidden="true"
+>
+  <svg class="h-full w-full" xmlns="http://www.w3.org/2000/svg">
+    <filter id={id}>
+      <feTurbulence type="fractalNoise" baseFrequency="0.82" numOctaves="2" stitchTiles="stitch" />
+      <feColorMatrix type="saturate" values="0" />
+    </filter>
+    <rect width="100%" height="100%" filter={`url(#${id})`} />
+  </svg>
+</div>
