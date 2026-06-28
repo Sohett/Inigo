@@ -29,8 +29,41 @@ export const hero = {
     "Inigo construit ton plan, l'ajuste chaque semaine et t'explique chaque séance. La méthode d'un coach pro, branchée sur tes données d'entraînement.",
   ctaPrimary: { label: "Laisser mon numéro", href: "#demarrer" },
   ctaSecondary: { label: "Voir la méthode", href: "#methode" },
-  // Légende mono du visuel signature (courbe de puissance).
-  signature: "Courbe de puissance",
+  // Label mono posé en haut du visuel signature.
+  signature: "Ton coaching, en direct",
+} as const;
+
+/**
+ * Visuel signature du hero : démo produit (photo + maquette WhatsApp).
+ * Ne contient que les textes de l'illustration ; la géométrie purement décorative
+ * (barres du graphe, dimensions) vit dans HeroShowcase.astro.
+ */
+export const heroShowcase = {
+  contact: { name: "Inigo", status: "en ligne" },
+  dayLabel: "Aujourd'hui",
+  inputPlaceholder: "Message",
+  // Fil de conversation illustratif. `from` : "in" = Inigo, "out" = l'athlète.
+  chat: [
+    {
+      from: "in",
+      time: "07:14",
+      text: "Cette semaine : 3 séances. Mardi tempo, jeudi seuil, dimanche sortie longue. Je t'explique le pourquoi 👇",
+    },
+    { from: "out", time: "07:16", text: "Jeudi je suis cuit du boulot, je peux décaler ?" },
+    {
+      from: "in",
+      time: "07:16",
+      text: "Oui. On passe le seuil à vendredi, repos jeudi. Le bloc reste cohérent.",
+    },
+  ],
+  // Chip de notification flottante (desktop).
+  chip: { name: "Inigo", time: "07:16", text: "Le bloc reste cohérent 💪" },
+  // Carte stats flottante (desktop).
+  stats: {
+    eyebrow: "Cette semaine",
+    title: "3 séances ajustées",
+    days: ["L", "M", "M", "J", "V", "S", "D"],
+  },
 } as const;
 
 export const coach = {

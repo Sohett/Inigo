@@ -1,6 +1,5 @@
 ---
-import PowerCurve from "@/components/PowerCurve.astro";
-import GrainOverlay from "@/components/GrainOverlay.astro";
+import HeroShowcase from "@/components/HeroShowcase.astro";
 import { hero } from "@/content/copy";
 ---
 
@@ -38,19 +37,10 @@ import { hero } from "@/content/copy";
     </div>
   </div>
 
-  {/* Visuel signature : dégradé « aube » + grain + courbe de puissance tracée. */}
-  <div class="mx-auto mt-16 max-w-5xl pb-20 sm:mt-20 sm:pb-28">
-    <div
-      class="rise-in relative isolate aspect-[16/9] overflow-hidden rounded-3xl aube-gradient shadow-[0_24px_80px_-32px_rgba(11,16,38,0.5)] sm:aspect-[16/7]"
-      style="--delay:360ms"
-    >
-      <GrainOverlay id="inigo-grain-hero" opacity={0.12} />
-      <div class="absolute inset-0 text-glacier">
-        <PowerCurve class="h-full w-full" draw drawDelay={560} strokeWidth={2} area />
-      </div>
-      <span class="eyebrow absolute left-5 top-5 text-glacier/70 sm:left-7 sm:top-7">
-        {hero.signature}
-      </span>
+  {/* Visuel signature : photo + démo produit WhatsApp (cf. HeroShowcase). */}
+  <div class="mx-auto mt-16 max-w-[1320px] pb-24 sm:mt-20 lg:pb-32">
+    <div class="rise-in" style="--delay:360ms">
+      <HeroShowcase />
     </div>
   </div>
 </section>

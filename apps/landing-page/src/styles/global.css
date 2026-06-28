@@ -186,6 +186,30 @@ html.js .reveal.is-visible {
   animation-delay: var(--draw-delay, 250ms);
 }
 
+/* Visuel hero : flottement décoratif (chip + téléphone) et pouls « live » de la
+   carte stats. Inclinaisons portées par les keyframes → état au repos = droit. */
+@keyframes inigo-float {
+  0%, 100% { transform: translateY(0) rotate(3deg); }
+  50% { transform: translateY(-9px) rotate(3deg); }
+}
+@keyframes inigo-float-phone {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-6px) rotate(-2deg); }
+}
+@keyframes inigo-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(37, 211, 102, 0.55); }
+  70% { box-shadow: 0 0 0 8px rgba(37, 211, 102, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(37, 211, 102, 0); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .inigo-float { animation: inigo-float 6s ease-in-out infinite; }
+  .inigo-pulse { animation: inigo-pulse 2.2s infinite; }
+}
+/* Le téléphone n'est animé/incliné qu'en composition desktop (≥ lg). */
+@media (min-width: 1024px) and (prefers-reduced-motion: no-preference) {
+  .inigo-float-phone { animation: inigo-float-phone 7s ease-in-out infinite; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   .reveal,
