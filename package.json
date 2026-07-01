@@ -14,7 +14,8 @@
     "lint": "pnpm -r run lint",
     "verify": "pnpm -r run lint && pnpm -r run typecheck && pnpm -r run test",
     "dev:mcp": "pnpm --filter @inigo/intervals-icu-mcp run dev",
-    "dev:landing": "pnpm --filter @inigo/landing-page run dev"
+    "dev:landing": "pnpm --filter @inigo/landing-page run dev",
+    "dev:coach": "pnpm --filter @inigo/inigo-coach run dev"
   },
   "devDependencies": {
     "@types/node": "^26.0.0",
