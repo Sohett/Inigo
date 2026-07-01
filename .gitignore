@@ -28,3 +28,4 @@ coverage/
 *.log
 .idea/
 .vscode/
+.mcp.json

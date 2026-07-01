@@ -22,7 +22,7 @@ describe("whatsappPayload", () => {
   it("normalises a wrapped {event,data} envelope", () => {
     const { event, message } = normalise({
       event: "message.received",
-      session: "inigo-coach",
+      session: "coach",
       data: { chatId: "c2", body: "yo" }
     });
     expect(event).toBe("message.received");

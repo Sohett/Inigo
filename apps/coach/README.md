@@ -1,4 +1,4 @@
-# inigo-coach
+# coach
 
 Backend d'Inigo (Next.js, full-stack, sur Vercel). Aujourd'hui il expose **un webhook**
 qui **mappe** les messages WhatsApp entrants (depuis une gateway **OpenWA** auto-hébergée)
@@ -15,10 +15,10 @@ WhatsApp via son outil MCP OpenWA (`MessageSendText`).
 ```
 WhatsApp (Thomas)
    ⇅
-OpenWA (Railway) — webhook message.received (filtre Sender=Thomas) ──►  inigo-coach
+OpenWA (Railway) — webhook message.received (filtre Sender=Thomas) ──►  coach
                  ◄── MCP /mcp : l'agent appelle MessageSendText (la réponse) ── Managed Agent
    ⇅
-inigo-coach (Vercel)
+coach (Vercel)
    POST /api/webhooks/whatsapp → whatsappToAnthropicManagedAgentsMapper → append user.message à la session fixe
    ⇅
 Managed Agent (Anthropic) — session fixe = mémoire ; MCP: intervals-icu-mcp + OpenWA ; répond via MessageSendText
@@ -47,7 +47,7 @@ Validées au boot par `src/config/config.ts`. Copie `.env.example` → `.env` **
 3. **Prompt système de l'agent** : « tu reçois des messages WhatsApp au format
    `chat_id: …\nmessage: …` ; réponds en appelant `MessageSendText(sessionId="<UUID session
    OpenWA>", chatId=<le chat_id fourni>, text=…)` ; concis, adapté à WhatsApp ».
-4. **Webhook OpenWA** → URL `https://<inigo-coach>/api/webhooks/whatsapp`, event
+4. **Webhook OpenWA** → URL `https://<coach>/api/webhooks/whatsapp`, event
    `message.received`, filtre `Sender is Thomas`.
 
 ## Lancer en local

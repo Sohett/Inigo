@@ -1,4 +1,4 @@
-# inigo-coach — guide agents
+# coach — guide agents
 
 Backend d'Inigo (Next.js full-stack, Vercel). Complète l'`AGENTS.md` racine. Contexte
 humain / déploiement / setup : `README.md`.
@@ -66,7 +66,7 @@ src/
 
 ## Tests
 
-- Vitest co-localisés (`*.spec.ts`). `pnpm --filter @inigo/inigo-coach run test`.
+- Vitest co-localisés (`*.spec.ts`). `pnpm --filter @inigo/coach run test`.
 - Couvre : config, auth (HMAC), parsing/normalisation du payload, **mapper** (payload →
   append correct + filtres), brain (fake SDK). Pas de réseau (fakes injectés).
 - `pnpm verify` (racine) doit être vert avant tout commit.

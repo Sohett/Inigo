@@ -39,12 +39,12 @@ export async function POST(request: Request): Promise<Response> {
       payload
     );
     if (result.status === "forwarded") {
-      console.info(`[inigo-coach] forwarded chat=${result.chatId}`);
+      console.info(`[coach] forwarded chat=${result.chatId}`);
     } else {
-      console.info(`[inigo-coach] ignored delivery: ${result.reason}`);
+      console.info(`[coach] ignored delivery: ${result.reason}`);
     }
   } catch (error) {
-    console.error("[inigo-coach] failed to forward inbound message", error);
+    console.error("[coach] failed to forward inbound message", error);
     return json({ ok: false, error: "forward_failed" }, 502);
   }
 
