@@ -2,7 +2,7 @@
 
 **Inigo est un coach sportif.** Ce dépôt est un monorepo TypeScript qui regroupe ses
 services : les services déployables vivent sous `apps/`.
-Premier service livré : **`intervals-icu-mcp`** (d'autres suivront).
+Services : **`intervals-icu-mcp`** (serveur MCP), **`landing-page`** (Astro), **`coach`** (backend qui relie WhatsApp au coach).
 
 > Ce fichier est la **source de vérité des conventions pour les agents** (standard
 > [`agents.md`](https://agents.md), lu par la plupart des outils). `CLAUDE.md` l'importe.
@@ -25,7 +25,9 @@ de ce service.
 
 ```
 apps/        # services déployables
-  intervals-icu-mcp/        # @inigo/intervals-icu-mcp — serveur MCP Intervals.icu
+  intervals-icu-mcp/   # @inigo/intervals-icu-mcp : serveur MCP Intervals.icu
+  landing-page/        # @inigo/landing-page : landing one-page (Astro), leads WhatsApp
+  coach/               # @inigo/coach : backend (Next.js), WhatsApp (OpenWA) vers le coach
 ```
 
 Chaque service est autonome : logique métier, client API, tests dans son propre dossier.
@@ -47,7 +49,8 @@ pnpm build                    # build de tous les projets
 pnpm --filter @inigo/intervals-icu-mcp run test
 ```
 
-Les commandes propres à un service (ex. `pnpm dev:mcp`) sont documentées dans son dossier.
+Raccourcis dev depuis la racine : `pnpm dev:mcp`, `pnpm dev:landing`, `pnpm dev:coach`. Le
+reste des commandes propres à un service est documenté dans son dossier.
 
 ## Conventions
 
@@ -92,5 +95,8 @@ Les exigences de test propres à un service (mocks, transports) sont dans son do
 
 ## Services
 
-- **intervals.icu (MCP)** — ajout/modif de tool, notes API, déploiement & Managed Agents :
-  voir `apps/intervals-icu-mcp/AGENTS.md` (agents) et `apps/intervals-icu-mcp/README.md` (humains).
+Chaque service documente ses détails dans son `AGENTS.md` (agents) et `README.md` (humains) :
+
+- **`intervals-icu-mcp`** : serveur MCP Intervals.icu (tools, notes API, déploiement, Managed Agents).
+- **`landing-page`** : landing one-page Astro (capte des leads WhatsApp).
+- **`coach`** : backend Next.js reliant WhatsApp (gateway OpenWA) au coach Managed Agent.

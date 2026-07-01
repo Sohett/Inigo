@@ -2,16 +2,16 @@
 
 But : faire tourner **OpenWA** (gateway WhatsApp non-officielle) en **process persistant**
 sur Railway, exposer son **API REST** + son **MCP** + un **webhook** vers l'app
-`inigo-coach` (sur Vercel). Suis les étapes dans l'ordre ; coche au fur et à mesure.
+`coach` (sur Vercel). Suis les étapes dans l'ordre ; coche au fur et à mesure.
 
 > Rappel d'archi : OpenWA **ne peut pas** vivre sur Vercel (process always-on + état de
-> session sur disque). Railway héberge la gateway ; Vercel héberge `inigo-coach`. Voir le
+> session sur disque). Railway héberge la gateway ; Vercel héberge `coach`. Voir le
 > [`README.md`](../README.md) du service.
 
 À la fin tu auras :
 - une URL publique HTTPS `https://<ton-service>.up.railway.app`
 - une session WhatsApp authentifiée (QR scanné une fois) qui **survit aux redeploys**
-- `POST /mcp` joignable (pour le Managed Agent) et un webhook vers `inigo-coach`
+- `POST /mcp` joignable (pour le Managed Agent) et un webhook vers `coach`
 
 ---
 
@@ -22,7 +22,7 @@ sur Railway, exposer son **API REST** + son **MCP** + un **webhook** vers l'app
 - [ ] Un **numéro WhatsApp dédié** + le téléphone à portée de main pour scanner le QR.
       ⚠️ Approche non-officielle = risque de ban : numéro dédié, volume bas, pas de spam.
 - [ ] (Optionnel) le **Railway CLI** : `npm i -g @railway/cli` puis `railway login`.
-- [ ] L'URL de ton app Vercel `inigo-coach` (ex. `https://inigo-coach.inigo-coach.com`) —
+- [ ] L'URL de ton app Vercel `coach` (ex. `https://coach.inigo-coach.com`) —
       peut être renseignée plus tard ; tu enregistreras le webhook une fois l'app déployée.
 
 Génère deux secrets tout de suite (garde-les) :
@@ -148,15 +148,15 @@ curl -X POST "$OWA_URL/mcp" \
 
 ---
 
-## 6. Enregistrer le webhook vers inigo-coach
+## 6. Enregistrer le webhook vers coach
 
-> À faire une fois `inigo-coach` déployé sur Vercel (tu connais alors son URL). Le `secret`
+> À faire une fois `coach` déployé sur Vercel (tu connais alors son URL). Le `secret`
 > est **optionnel** en MVP ; si tu le mets, il doit être identique à `WHATSAPP_WEBHOOK_SECRET`
 > côté app (clé HMAC vérifiée sur l'entête `X-OpenWA-Signature`). Tu peux aussi le faire
 > depuis l'écran « Create Webhook » du dashboard OpenWA.
 
 ```bash
-export COACH_URL="https://<inigo-coach>.vercel.app"   # ou ton domaine custom
+export COACH_URL="https://<coach>.vercel.app"   # ou ton domaine custom
 
 curl -X POST "$OWA_URL/api/sessions/$OWA_SESSION_ID/webhooks" \
   -H "Content-Type: application/json" -H "X-API-Key: $OWA_API_KEY" \
@@ -174,7 +174,7 @@ curl "$OWA_URL/api/sessions/$OWA_SESSION_ID/webhooks" -H "X-API-Key: $OWA_API_KE
 
 ## 7. Câbler les variables
 
-### Côté app (Vercel — `apps/inigo-coach`)
+### Côté app (Vercel — `apps/coach`)
 ```
 ANTHROPIC_API_KEY        = sk-ant-…
 ANTHROPIC_SESSION_ID     = <id de la session Managed fixe (sesn_…)>
