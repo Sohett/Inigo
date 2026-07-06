@@ -44,6 +44,7 @@ Validées au boot par `src/config/config.ts`. Copie `.env.example` → `.env` **
 2. **Session Managed fixe** (contrôle Anthropic, `ant` CLI / console), créée une fois avec
    ton agent coach + un **vault `static_bearer`** pour le MCP OpenWA (`url=<gateway>/mcp`,
    `token=` clé OPERATOR). Son id → `ANTHROPIC_SESSION_ID`.
+   > Les *deployments* Managed servent uniquement aux runs planifiés (cron) ; ici on n'en utilise pas : le coach pousse les messages à une session existante via l'API (`POST /v1/sessions/:id/events`).
 3. **Prompt système de l'agent** : « tu reçois des messages WhatsApp au format
    `chat_id: …\nmessage: …` ; réponds en appelant `MessageSendText(sessionId="<UUID session
    OpenWA>", chatId=<le chat_id fourni>, text=…)` ; concis, adapté à WhatsApp ».
