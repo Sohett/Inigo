@@ -33,6 +33,8 @@ src/
     whatsappPayload.ts             # schémas zod + normalisation du payload OpenWA
   brain/managedAgents.ts           # FRONTIÈRE cerveau : appendUserMessage(sessionId,text) + adaptateur SDK
   deps.ts                          # singleton lazy { config, brain }
+agent-skills/                      # skills attachées au Managed Agent (uploadées côté Anthropic, PAS des skills Claude Code)
+  intervals-icu-workouts/          # syntaxe du workout builder Intervals.icu (SKILL.md + reference/)
 # futur : app/(admin)/… , app/api/admin/… , src/services/…
 ```
 
@@ -63,6 +65,35 @@ src/
   (webhook.site) et resserrer si besoin.
 - **Outil d'envoi MCP** = `MessageSendText` (confirmé via `tools/list`), exige `sessionId`
   (UUID de session OpenWA) + `chatId` + `text` → géré dans le **prompt système de l'agent**.
+
+## Skills du Managed Agent
+
+`agent-skills/` regroupe les **skills attachées au Managed Agent Inigo** (au sens
+[Managed Agents Skills](https://platform.claude.com/docs/en/managed-agents/skills)). À ne pas
+confondre avec les skills de `/.claude/skills/`, qui sont consommées par Claude Code en local
+pour le développement de ce repo.
+
+- **`intervals-icu-workouts`** : apprend à l'agent la syntaxe du workout builder Intervals.icu.
+  Le texte rédigé va dans le champ `description` du tool MCP `create_or_update_event`
+  (`apps/intervals-icu-mcp`), avec un `type` (Ride/Run/Swim) cohérent avec la cible.
+
+Chaque skill est un dossier `SKILL.md` (+ `reference/`). Le cycle upload/attach est **manuel**
+(comme la session, le MCP et le vault) car l'agent est créé hors-repo :
+
+```bash
+# 1) zipper la skill
+(cd apps/coach/agent-skills && zip -r intervals-icu-workouts.zip intervals-icu-workouts)
+
+# 2) créer la skill → renvoie un skill_* id
+curl -X POST "https://api.anthropic.com/v1/skills" \
+  -H "x-api-key: $ANTHROPIC_API_KEY" \
+  -H "anthropic-version: 2023-06-01" \
+  -H "anthropic-beta: skills-2025-10-02" \
+  -F "files[]=@apps/coach/agent-skills/intervals-icu-workouts.zip"
+```
+
+Puis attacher `{"type":"custom","skill_id":"skill_…","version":"latest"}` au tableau `skills`
+de l'agent (max 20 skills/session). Re-zipper + re-`POST` publie une nouvelle version.
 
 ## Tests
 
