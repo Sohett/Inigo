@@ -85,7 +85,7 @@ const MACRO_PLAN = `# Macro-plan — Thomas · W28 → W38 (route vers Le Tour B
 ## 2. Plan semaine par semaine
 | Sem | Dates | Phase | Focus | TSS cible | CTL | Séances |
 |---|---|---|---|---|---|---|
-| **W28** | 7-13 juil | Build 1 — reprise | Relancer la structure | **440-500** | ~50 | VO2 |
+| **W28** | 7-13 juil | Build 1 — reprise / pré-camp | Relancer la structure | **440-500** | ~50 | VO2 |
 | **W29** | 13-19 juil | Camp Alpes | Gros volume | **560-680** | ~57 | cols |
 | **W30** | 27 juil-2 août | Absorption | Décharge | **360-440** | ~57 | spins |
 `;

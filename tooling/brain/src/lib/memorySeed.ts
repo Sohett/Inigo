@@ -251,9 +251,11 @@ function phaseTypeFrom(phase: string): PhaseType | null {
   const p = phase.toLowerCase();
   if (p.includes("taper")) return "taper";
   if (p.includes("absorption") || p.includes("deload")) return "transition";
+  // "build" before "camp": a "Build … pré-camp" week is a build week, while the
+  // real volume camps (W29 Alpes, W33 Languedoc) are labelled "Camp …" with no "build".
+  if (p.includes("build")) return "build";
   if (p.includes("camp")) return "base";
   if (p.includes("spécifique") || p.includes("specifique")) return "build";
-  if (p.includes("build")) return "build";
   return null;
 }
 
