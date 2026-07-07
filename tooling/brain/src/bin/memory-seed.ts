@@ -28,6 +28,11 @@ import { loadLocalEnv } from "../lib/util";
  *   ATHLETE_PHONE_NUM (required to --apply), ATHLETE_CHAT_ID, ATHLETE_SESSION_ID,
  *   ATHLETE_MANAGED_AGENT_ID, ATHLETE_DISPLAY_NAME (default "Thomas Sohet").
  * DATABASE_URL (Neon) is required to --apply.
+ *
+ * Recovery: the DB write is idempotent, so re-running --apply is always safe. If a
+ * --clear-store is interrupted mid-way (e.g. a sha guard trips on a concurrent
+ * edit), the data is already in Neon; delete any remaining migrated files by hand —
+ * a re-run would fail at parse time on the files already removed.
  */
 
 function maskPhone(phone: string | null): string {

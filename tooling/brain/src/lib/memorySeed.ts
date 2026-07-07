@@ -425,6 +425,8 @@ function parseAdaptationLog(md: string): SeedLog[] {
     const summary = fields["quoi"] ?? typeLabel.trim();
     const ref = fields["réf"] ?? fields["ref"] ?? "";
     entries.push({
+      // Most entries are day-granular; the few with a time are normalised to UTC
+      // (deliberate — journal metadata, exact wall-clock tz is not load-bearing).
       occurredAt: new Date(`${date}T${time ?? "00:00"}:00Z`),
       author: author.trim(),
       trigger: null,
@@ -571,6 +573,8 @@ export async function writeSeed(
       set: { ...data.profile, updatedAt: now }
     });
 
+  // Thresholds are historical (append-only): upsert on the natural key, never
+  // deleted. Re-running with the same history is a no-op; history only ever grows.
   for (const t of data.thresholds) {
     await db
       .insert(athleteThreshold)
@@ -589,7 +593,9 @@ export async function writeSeed(
   }
 
   // Keyless tables: clear-then-insert, scoped to this athlete. Order respects the
-  // FKs (adaptation_log/goal reference the plan; plan_block cascades from the plan).
+  // FKs: adaptation_log references training_plan and training_plan references goal
+  // (both ON DELETE set null), and plan_block cascades from training_plan — so we
+  // drop the journal, then the plan (blocks cascade), then goals, before re-inserting.
   await db.delete(adaptationLog).where(eq(adaptationLog.athleteId, athleteId));
   await db.delete(trainingPlan).where(eq(trainingPlan.athleteId, athleteId));
   await db.delete(goal).where(eq(goal.athleteId, athleteId));
@@ -654,7 +660,67 @@ export interface CompletenessReport {
   rows: CompletenessRow[];
 }
 
-/** Query Neon and confirm every parsed row landed. Gates the store clear. */
+/** Row counts (and profile-field presence) read back from Neon. */
+export interface CompletenessCounts {
+  profileRows: number;
+  profileHasCoachingTargets: boolean;
+  profileHasConstraintsNotes: boolean;
+  profileHasHealthNotes: boolean;
+  thresholds: number;
+  goals: number;
+  plans: number;
+  blocks: number;
+  logs: number;
+}
+
+/**
+ * Pure verdict: does what we read back from the DB match what we parsed? A field
+ * is only required when we actually parsed a value for it (so a store legitimately
+ * missing coaching targets is not a false "incomplete"). Kept separate from the DB
+ * reads so this safety-critical logic — the gate before the irreversible clear — is
+ * unit-testable without a live database.
+ */
+export function evaluateCompleteness(
+  actual: CompletenessCounts,
+  data: ParsedAthleteData
+): CompletenessReport {
+  const expectCoaching = data.profile.coachingTargets !== null;
+  const expectConstraintsNotes = data.profile.constraintsNotes.length > 0;
+  const expectHealthNotes = data.profile.healthNotes.length > 0;
+  const profileOk =
+    actual.profileRows === 1 &&
+    (!expectCoaching || actual.profileHasCoachingTargets) &&
+    (!expectConstraintsNotes || actual.profileHasConstraintsNotes) &&
+    (!expectHealthNotes || actual.profileHasHealthNotes);
+
+  const rows: CompletenessRow[] = [
+    { table: "athlete_profile", expected: 1, actual: actual.profileRows, ok: profileOk },
+    {
+      table: "athlete_threshold",
+      expected: data.thresholds.length,
+      actual: actual.thresholds,
+      ok: actual.thresholds === data.thresholds.length && actual.thresholds > 0
+    },
+    { table: "goal", expected: data.goals.length, actual: actual.goals, ok: actual.goals === data.goals.length },
+    { table: "training_plan", expected: 1, actual: actual.plans, ok: actual.plans === 1 },
+    {
+      table: "plan_block",
+      expected: data.plan.blocks.length,
+      actual: actual.blocks,
+      ok: actual.blocks === data.plan.blocks.length && actual.blocks > 0
+    },
+    {
+      table: "adaptation_log",
+      expected: data.logs.length,
+      actual: actual.logs,
+      ok: actual.logs === data.logs.length && actual.logs > 0
+    }
+  ];
+
+  return { ok: rows.every((r) => r.ok), rows };
+}
+
+/** Query Neon for the written row counts, then delegate the verdict to `evaluateCompleteness`. */
 export async function checkCompleteness(
   db: Db,
   athleteId: string,
@@ -690,37 +756,20 @@ export async function checkCompleteness(
     .from(adaptationLog)
     .where(eq(adaptationLog.athleteId, athleteId));
 
-  const profileOk =
-    profileRows.length === 1 &&
-    !!profile?.coachingTargets &&
-    !!profile?.constraintsNotes &&
-    !!profile?.healthNotes;
-
-  const rows: CompletenessRow[] = [
-    { table: "athlete_profile", expected: 1, actual: profileRows.length, ok: profileOk },
+  return evaluateCompleteness(
     {
-      table: "athlete_threshold",
-      expected: data.thresholds.length,
-      actual: thresholds.length,
-      ok: thresholds.length === data.thresholds.length && thresholds.length > 0
+      profileRows: profileRows.length,
+      profileHasCoachingTargets: !!profile?.coachingTargets,
+      profileHasConstraintsNotes: !!profile?.constraintsNotes,
+      profileHasHealthNotes: !!profile?.healthNotes,
+      thresholds: thresholds.length,
+      goals: goals.length,
+      plans: plans.length,
+      blocks: blocks.length,
+      logs: logs.length
     },
-    { table: "goal", expected: data.goals.length, actual: goals.length, ok: goals.length === data.goals.length },
-    { table: "training_plan", expected: 1, actual: plans.length, ok: plans.length === 1 },
-    {
-      table: "plan_block",
-      expected: data.plan.blocks.length,
-      actual: blocks.length,
-      ok: blocks.length === data.plan.blocks.length && blocks.length > 0
-    },
-    {
-      table: "adaptation_log",
-      expected: data.logs.length,
-      actual: logs.length,
-      ok: logs.length === data.logs.length && logs.length > 0
-    }
-  ];
-
-  return { ok: rows.every((r) => r.ok), rows };
+    data
+  );
 }
 
 // --- Clearing the migrated files (gated) ------------------------------------

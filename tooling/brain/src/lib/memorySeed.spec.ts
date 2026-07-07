@@ -4,8 +4,10 @@ import type { MemoryEntry } from "./memoryAudit";
 import {
   MIGRATED_PATHS,
   clearMigratedFiles,
+  evaluateCompleteness,
   parseAthleteStore,
-  planClear
+  planClear,
+  type CompletenessCounts
 } from "./memorySeed";
 
 /**
@@ -215,6 +217,48 @@ describe("planClear", () => {
       "/current-plan/week-2026-28.md",
       "/runtime/proposed-week.json"
     ]);
+  });
+});
+
+describe("evaluateCompleteness (the gate before the clear)", () => {
+  const data = parseAthleteStore(fullStore());
+  const fullCounts = (): CompletenessCounts => ({
+    profileRows: 1,
+    profileHasCoachingTargets: true,
+    profileHasConstraintsNotes: true,
+    profileHasHealthNotes: true,
+    thresholds: data.thresholds.length,
+    goals: data.goals.length,
+    plans: 1,
+    blocks: data.plan.blocks.length,
+    logs: data.logs.length
+  });
+
+  it("passes only when every count matches what was parsed", () => {
+    expect(evaluateCompleteness(fullCounts(), data).ok).toBe(true);
+  });
+
+  it("fails and flags the offending table when a count is short", () => {
+    const report = evaluateCompleteness({ ...fullCounts(), logs: data.logs.length - 1 }, data);
+    expect(report.ok).toBe(false);
+    expect(report.rows.find((r) => r.table === "adaptation_log")?.ok).toBe(false);
+  });
+
+  it("fails when the profile row is missing", () => {
+    expect(evaluateCompleteness({ ...fullCounts(), profileRows: 0 }, data).ok).toBe(false);
+  });
+
+  it("does not require coaching_targets when the source had none", () => {
+    const store = fullStore().map((m) =>
+      m.path === "/fitness-state.json" ? { ...m, content: "{}" } : m
+    );
+    const noTargets = parseAthleteStore(store);
+    expect(noTargets.profile.coachingTargets).toBeNull();
+    const report = evaluateCompleteness(
+      { ...fullCounts(), profileHasCoachingTargets: false },
+      noTargets
+    );
+    expect(report.ok).toBe(true);
   });
 });
 
