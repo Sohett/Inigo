@@ -13,7 +13,12 @@ export const configSchema = z.object({
    * Optional default agent to operate on (brain:pull, brain:agent:apply).
    * When unset, brain:pull snapshots every agent in the workspace.
    */
-  BRAIN_AGENT_ID: z.string().min(1).optional()
+  BRAIN_AGENT_ID: z.string().min(1).optional(),
+  /**
+   * Neon connection string. Optional here (only the seed writes to the DB); the
+   * seed bin requires it explicitly before any write. Never logged.
+   */
+  DATABASE_URL: z.string().min(1).optional()
 });
 
 export type BrainConfig = z.infer<typeof configSchema>;

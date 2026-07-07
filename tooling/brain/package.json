@@ -12,10 +12,13 @@
     "brain:memory:audit": "tsx src/bin/memory-audit.ts",
     "brain:skill:deploy": "tsx src/bin/skill-deploy.ts",
     "brain:agent:apply": "tsx src/bin/agent-apply.ts",
-    "brain:vault:cred:add": "tsx src/bin/vault-cred-add.ts"
+    "brain:vault:cred:add": "tsx src/bin/vault-cred-add.ts",
+    "brain:memory:seed": "tsx src/bin/memory-seed.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.107.0",
+    "@inigo/db": "workspace:*",
+    "drizzle-orm": "^0.44.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
