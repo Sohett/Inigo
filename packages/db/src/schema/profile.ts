@@ -41,7 +41,10 @@ export const athleteProfile = pgTable(
     healthNotes: text("health_notes"),
     /** Coaching config (peak event, CTL peak target, ramp max, TSB window). */
     coachingTargets: jsonb("coaching_targets").$type<CoachingTargets>(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date())
   },
   (t) => [
     check("athlete_profile_sex_check", sql`${t.sex} is null or ${t.sex} in ('M', 'F', 'other')`)

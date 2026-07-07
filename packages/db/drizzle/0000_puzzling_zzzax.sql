@@ -107,7 +107,8 @@ CREATE TABLE "plan_block" (
 	"focus" text,
 	"order_index" integer NOT NULL,
 	"weekly_targets" jsonb,
-	CONSTRAINT "plan_block_phase_type_check" CHECK ("plan_block"."phase_type" is null or "plan_block"."phase_type" in ('base', 'build', 'peak', 'taper', 'transition'))
+	CONSTRAINT "plan_block_phase_type_check" CHECK ("plan_block"."phase_type" is null or "plan_block"."phase_type" in ('base', 'build', 'peak', 'taper', 'transition')),
+	CONSTRAINT "plan_block_dates_check" CHECK ("plan_block"."end_date" >= "plan_block"."start_date")
 );
 --> statement-breakpoint
 CREATE TABLE "training_plan" (
@@ -122,7 +123,8 @@ CREATE TABLE "training_plan" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "training_plan_status_check" CHECK ("training_plan"."status" in ('draft', 'active', 'completed', 'archived')),
-	CONSTRAINT "training_plan_created_by_check" CHECK ("training_plan"."created_by" is null or "training_plan"."created_by" in ('ai', 'coach', 'system'))
+	CONSTRAINT "training_plan_created_by_check" CHECK ("training_plan"."created_by" is null or "training_plan"."created_by" in ('ai', 'coach', 'system')),
+	CONSTRAINT "training_plan_dates_check" CHECK ("training_plan"."end_date" >= "training_plan"."start_date")
 );
 --> statement-breakpoint
 CREATE TABLE "weekly_proposition" (

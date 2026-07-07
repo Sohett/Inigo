@@ -1,5 +1,5 @@
 {
-  "id": "51cbf51f-7a4b-4d65-b7a6-93bc56db80f6",
+  "id": "b57e875c-2c8e-46ab-a512-61b39396142b",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -844,6 +844,10 @@
         "plan_block_phase_type_check": {
           "name": "plan_block_phase_type_check",
           "value": "\"plan_block\".\"phase_type\" is null or \"plan_block\".\"phase_type\" in ('base', 'build', 'peak', 'taper', 'transition')"
+        },
+        "plan_block_dates_check": {
+          "name": "plan_block_dates_check",
+          "value": "\"plan_block\".\"end_date\" >= \"plan_block\".\"start_date\""
         }
       },
       "isRLSEnabled": false
@@ -973,6 +977,10 @@
         "training_plan_created_by_check": {
           "name": "training_plan_created_by_check",
           "value": "\"training_plan\".\"created_by\" is null or \"training_plan\".\"created_by\" in ('ai', 'coach', 'system')"
+        },
+        "training_plan_dates_check": {
+          "name": "training_plan_dates_check",
+          "value": "\"training_plan\".\"end_date\" >= \"training_plan\".\"start_date\""
         }
       },
       "isRLSEnabled": false

@@ -24,7 +24,10 @@ export const athleteCredential = pgTable(
     secretIv: bytea("secret_iv").notNull(),
     secretAuthTag: bytea("secret_auth_tag").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
     rotatedAt: timestamp("rotated_at", { withTimezone: true })
   },
   (t) => [

@@ -61,7 +61,8 @@ export async function setIntervalsKey(
         secretCiphertext: sealed.ciphertext,
         secretIv: sealed.iv,
         secretAuthTag: sealed.authTag,
-        rotatedAt: new Date()
+        rotatedAt: new Date(),
+        updatedAt: new Date()
       }
     });
 }

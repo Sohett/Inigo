@@ -33,7 +33,8 @@ export const trainingPlan = pgTable(
     check(
       "training_plan_created_by_check",
       sql`${t.createdBy} is null or ${t.createdBy} in ('ai', 'coach', 'system')`
-    )
+    ),
+    check("training_plan_dates_check", sql`${t.endDate} >= ${t.startDate}`)
   ]
 );
 
@@ -62,6 +63,7 @@ export const planBlock = pgTable(
     check(
       "plan_block_phase_type_check",
       sql`${t.phaseType} is null or ${t.phaseType} in ('base', 'build', 'peak', 'taper', 'transition')`
-    )
+    ),
+    check("plan_block_dates_check", sql`${t.endDate} >= ${t.startDate}`)
   ]
 );
