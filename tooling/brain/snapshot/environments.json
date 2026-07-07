@@ -1,0 +1,31 @@
+[
+  {
+    "id": "env_01AZaYzuAgRrayUXudep4dtG",
+    "type": "environment",
+    "name": "Inigo Cloud Env",
+    "description": "",
+    "created_at": "2026-06-30T12:51:19.215074Z",
+    "updated_at": "2026-07-03T16:56:26.097998Z",
+    "archived_at": null,
+    "state": "active",
+    "config": {
+      "type": "cloud",
+      "packages": {
+        "type": "packages",
+        "pip": [],
+        "npm": [],
+        "apt": [],
+        "cargo": [],
+        "gem": [],
+        "go": []
+      },
+      "networking": {
+        "type": "unrestricted"
+      },
+      "init_script": "",
+      "environment": {}
+    },
+    "metadata": {},
+    "scope": "organization"
+  }
+]

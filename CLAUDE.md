@@ -17,5 +17,9 @@ est spécifique à Claude Code.
 - **Skill `intervals-icu-api`** : avant d'ajouter, modifier ou vérifier un endpoint
   Intervals.icu, consulte ce skill (spec OpenAPI bundlée + recettes de requête). Ne devine
   jamais la forme d'un endpoint.
+- **Skill `managed-agents-api`** : avant de toucher au brain (Claude Managed Agents) — lire ou
+  mettre à jour un agent, gérer versions/sessions/environnements/vaults, auditer la mémoire,
+  déployer un skill d'agent — consulte ce skill (modèle objet, tables REST/`ant`/SDK, recettes).
+  L'outillage vit dans `tooling/brain/` (`@inigo/brain`) : lecture par défaut, écritures gated.
 - **Doc d'un service** : quand tu travailles dans `apps/<service>/`, l'`AGENTS.md` de ce
   dossier (chargé automatiquement) complète celui-ci avec les détails du service.

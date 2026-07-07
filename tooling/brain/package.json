@@ -1,0 +1,25 @@
+{
+  "name": "@inigo/brain",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Outillage dev local pour opérer le brain (Claude Managed Agents) : lecture d'archi, audit mémoire, deploy de skills, écritures gated.",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint .",
+    "brain:pull": "tsx src/bin/pull.ts",
+    "brain:memory:audit": "tsx src/bin/memory-audit.ts",
+    "brain:skill:deploy": "tsx src/bin/skill-deploy.ts",
+    "brain:agent:apply": "tsx src/bin/agent-apply.ts",
+    "brain:vault:cred:add": "tsx src/bin/vault-cred-add.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.107.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "msw": "^2.14.6",
+    "tsx": "^4.20.3"
+  }
+}

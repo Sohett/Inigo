@@ -28,10 +28,14 @@ apps/        # services déployables
   intervals-icu-mcp/   # @inigo/intervals-icu-mcp : serveur MCP Intervals.icu
   landing-page/        # @inigo/landing-page : landing one-page (Astro), leads WhatsApp
   coach/               # @inigo/coach : backend (Next.js), WhatsApp (OpenWA) vers le coach
+tooling/     # outillage dev local (ne ship pas)
+  brain/               # @inigo/brain : opérer le brain (Managed Agents) — pull, audit mémoire, deploy skills
+  agent-skills/        # skills attachées au Managed Agent (SKILL.md + reference/), déployées via @inigo/brain
 ```
 
 Chaque service est autonome : logique métier, client API, tests dans son propre dossier.
-Pas de `libs/` partagées à ce stade — tout vit dans le service qui en a besoin.
+Pas de `libs/` partagées à ce stade — tout vit dans le service qui en a besoin. `tooling/`
+regroupe l'outillage de dev (non déployé).
 
 ## Commandes
 

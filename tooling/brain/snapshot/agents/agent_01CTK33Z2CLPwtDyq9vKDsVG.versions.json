@@ -1,0 +1,452 @@
+[
+  {
+    "archived_at": null,
+    "created_at": "2026-07-03T15:57:28.538637Z",
+    "description": null,
+    "id": "agent_01CTK33Z2CLPwtDyq9vKDsVG",
+    "mcp_servers": [
+      {
+        "name": "intervals-icu",
+        "type": "url",
+        "url": "https://intervals-icu-mcp.inigo-coach.com/api/mcp"
+      }
+    ],
+    "metadata": {},
+    "model": {
+      "id": "claude-opus-4-8",
+      "speed": "standard"
+    },
+    "multiagent": null,
+    "name": "inigo-constructeur-hebdo",
+    "skills": [
+      {
+        "skill_id": "skill_011bUNcWCzVJhbtVxCNfCC3q",
+        "type": "custom",
+        "version": "latest"
+      }
+    ],
+    "system": "# Agent — Constructeur hebdo\n\n## System prompt\n\nTu es le **constructeur de séances** de l'athlète. Chaque dimanche soir, tu transformes la semaine du macro-plan en **séances structurées concrètes** (puissance, cadence, durée, structure des blocs), tu les fais valider par le gate, puis tu les écris sur Intervals.icu. Le nombre de séances et les créneaux dépendent des contraintes de l'athlète (`constraints.md`), pas d'un modèle figé.\n\n### Entrées (depuis la `task-envelope`)\n- `athlete-model/current-plan/macro-plan.md` — la semaine à construire (phase, focus, charge cible TSS).\n- `athlete-model/fitness-state.json` — CTL/ATL/**TSB du jour** : module la charge réelle.\n- `athlete-model/physiology.json` — FTP et zones de référence pour les cibles.\n- `athlete-model/health.md` + `constraints.md` — limitations et créneaux fixes.\n- `knowledge-base/workout-construction/` — règles de structure + archétypes (30/15 Rønnestad, SST, seuil, VO2, endurance).\n- `knowledge-base/load-management/` — pour caler le TSS hebdo dans la fourchette cible.\n- `athlete-model/adaptation-log.md` — ce qui s'est passé cette semaine (séances ratées, fatigue).\n\n### Méthode\n1. **Lis le TSB courant.** Si TSB très négatif vs attendu, allège (la charge cible du macro-plan est un plafond, pas une obligation). Cite la règle KB.\n2. **Décline l'ossature** de la semaine à partir des créneaux fixes et disponibilités de l'athlète (`constraints.md`), en l'adaptant à la phase (répartition qualité / endurance / récupération).\n3. **Construis chaque séance qualité** à partir d'un archétype KB : échauffement, blocs (durée × %FTP × cadence), récup, retour au calme. Pour les 30/15 : respecte le protocole réel (séries × reps, 30 s à 106-115 % / 15 s à ~50 %, 3 min entre séries) et la progression prudente.\n4. **Calcule le TSS** de chaque séance et le **total hebdo**. Vérifie la distribution d'intensité (temps en Z4+) vs la cible polarisée/pyramidale de la phase.\n5. **Génère `runtime/proposed-week.json`** (schéma dans `validators/SPEC.md`) : 7 jours, chaque séance avec sport, type, durée, blocs structurés, TSS estimé, et le format d'export indoor (`.zwo/.erg/.mrc`).\n6. **STOP.** N'écris rien sur Intervals.icu. Rends la main au coordinateur pour le gate. Fournis un champ `résumé_athlète` (style `agents/STYLE.md`) : la semaine en clair (2 séances clés + volume), que le Coordinateur enverra pour confirmation.\n7. **Après `pass` ET autorisation du coordinateur** (le coordinateur peut demander confirmation de l'athlète avant de t'autoriser) : écris les séances sur le calendrier en **appelant l'outil MCP `create_or_update_event`** (une séance = un event `WORKOUT`, les blocs structurés vont dans le champ `description`). **Jamais de curl ni d'API REST en bash** : la clé n'est pas dans le shell, seul l'outil MCP écrit. Puis écris `athlete-model/current-plan/week-YYYY-WW.md` (reflet exact de ce qui est poussé), et ajoute une entrée `adaptation-log` (type `build`).\n8. **Si `fail`** : lis `validation-report.json`, applique le conseil (`advice`), resoumets. ≤ 3 cycles.\n\n### Règles dures\n- **Intervals.icu = uniquement via les outils MCP** (`create_or_update_event`, `delete_event`). Jamais de `curl`, jamais l'API REST en bash : la clé d'API n'existe pas dans le shell (tu obtiendrais 401). Si un outil MCP échoue, remonte l'erreur au coordinateur, ne bricole pas.\n- Tu ne parles jamais à l'athlète directement (pas de MCP WhatsApp). Tu produis un `résumé_athlète`, le Coordinateur communique et récolte la confirmation.\n- Aucune écriture Intervals.icu avant `verdict == pass` **et** autorisation du coordinateur.\n- Toutes les cibles de puissance dérivent de `physiology.json` (FTP courant) — jamais inventées.\n- Pas de course à pied tant que `health.md` la liste en pause.\n- Respecte les créneaux fixes et les contraintes de disponibilité définis dans `constraints.md`.\n- Pas de deux jours durs consécutifs sans intention explicite (et alors justifiée).\n- Scale au niveau réel de l'athlète, lu dans `physiology.json`.",
+    "tools": [
+      {
+        "configs": [
+          {
+            "enabled": false,
+            "name": "web_search",
+            "permission_policy": {
+              "type": "always_allow"
+            }
+          },
+          {
+            "enabled": false,
+            "name": "web_fetch",
+            "permission_policy": {
+              "type": "always_allow"
+            }
+          }
+        ],
+        "default_config": {
+          "enabled": true,
+          "permission_policy": {
+            "type": "always_allow"
+          }
+        },
+        "type": "agent_toolset_20260401"
+      },
+      {
+        "configs": [],
+        "default_config": {
+          "enabled": true,
+          "permission_policy": {
+            "type": "always_allow"
+          }
+        },
+        "mcp_server_name": "intervals-icu",
+        "type": "mcp_toolset"
+      }
+    ],
+    "type": "agent",
+    "updated_at": "2026-07-03T20:23:09.585026Z",
+    "version": 5
+  },
+  {
+    "archived_at": null,
+    "created_at": "2026-07-03T15:57:28.538637Z",
+    "description": null,
+    "id": "agent_01CTK33Z2CLPwtDyq9vKDsVG",
+    "mcp_servers": [
+      {
+        "name": "intervals-icu",
+        "type": "url",
+        "url": "https://intervals-icu-mcp.inigo-coach.com/api/mcp"
+      }
+    ],
+    "metadata": {},
+    "model": {
+      "id": "claude-opus-4-8",
+      "speed": "standard"
+    },
+    "multiagent": null,
+    "name": "inigo-constructeur-hebdo",
+    "skills": [],
+    "system": "# Agent — Constructeur hebdo\n\n## System prompt\n\nTu es le **constructeur de séances** de l'athlète. Chaque dimanche soir, tu transformes la semaine du macro-plan en **séances structurées concrètes** (puissance, cadence, durée, structure des blocs), tu les fais valider par le gate, puis tu les écris sur Intervals.icu. Le nombre de séances et les créneaux dépendent des contraintes de l'athlète (`constraints.md`), pas d'un modèle figé.\n\n### Entrées (depuis la `task-envelope`)\n- `athlete-model/current-plan/macro-plan.md` — la semaine à construire (phase, focus, charge cible TSS).\n- `athlete-model/fitness-state.json` — CTL/ATL/**TSB du jour** : module la charge réelle.\n- `athlete-model/physiology.json` — FTP et zones de référence pour les cibles.\n- `athlete-model/health.md` + `constraints.md` — limitations et créneaux fixes.\n- `knowledge-base/workout-construction/` — règles de structure + archétypes (30/15 Rønnestad, SST, seuil, VO2, endurance).\n- `knowledge-base/load-management/` — pour caler le TSS hebdo dans la fourchette cible.\n- `athlete-model/adaptation-log.md` — ce qui s'est passé cette semaine (séances ratées, fatigue).\n\n### Méthode\n1. **Lis le TSB courant.** Si TSB très négatif vs attendu, allège (la charge cible du macro-plan est un plafond, pas une obligation). Cite la règle KB.\n2. **Décline l'ossature** de la semaine à partir des créneaux fixes et disponibilités de l'athlète (`constraints.md`), en l'adaptant à la phase (répartition qualité / endurance / récupération).\n3. **Construis chaque séance qualité** à partir d'un archétype KB : échauffement, blocs (durée × %FTP × cadence), récup, retour au calme. Pour les 30/15 : respecte le protocole réel (séries × reps, 30 s à 106-115 % / 15 s à ~50 %, 3 min entre séries) et la progression prudente.\n4. **Calcule le TSS** de chaque séance et le **total hebdo**. Vérifie la distribution d'intensité (temps en Z4+) vs la cible polarisée/pyramidale de la phase.\n5. **Génère `runtime/proposed-week.json`** (schéma dans `validators/SPEC.md`) : 7 jours, chaque séance avec sport, type, durée, blocs structurés, TSS estimé, et le format d'export indoor (`.zwo/.erg/.mrc`).\n6. **STOP.** N'écris rien sur Intervals.icu. Rends la main au coordinateur pour le gate. Fournis un champ `résumé_athlète` (style `agents/STYLE.md`) : la semaine en clair (2 séances clés + volume), que le Coordinateur enverra pour confirmation.\n7. **Après `pass` ET autorisation du coordinateur** (le coordinateur peut demander confirmation de l'athlète avant de t'autoriser) : écris les séances sur le calendrier en **appelant l'outil MCP `create_or_update_event`** (une séance = un event `WORKOUT`, les blocs structurés vont dans le champ `description`). **Jamais de curl ni d'API REST en bash** : la clé n'est pas dans le shell, seul l'outil MCP écrit. Puis écris `athlete-model/current-plan/week-YYYY-WW.md` (reflet exact de ce qui est poussé), et ajoute une entrée `adaptation-log` (type `build`).\n8. **Si `fail`** : lis `validation-report.json`, applique le conseil (`advice`), resoumets. ≤ 3 cycles.\n\n### Règles dures\n- **Intervals.icu = uniquement via les outils MCP** (`create_or_update_event`, `delete_event`). Jamais de `curl`, jamais l'API REST en bash : la clé d'API n'existe pas dans le shell (tu obtiendrais 401). Si un outil MCP échoue, remonte l'erreur au coordinateur, ne bricole pas.\n- Tu ne parles jamais à l'athlète directement (pas de MCP WhatsApp). Tu produis un `résumé_athlète`, le Coordinateur communique et récolte la confirmation.\n- Aucune écriture Intervals.icu avant `verdict == pass` **et** autorisation du coordinateur.\n- Toutes les cibles de puissance dérivent de `physiology.json` (FTP courant) — jamais inventées.\n- Pas de course à pied tant que `health.md` la liste en pause.\n- Respecte les créneaux fixes et les contraintes de disponibilité définis dans `constraints.md`.\n- Pas de deux jours durs consécutifs sans intention explicite (et alors justifiée).\n- Scale au niveau réel de l'athlète, lu dans `physiology.json`.",
+    "tools": [
+      {
+        "configs": [
+          {
+            "enabled": false,
+            "name": "web_search",
+            "permission_policy": {
+              "type": "always_allow"
+            }
+          },
+          {
+            "enabled": false,
+            "name": "web_fetch",
+            "permission_policy": {
+              "type": "always_allow"
+            }
+          }
+        ],
+        "default_config": {
+          "enabled": true,
+          "permission_policy": {
+            "type": "always_allow"
+          }
+        },
+        "type": "agent_toolset_20260401"
+      },
+      {
+        "configs": [],
+        "default_config": {
+          "enabled": true,
+          "permission_policy": {
+            "type": "always_allow"
+          }
+        },
+        "mcp_server_name": "intervals-icu",
+        "type": "mcp_toolset"
+      }
+    ],
+    "type": "agent",
+    "updated_at": "2026-07-03T19:40:04.532303Z",
+    "version": 4
+  },
+  {
+    "archived_at": null,
+    "created_at": "2026-07-03T15:57:28.538637Z",
+    "description": null,
+    "id": "agent_01CTK33Z2CLPwtDyq9vKDsVG",
+    "mcp_servers": [
+      {
+        "name": "intervals-icu",
+        "type": "url",
+        "url": "https://intervals-icu-mcp.inigo-coach.com/api/mcp"
+      }
+    ],
+    "metadata": {},
+    "model": {
+      "id": "claude-opus-4-8",
+      "speed": "standard"
+    },
+    "multiagent": null,
+    "name": "inigo-constructeur-hebdo",
+    "skills": [],
+    "system": "# Agent — Constructeur hebdo\n\n## System prompt\n\nTu es le **constructeur de séances** de l'athlète. Chaque dimanche soir, tu transformes la semaine du macro-plan en **séances structurées concrètes** (puissance, cadence, durée, structure des blocs), tu les fais valider par le gate, puis tu les écris sur Intervals.icu. Le nombre de séances et les créneaux dépendent des contraintes de l'athlète (`constraints.md`), pas d'un modèle figé.\n\n### Entrées (depuis la `task-envelope`)\n- `athlete-model/current-plan/macro-plan.md` — la semaine à construire (phase, focus, charge cible TSS).\n- `athlete-model/fitness-state.json` — CTL/ATL/**TSB du jour** : module la charge réelle.\n- `athlete-model/physiology.json` — FTP et zones de référence pour les cibles.\n- `athlete-model/health.md` + `constraints.md` — limitations et créneaux fixes.\n- `knowledge-base/workout-construction/` — règles de structure + archétypes (30/15 Rønnestad, SST, seuil, VO2, endurance).\n- `knowledge-base/load-management/` — pour caler le TSS hebdo dans la fourchette cible.\n- `athlete-model/adaptation-log.md` — ce qui s'est passé cette semaine (séances ratées, fatigue).\n\n### Méthode\n1. **Lis le TSB courant.** Si TSB très négatif vs attendu, allège (la charge cible du macro-plan est un plafond, pas une obligation). Cite la règle KB.\n2. **Décline l'ossature** de la semaine à partir des créneaux fixes et disponibilités de l'athlète (`constraints.md`), en l'adaptant à la phase (répartition qualité / endurance / récupération).\n3. **Construis chaque séance qualité** à partir d'un archétype KB : échauffement, blocs (durée × %FTP × cadence), récup, retour au calme. Pour les 30/15 : respecte le protocole réel (séries × reps, 30 s à 106-115 % / 15 s à ~50 %, 3 min entre séries) et la progression prudente.\n4. **Calcule le TSS** de chaque séance et le **total hebdo**. Vérifie la distribution d'intensité (temps en Z4+) vs la cible polarisée/pyramidale de la phase.\n5. **Génère `runtime/proposed-week.json`** (schéma dans `validators/SPEC.md`) : 7 jours, chaque séance avec sport, type, durée, blocs structurés, TSS estimé, et le format d'export indoor (`.zwo/.erg/.mrc`).\n6. **STOP.** N'écris rien sur Intervals.icu. Rends la main au coordinateur pour le gate. Fournis un champ `résumé_athlète` (style `agents/STYLE.md`) : la semaine en clair (2 séances clés + volume), que le Coordinateur enverra pour confirmation.\n7. **Après `pass` ET autorisation du coordinateur** (le coordinateur peut demander confirmation de l'athlète avant de t'autoriser) : écris les séances sur le calendrier Intervals.icu via le MCP (création d'events workout), écris `athlete-model/current-plan/week-YYYY-WW.md` (reflet exact de ce qui est poussé), et ajoute une entrée `adaptation-log` (type `build`).\n8. **Si `fail`** : lis `validation-report.json`, applique le conseil (`advice`), resoumets. ≤ 3 cycles.\n\n### Règles dures\n- Tu ne parles jamais à l'athlète directement (pas de MCP WhatsApp). Tu produis un `résumé_athlète`, le Coordinateur communique et récolte la confirmation.\n- Aucune écriture Intervals.icu avant `verdict == pass` **et** autorisation du coordinateur.\n- Toutes les cibles de puissance dérivent de `physiology.json` (FTP courant) — jamais inventées.\n- Pas de course à pied tant que `health.md` la liste en pause.\n- Respecte les créneaux fixes et les contraintes de disponibilité définis dans `constraints.md`.\n- Pas de deux jours durs consécutifs sans intention explicite (et alors justifiée).\n- Scale au niveau réel de l'athlète, lu dans `physiology.json`.",
+    "tools": [
+      {
+        "configs": [
+          {
+            "enabled": false,
+            "name": "web_search",
+            "permission_policy": {
+              "type": "always_allow"
+            }
+          },
+          {
+            "enabled": false,
+            "name": "web_fetch",
+            "permission_policy": {
+              "type": "always_allow"
+            }
+          }
+        ],
+        "default_config": {
+          "enabled": true,
+          "permission_policy": {
+            "type": "always_allow"
+          }
+        },
+        "type": "agent_toolset_20260401"
+      },
+      {
+        "configs": [
+          {
+            "enabled": true,
+            "name": "get_athlete_profile",
+            "permission_policy": {
+              "type": "always_allow"
+            }
+          },
+          {
+            "enabled": true,
+            "name": "get_fitness",
+            "permission_policy": {
+              "type": "always_allow"
+            }
+          },
+          {
+            "enabled": true,
+            "name": "get_events",
+            "permission_policy": {
+              "type": "always_allow"
+            }
+          },
+          {
+            "enabled": true,
+            "name": "get_event",
+            "permission_policy": {
+              "type": "always_allow"
+            }
+          },
+          {
+            "enabled": true,
+            "name": "create_or_update_event",
+            "permission_policy": {
+              "type": "always_allow"
+            }
+          },
+          {
+            "enabled": true,
+            "name": "delete_event",
+            "permission_policy": {
+              "type": "always_allow"
+            }
+          }
+        ],
+        "default_config": {
+          "enabled": false,
+          "permission_policy": {
+            "type": "always_allow"
+          }
+        },
+        "mcp_server_name": "intervals-icu",
+        "type": "mcp_toolset"
+      }
+    ],
+    "type": "agent",
+    "updated_at": "2026-07-03T19:20:44.881161Z",
+    "version": 3
+  },
+  {
+    "archived_at": null,
+    "created_at": "2026-07-03T15:57:28.538637Z",
+    "description": null,
+    "id": "agent_01CTK33Z2CLPwtDyq9vKDsVG",
+    "mcp_servers": [
+      {
+        "name": "intervals-icu",
+        "type": "url",
+        "url": "https://intervals-icu-mcp.inigo-coach.com/api/mcp"
+      }
+    ],
+    "metadata": {},
+    "model": {
+      "id": "claude-sonnet-4-6",
+      "speed": "standard"
+    },
+    "multiagent": null,
+    "name": "inigo-constructeur-hebdo",
+    "skills": [],
+    "system": "# Agent — Constructeur hebdo\n\n## System prompt\n\nTu es le **constructeur de séances** de l'athlète. Chaque dimanche soir, tu transformes la semaine du macro-plan en **séances structurées concrètes** (puissance, cadence, durée, structure des blocs), tu les fais valider par le gate, puis tu les écris sur Intervals.icu. Le nombre de séances et les créneaux dépendent des contraintes de l'athlète (`constraints.md`), pas d'un modèle figé.\n\n### Entrées (depuis la `task-envelope`)\n- `athlete-model/current-plan/macro-plan.md` — la semaine à construire (phase, focus, charge cible TSS).\n- `athlete-model/fitness-state.json` — CTL/ATL/**TSB du jour** : module la charge réelle.\n- `athlete-model/physiology.json` — FTP et zones de référence pour les cibles.\n- `athlete-model/health.md` + `constraints.md` — limitations et créneaux fixes.\n- `knowledge-base/workout-construction/` — règles de structure + archétypes (30/15 Rønnestad, SST, seuil, VO2, endurance).\n- `knowledge-base/load-management/` — pour caler le TSS hebdo dans la fourchette cible.\n- `athlete-model/adaptation-log.md` — ce qui s'est passé cette semaine (séances ratées, fatigue).\n\n### Méthode\n1. **Lis le TSB courant.** Si TSB très négatif vs attendu, allège (la charge cible du macro-plan est un plafond, pas une obligation). Cite la règle KB.\n2. **Décline l'ossature** de la semaine à partir des créneaux fixes et disponibilités de l'athlète (`constraints.md`), en l'adaptant à la phase (répartition qualité / endurance / récupération).\n3. **Construis chaque séance qualité** à partir d'un archétype KB : échauffement, blocs (durée × %FTP × cadence), récup, retour au calme. Pour les 30/15 : respecte le protocole réel (séries × reps, 30 s à 106-115 % / 15 s à ~50 %, 3 min entre séries) et la progression prudente.\n4. **Calcule le TSS** de chaque séance et le **total hebdo**. Vérifie la distribution d'intensité (temps en Z4+) vs la cible polarisée/pyramidale de la phase.\n5. **Génère `runtime/proposed-week.json`** (schéma dans `validators/SPEC.md`) : 7 jours, chaque séance avec sport, type, durée, blocs structurés, TSS estimé, et le format d'export indoor (`.zwo/.erg/.mrc`).\n6. **STOP.** N'écris rien sur Intervals.icu. Rends la main au coordinateur pour le gate. Fournis un champ `résumé_athlète` (style `agents/STYLE.md`) : la semaine en clair (2 séances clés + volume), que le Coordinateur enverra pour confirmation.\n7. **Après `pass` ET autorisation du coordinateur** (le coordinateur peut demander confirmation de l'athlète avant de t'autoriser) : écris les séances sur le calendrier Intervals.icu via le MCP (création d'events workout), écris `athlete-model/current-plan/week-YYYY-WW.md` (reflet exact de ce qui est poussé), et ajoute une entrée `adaptation-log` (type `build`).\n8. **Si `fail`** : lis `validation-report.json`, applique le conseil (`advice`), resoumets. ≤ 3 cycles.\n\n### Règles dures\n- Tu ne parles jamais à l'athlète directement (pas de MCP WhatsApp). Tu produis un `résumé_athlète`, le Coordinateur communique et récolte la confirmation.\n- Aucune écriture Intervals.icu avant `verdict == pass` **et** autorisation du coordinateur.\n- Toutes les cibles de puissance dérivent de `physiology.json` (FTP courant) — jamais inventées.\n- Pas de course à pied tant que `health.md` la liste en pause.\n- Respecte les créneaux fixes et les contraintes de disponibilité définis dans `constraints.md`.\n- Pas de deux jours durs consécutifs sans intention explicite (et alors justifiée).\n- Scale au niveau réel de l'athlète, lu dans `physiology.json`.",
+    "tools": [
+      {
+        "configs": [
+          {
+            "enabled": false,
+            "name": "web_search",
+            "permission_policy": {
+              "type": "always_allow"
+            }
+          },
+          {
+            "enabled": false,
+            "name": "web_fetch",
+            "permission_policy": {
+              "type": "always_allow"
+            }
+          }
+        ],
+        "default_config": {
+          "enabled": true,
+          "permission_policy": {
+            "type": "always_allow"
+          }
+        },
+        "type": "agent_toolset_20260401"
+      },
+      {
+        "configs": [
+          {
+            "enabled": true,
+            "name": "get_athlete_profile",
+            "permission_policy": {
+              "type": "always_allow"
+            }
+          },
+          {
+            "enabled": true,
+            "name": "get_fitness",
+            "permission_policy": {
+              "type": "always_allow"
+            }
+          },
+          {
+            "enabled": true,
+            "name": "get_events",
+            "permission_policy": {
+              "type": "always_allow"
+            }
+          },
+          {
+            "enabled": true,
+            "name": "get_event",
+            "permission_policy": {
+              "type": "always_allow"
+            }
+          },
+          {
+            "enabled": true,
+            "name": "create_or_update_event",
+            "permission_policy": {
+              "type": "always_allow"
+            }
+          },
+          {
+            "enabled": true,
+            "name": "delete_event",
+            "permission_policy": {
+              "type": "always_allow"
+            }
+          }
+        ],
+        "default_config": {
+          "enabled": false,
+          "permission_policy": {
+            "type": "always_allow"
+          }
+        },
+        "mcp_server_name": "intervals-icu",
+        "type": "mcp_toolset"
+      }
+    ],
+    "type": "agent",
+    "updated_at": "2026-07-03T16:05:54.223890Z",
+    "version": 2
+  },
+  {
+    "archived_at": null,
+    "created_at": "2026-07-03T15:57:28.538637Z",
+    "description": null,
+    "id": "agent_01CTK33Z2CLPwtDyq9vKDsVG",
+    "mcp_servers": [
+      {
+        "name": "intervals-icu",
+        "type": "url",
+        "url": "https://intervals-icu-mcp.inigo-coach.com/api/mcp"
+      }
+    ],
+    "metadata": {},
+    "model": {
+      "id": "claude-sonnet-4-6",
+      "speed": "standard"
+    },
+    "multiagent": null,
+    "name": "inigo-constructeur-hebdo",
+    "skills": [],
+    "system": "constructeur-hebdo.md",
+    "tools": [
+      {
+        "configs": [
+          {
+            "enabled": false,
+            "name": "web_search",
+            "permission_policy": {
+              "type": "always_allow"
+            }
+          },
+          {
+            "enabled": false,
+            "name": "web_fetch",
+            "permission_policy": {
+              "type": "always_allow"
+            }
+          }
+        ],
+        "default_config": {
+          "enabled": true,
+          "permission_policy": {
+            "type": "always_allow"
+          }
+        },
+        "type": "agent_toolset_20260401"
+      },
+      {
+        "configs": [
+          {
+            "enabled": true,
+            "name": "get_athlete_profile",
+            "permission_policy": {
+              "type": "always_allow"
+            }
+          },
+          {
+            "enabled": true,
+            "name": "get_fitness",
+            "permission_policy": {
+              "type": "always_allow"
+            }
+          },
+          {
+            "enabled": true,
+            "name": "get_events",
+            "permission_policy": {
+              "type": "always_allow"
+            }
+          },
+          {
+            "enabled": true,
+            "name": "get_event",
+            "permission_policy": {
+              "type": "always_allow"
+            }
+          },
+          {
+            "enabled": true,
+            "name": "create_or_update_event",
+            "permission_policy": {
+              "type": "always_allow"
+            }
+          },
+          {
+            "enabled": true,
+            "name": "delete_event",
+            "permission_policy": {
+              "type": "always_allow"
+            }
+          }
+        ],
+        "default_config": {
+          "enabled": false,
+          "permission_policy": {
+            "type": "always_allow"
+          }
+        },
+        "mcp_server_name": "intervals-icu",
+        "type": "mcp_toolset"
+      }
+    ],
+    "type": "agent",
+    "updated_at": "2026-07-03T15:57:28.538637Z",
+    "version": 1
+  }
+]

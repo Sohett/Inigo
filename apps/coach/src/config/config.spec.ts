@@ -3,7 +3,9 @@ import { loadConfig } from "./config";
 
 const base: Record<string, string> = {
   ANTHROPIC_API_KEY: "sk-ant-xxx",
-  ANTHROPIC_SESSION_ID: "sesn_123"
+  ANTHROPIC_SESSION_ID: "sesn_123",
+  DATABASE_URL: "postgresql://user:pass@host/db?sslmode=require",
+  DB_ENCRYPTION_KEY: Buffer.alloc(32).toString("base64")
 };
 
 describe("loadConfig", () => {
@@ -11,6 +13,19 @@ describe("loadConfig", () => {
     const config = loadConfig(base);
     expect(config.ANTHROPIC_SESSION_ID).toBe("sesn_123");
     expect(config.WHATSAPP_WEBHOOK_SECRET).toBeUndefined();
+    expect(config.DATABASE_URL).toContain("postgresql://");
+  });
+
+  it("throws when DATABASE_URL is missing", () => {
+    const { DATABASE_URL, ...rest } = base;
+    void DATABASE_URL;
+    expect(() => loadConfig(rest)).toThrow(/DATABASE_URL/);
+  });
+
+  it("throws when DB_ENCRYPTION_KEY is not a 32-byte base64 key", () => {
+    expect(() => loadConfig({ ...base, DB_ENCRYPTION_KEY: Buffer.alloc(16).toString("base64") })).toThrow(
+      /DB_ENCRYPTION_KEY/
+    );
   });
 
   it("accepts an optional webhook secret", () => {

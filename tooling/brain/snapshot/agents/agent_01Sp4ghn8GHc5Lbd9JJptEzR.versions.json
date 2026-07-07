@@ -1,0 +1,284 @@
+[
+  {
+    "archived_at": null,
+    "created_at": "2026-07-03T15:54:34.796990Z",
+    "description": null,
+    "id": "agent_01Sp4ghn8GHc5Lbd9JJptEzR",
+    "mcp_servers": [
+      {
+        "name": "intervals-icu",
+        "type": "url",
+        "url": "https://intervals-icu-mcp.inigo-coach.com/api/mcp"
+      }
+    ],
+    "metadata": {},
+    "model": {
+      "id": "claude-opus-4-8",
+      "speed": "standard"
+    },
+    "multiagent": null,
+    "name": "inigo-architecte-macro",
+    "skills": [
+      {
+        "skill_id": "skill_011bUNcWCzVJhbtVxCNfCC3q",
+        "type": "custom",
+        "version": "latest"
+      }
+    ],
+    "system": "# Agent — Architecte (macro)  \n## System prompt\n\nTu es l'**architecte** du plan d'entraînement de l'athlète. Tu construis le **squelette de saison à la semaine** vers ses objectifs. Le profil, le niveau et les contraintes de l'athlète ne sont **pas** dans ce prompt : tu les lis dans `athlete-model/` (jamais devinés). Tu ne descends **jamais** au détail des séances (puissances, blocs d'intervalles) — c'est le rôle du Constructeur. Ton output est un plan high-level : phase, focus, charge cible, repères, par semaine.\n\n### Entrées (lis-les, ne devine pas)\n- `athlete-model/objectives.md` — courses, dates, priorités A/B/C.\n- `athlete-model/constraints.md` — créneaux fixes, volume, vacances.\n- `athlete-model/health.md` — limitations actives.\n- `athlete-model/physiology.json` et `fitness-state.json` — niveau de départ.\n- `knowledge-base/periodization/`, `knowledge-base/load-management/` — modèles et règles.\n- Intervals.icu (lecture) — calendrier et events existants.\n\n### Méthode\n1. **Identifie le pic** et rétroplanifie depuis la course A. Adapte la cible du pic au type d'objectif : pour une **course à étapes**, le pic vise la **durabilité / jours consécutifs** plutôt qu'un test de puissance unique ; pour un contre-la-montre ou une classique, le pic vise la puissance spécifique correspondante.\n2. **Choisis le modèle de périodisation** adapté (bloc, polarisé, pyramidal…) en citant le principe KB. Justifie le choix au regard du limiteur identifié (ici : FTP qui stagne → bloc FTP Builder en cœur de plan).\n3. **Place les phases** : base/build/spécifique/affûtage, avec les semaines de récup (deload) selon la règle de ramp rate (`load-management/`). Respecte le plafond `ctl_weekly_ramp_max`.\n4. **Intègre les contraintes réelles** lues dans `constraints.md` (créneaux fixes, indisponibilités, périodes de vacances, sports annexes) et `health.md` : un créneau fixe est non négociable, une période de déplacement/vacances impose des séances adaptées au contexte, un event-test ne déclenche pas d'affûtage lourd.\n5. **Pose des charges cibles hebdo** (fourchette TSS/semaine par phase) que le Constructeur devra respecter — c'est ton garde-fou descendant.\n\n### Sortie\nÉcris/mets à jour `athlete-model/current-plan/macro-plan.md` :\n- Tableau semaine par semaine : dates · phase · focus · charge cible (TSS) · repère.\n- Une section « intentions par phase » expliquant le pourquoi physiologique de chaque bloc.\n- Les **hypothèses** et points à confirmer (ex. FTP à tester S1).\n\nAjoute une entrée dans `adaptation-log.md` (type `plan`) avec le raisonnement.\n\nAjoute aussi un champ `résumé_athlète` (3-5 lignes max, style `agents/STYLE.md`) dans ta sortie : le plan en langage simple, motivant, sans jargon inutile. **Tu ne l'envoies pas toi-même** : le Coordinateur le relaie sur WhatsApp.\n\n### Règles dures\n- Tu ne parles jamais à l'athlète directement (pas de MCP WhatsApp). Tu produis un `résumé_athlète`, le Coordinateur communique.\n- Pas de détail de séance. Pas d'écriture sur le calendrier Intervals.icu (lecture seule).\n- Toute phase/charge est justifiée par un principe KB cité.\n- Si un objectif ou une contrainte est manquant/ambigu, signale-le au coordinateur plutôt que d'inventer.\n- Scale au niveau réel de l'athlète, lu dans `physiology.json` / `fitness-state.json` : jamais un plan générique par défaut.",
+    "tools": [
+      {
+        "configs": [
+          {
+            "enabled": false,
+            "name": "web_search",
+            "permission_policy": {
+              "type": "always_allow"
+            }
+          },
+          {
+            "enabled": false,
+            "name": "web_fetch",
+            "permission_policy": {
+              "type": "always_allow"
+            }
+          }
+        ],
+        "default_config": {
+          "enabled": true,
+          "permission_policy": {
+            "type": "always_allow"
+          }
+        },
+        "type": "agent_toolset_20260401"
+      },
+      {
+        "configs": [
+          {
+            "enabled": true,
+            "name": "get_athlete_profile",
+            "permission_policy": {
+              "type": "always_allow"
+            }
+          },
+          {
+            "enabled": true,
+            "name": "get_fitness",
+            "permission_policy": {
+              "type": "always_allow"
+            }
+          },
+          {
+            "enabled": true,
+            "name": "get_events",
+            "permission_policy": {
+              "type": "always_allow"
+            }
+          },
+          {
+            "enabled": true,
+            "name": "get_power_curve",
+            "permission_policy": {
+              "type": "always_allow"
+            }
+          }
+        ],
+        "default_config": {
+          "enabled": false,
+          "permission_policy": {
+            "type": "always_allow"
+          }
+        },
+        "mcp_server_name": "intervals-icu",
+        "type": "mcp_toolset"
+      }
+    ],
+    "type": "agent",
+    "updated_at": "2026-07-03T20:22:49.129409Z",
+    "version": 3
+  },
+  {
+    "archived_at": null,
+    "created_at": "2026-07-03T15:54:34.796990Z",
+    "description": null,
+    "id": "agent_01Sp4ghn8GHc5Lbd9JJptEzR",
+    "mcp_servers": [
+      {
+        "name": "intervals-icu",
+        "type": "url",
+        "url": "https://intervals-icu-mcp.inigo-coach.com/api/mcp"
+      }
+    ],
+    "metadata": {},
+    "model": {
+      "id": "claude-opus-4-8",
+      "speed": "standard"
+    },
+    "multiagent": null,
+    "name": "inigo-architecte-macro",
+    "skills": [],
+    "system": "# Agent — Architecte (macro)  \n## System prompt\n\nTu es l'**architecte** du plan d'entraînement de l'athlète. Tu construis le **squelette de saison à la semaine** vers ses objectifs. Le profil, le niveau et les contraintes de l'athlète ne sont **pas** dans ce prompt : tu les lis dans `athlete-model/` (jamais devinés). Tu ne descends **jamais** au détail des séances (puissances, blocs d'intervalles) — c'est le rôle du Constructeur. Ton output est un plan high-level : phase, focus, charge cible, repères, par semaine.\n\n### Entrées (lis-les, ne devine pas)\n- `athlete-model/objectives.md` — courses, dates, priorités A/B/C.\n- `athlete-model/constraints.md` — créneaux fixes, volume, vacances.\n- `athlete-model/health.md` — limitations actives.\n- `athlete-model/physiology.json` et `fitness-state.json` — niveau de départ.\n- `knowledge-base/periodization/`, `knowledge-base/load-management/` — modèles et règles.\n- Intervals.icu (lecture) — calendrier et events existants.\n\n### Méthode\n1. **Identifie le pic** et rétroplanifie depuis la course A. Adapte la cible du pic au type d'objectif : pour une **course à étapes**, le pic vise la **durabilité / jours consécutifs** plutôt qu'un test de puissance unique ; pour un contre-la-montre ou une classique, le pic vise la puissance spécifique correspondante.\n2. **Choisis le modèle de périodisation** adapté (bloc, polarisé, pyramidal…) en citant le principe KB. Justifie le choix au regard du limiteur identifié (ici : FTP qui stagne → bloc FTP Builder en cœur de plan).\n3. **Place les phases** : base/build/spécifique/affûtage, avec les semaines de récup (deload) selon la règle de ramp rate (`load-management/`). Respecte le plafond `ctl_weekly_ramp_max`.\n4. **Intègre les contraintes réelles** lues dans `constraints.md` (créneaux fixes, indisponibilités, périodes de vacances, sports annexes) et `health.md` : un créneau fixe est non négociable, une période de déplacement/vacances impose des séances adaptées au contexte, un event-test ne déclenche pas d'affûtage lourd.\n5. **Pose des charges cibles hebdo** (fourchette TSS/semaine par phase) que le Constructeur devra respecter — c'est ton garde-fou descendant.\n\n### Sortie\nÉcris/mets à jour `athlete-model/current-plan/macro-plan.md` :\n- Tableau semaine par semaine : dates · phase · focus · charge cible (TSS) · repère.\n- Une section « intentions par phase » expliquant le pourquoi physiologique de chaque bloc.\n- Les **hypothèses** et points à confirmer (ex. FTP à tester S1).\n\nAjoute une entrée dans `adaptation-log.md` (type `plan`) avec le raisonnement.\n\nAjoute aussi un champ `résumé_athlète` (3-5 lignes max, style `agents/STYLE.md`) dans ta sortie : le plan en langage simple, motivant, sans jargon inutile. **Tu ne l'envoies pas toi-même** : le Coordinateur le relaie sur WhatsApp.\n\n### Règles dures\n- Tu ne parles jamais à l'athlète directement (pas de MCP WhatsApp). Tu produis un `résumé_athlète`, le Coordinateur communique.\n- Pas de détail de séance. Pas d'écriture sur le calendrier Intervals.icu (lecture seule).\n- Toute phase/charge est justifiée par un principe KB cité.\n- Si un objectif ou une contrainte est manquant/ambigu, signale-le au coordinateur plutôt que d'inventer.\n- Scale au niveau réel de l'athlète, lu dans `physiology.json` / `fitness-state.json` : jamais un plan générique par défaut.",
+    "tools": [
+      {
+        "configs": [
+          {
+            "enabled": false,
+            "name": "web_search",
+            "permission_policy": {
+              "type": "always_allow"
+            }
+          },
+          {
+            "enabled": false,
+            "name": "web_fetch",
+            "permission_policy": {
+              "type": "always_allow"
+            }
+          }
+        ],
+        "default_config": {
+          "enabled": true,
+          "permission_policy": {
+            "type": "always_allow"
+          }
+        },
+        "type": "agent_toolset_20260401"
+      },
+      {
+        "configs": [
+          {
+            "enabled": true,
+            "name": "get_athlete_profile",
+            "permission_policy": {
+              "type": "always_allow"
+            }
+          },
+          {
+            "enabled": true,
+            "name": "get_fitness",
+            "permission_policy": {
+              "type": "always_allow"
+            }
+          },
+          {
+            "enabled": true,
+            "name": "get_events",
+            "permission_policy": {
+              "type": "always_allow"
+            }
+          },
+          {
+            "enabled": true,
+            "name": "get_power_curve",
+            "permission_policy": {
+              "type": "always_allow"
+            }
+          }
+        ],
+        "default_config": {
+          "enabled": false,
+          "permission_policy": {
+            "type": "always_allow"
+          }
+        },
+        "mcp_server_name": "intervals-icu",
+        "type": "mcp_toolset"
+      }
+    ],
+    "type": "agent",
+    "updated_at": "2026-07-03T16:05:06.424041Z",
+    "version": 2
+  },
+  {
+    "archived_at": null,
+    "created_at": "2026-07-03T15:54:34.796990Z",
+    "description": null,
+    "id": "agent_01Sp4ghn8GHc5Lbd9JJptEzR",
+    "mcp_servers": [
+      {
+        "name": "intervals-icu",
+        "type": "url",
+        "url": "https://intervals-icu-mcp.inigo-coach.com/api/mcp"
+      }
+    ],
+    "metadata": {},
+    "model": {
+      "id": "claude-opus-4-8",
+      "speed": "standard"
+    },
+    "multiagent": null,
+    "name": "inigo-architecte-macro",
+    "skills": [],
+    "system": "",
+    "tools": [
+      {
+        "configs": [
+          {
+            "enabled": false,
+            "name": "web_search",
+            "permission_policy": {
+              "type": "always_allow"
+            }
+          },
+          {
+            "enabled": false,
+            "name": "web_fetch",
+            "permission_policy": {
+              "type": "always_allow"
+            }
+          }
+        ],
+        "default_config": {
+          "enabled": true,
+          "permission_policy": {
+            "type": "always_allow"
+          }
+        },
+        "type": "agent_toolset_20260401"
+      },
+      {
+        "configs": [
+          {
+            "enabled": true,
+            "name": "get_athlete_profile",
+            "permission_policy": {
+              "type": "always_allow"
+            }
+          },
+          {
+            "enabled": true,
+            "name": "get_fitness",
+            "permission_policy": {
+              "type": "always_allow"
+            }
+          },
+          {
+            "enabled": true,
+            "name": "get_events",
+            "permission_policy": {
+              "type": "always_allow"
+            }
+          },
+          {
+            "enabled": true,
+            "name": "get_power_curve",
+            "permission_policy": {
+              "type": "always_allow"
+            }
+          }
+        ],
+        "default_config": {
+          "enabled": false,
+          "permission_policy": {
+            "type": "always_allow"
+          }
+        },
+        "mcp_server_name": "intervals-icu",
+        "type": "mcp_toolset"
+      }
+    ],
+    "type": "agent",
+    "updated_at": "2026-07-03T15:54:34.796990Z",
+    "version": 1
+  }
+]
