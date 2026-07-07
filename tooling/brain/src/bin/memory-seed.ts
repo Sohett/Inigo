@@ -21,13 +21,17 @@ import { loadLocalEnv } from "../lib/util";
  * One-off seed of the athlete memory store into Neon (INI-18).
  *
  *   brain:memory:seed [--store=memstore_…]              # dry-run: read + map + plan
- *   brain:memory:seed --apply                           # write to Neon + verify
- *   brain:memory:seed --apply --clear-store             # + delete the 7 migrated files
+ *   brain:memory:seed --apply --phone=+32…              # write to Neon + verify
+ *   brain:memory:seed --apply --phone=+32… --clear-store   # + delete the 7 migrated files
  *
- * Identity/routing for the athlete row comes from env (never committed):
- *   ATHLETE_PHONE_NUM (required to --apply), ATHLETE_CHAT_ID, ATHLETE_SESSION_ID,
- *   ATHLETE_MANAGED_AGENT_ID, ATHLETE_DISPLAY_NAME (default "Thomas Sohet").
- * DATABASE_URL (Neon) is required to --apply.
+ * Identity/routing for the athlete row (not secrets) via CLI flags, falling back to
+ * the matching ATHLETE_* env var:
+ *   --phone=       (required to --apply)   / ATHLETE_PHONE_NUM
+ *   --agent-id=    (coordinator)           / ATHLETE_MANAGED_AGENT_ID
+ *   --session-id=                          / ATHLETE_SESSION_ID
+ *   --chat-id=                             / ATHLETE_CHAT_ID
+ *   --display-name= (default "Thomas Sohet") / ATHLETE_DISPLAY_NAME
+ * DATABASE_URL (Neon, embeds a password → env only) is required to --apply.
  *
  * Recovery: the DB write is idempotent, so re-running --apply is always safe. If a
  * --clear-store is interrupted mid-way (e.g. a sha guard trips on a concurrent
@@ -40,13 +44,14 @@ function maskPhone(phone: string | null): string {
   return phone.length <= 5 ? "***" : `${phone.slice(0, 4)}***${phone.slice(-2)}`;
 }
 
-function loadRouting(storeId: string): AthleteRouting {
+function loadRouting(argv: readonly string[], storeId: string): AthleteRouting {
+  // CLI flags win over env; these are routing values, not secrets.
   return {
-    displayName: process.env.ATHLETE_DISPLAY_NAME ?? "Thomas Sohet",
-    phoneNum: process.env.ATHLETE_PHONE_NUM ?? null,
-    chatId: process.env.ATHLETE_CHAT_ID ?? null,
-    anthropicSessionId: process.env.ATHLETE_SESSION_ID ?? null,
-    managedAgentId: process.env.ATHLETE_MANAGED_AGENT_ID ?? null,
+    displayName: getOption(argv, "display-name") ?? process.env.ATHLETE_DISPLAY_NAME ?? "Thomas Sohet",
+    phoneNum: getOption(argv, "phone") ?? process.env.ATHLETE_PHONE_NUM ?? null,
+    chatId: getOption(argv, "chat-id") ?? process.env.ATHLETE_CHAT_ID ?? null,
+    anthropicSessionId: getOption(argv, "session-id") ?? process.env.ATHLETE_SESSION_ID ?? null,
+    managedAgentId: getOption(argv, "agent-id") ?? process.env.ATHLETE_MANAGED_AGENT_ID ?? null,
     memoryStoreId: storeId
   };
 }
@@ -78,7 +83,7 @@ async function main(): Promise<void> {
   loadLocalEnv(path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../.."));
   const config = loadConfig();
   const client = createBrainClient(config.ANTHROPIC_API_KEY);
-  const routing = loadRouting(storeId);
+  const routing = loadRouting(argv, storeId);
 
   // Read (always, read-only) and map.
   const audit = await collectMemory(client, { storeId });
