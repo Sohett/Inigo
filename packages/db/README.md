@@ -36,8 +36,24 @@ committed under `drizzle/`. The generate step needs no database; the apply step 
 
 ```bash
 pnpm --filter @inigo/db run db:generate   # edit schema -> regenerate SQL (commit it)
-DATABASE_URL=postgresql://... pnpm --filter @inigo/db run db:migrate   # apply to Neon
+DATABASE_URL=postgresql://... pnpm --filter @inigo/db run db:migrate   # apply to a given DB
 ```
+
+Nothing applies migrations automatically (no CI step, no Vercel build hook): a deploy
+never touches the database. You run `migrate` by hand against the target DB.
+
+**Production** has its own script that reads the prod connection string from a
+gitignored `packages/db/.env.prod` (never committed — create it once, e.g. via
+`vercel env pull` or from the Neon dashboard):
+
+```bash
+# packages/db/.env.prod  ->  DATABASE_URL=postgresql://...prod...
+pnpm --filter @inigo/db run db:migrate:prod
+```
+
+It fails loudly if `.env.prod` is missing, so it can never silently hit the wrong DB.
+`migrate` is idempotent (drizzle tracks applied files in `__drizzle_migrations`), so
+re-running it after each new migration is safe.
 
 Never `push` in production: migrations are versioned and applied via `migrate`.
 
