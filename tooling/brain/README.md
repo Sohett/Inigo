@@ -26,6 +26,9 @@ pnpm --filter @inigo/brain run brain:skill:deploy <nom> [--apply] [--attach --ag
 pnpm --filter @inigo/brain run brain:agent:apply <agent_id> [--file=<path>] [--apply]
 pnpm --filter @inigo/brain run brain:vault:cred:add --vault=<id> --name=<VAR> \
   (--value-env=<ENV> | --value=<literal>) --hosts=h1,h2 [--display=<label>] [--apply]
+
+# Seed one-off store athlète -> Neon (INI-18). --apply écrit, --clear-store vide les 7 migrés.
+pnpm --filter @inigo/brain run brain:memory:seed [--store=<id>] [--apply] [--clear-store]
 ```
 
 ## Workflows
@@ -37,6 +40,9 @@ pnpm --filter @inigo/brain run brain:vault:cred:add --vault=<id> --name=<VAR> \
   <id> --apply` (nouvelle version, protégé contre les conflits de version 409).
 - **Déployer un skill** : éditer `tooling/agent-skills/<nom>/` → `brain:skill:deploy <nom> --apply`.
 - **Auditer la mémoire** : `brain:memory:audit` → lire `memory/` → produire des recommandations.
+- **Migrer l'athlète vers Neon** : `brain:memory:seed` (dry-run) pour prévisualiser le mapping → `--apply`
+  (écrit dans Neon via `@inigo/db`, `DATABASE_URL` + `ATHLETE_*` en env) puis vérifie la complétude →
+  `--clear-store` supprime les 7 fichiers migrés (garde schemas/ops/runtime). Idempotent.
 
 Détails d'API (endpoints, `ant`, SDK) : skill `managed-agents-api` (`.claude/skills/`).
 
