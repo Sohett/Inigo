@@ -111,6 +111,8 @@ export interface SeedPlan {
   endDate: string;
   /** Title of the peak goal to link the plan to, if present among the goals. */
   peakGoalTitle: string | null;
+  /** Full macro-plan markdown (strategy, per-phase intentions, open questions). */
+  rationale: string;
   blocks: SeedBlock[];
 }
 
@@ -375,9 +377,13 @@ function parseMacroPlan(md: string): SeedPlan {
     const phase = (cells[2] ?? "").trim();
     const focus = (cells[3] ?? "").trim() || null;
     const plannedTss = parseTss(cells[4] ?? "");
+    const ctlTarget = (cells[5] ?? "").match(/~?\s*(\d+)/)?.[1];
+    const keySessions = (cells[6] ?? "").replace(/\*/g, "").trim() || null;
     const weeklyTarget: WeeklyTarget = { weekStart: dates.start };
     if (plannedTss !== undefined) weeklyTarget.plannedTss = plannedTss;
     if (focus) weeklyTarget.focus = focus;
+    if (keySessions) weeklyTarget.keySessions = keySessions;
+    if (ctlTarget) weeklyTarget.ctlTarget = Number(ctlTarget);
     blocks.push({
       name: phase ? `${week} — ${phase}` : week,
       phaseType: phaseTypeFrom(phase),
@@ -397,7 +403,9 @@ function parseMacroPlan(md: string): SeedPlan {
   const startDate = blocks.map((b) => b.startDate).reduce((a, b) => (b < a ? b : a));
   const endDate = blocks.map((b) => b.endDate).reduce((a, b) => (b > a ? b : a));
 
-  return { name, startDate, endDate, peakGoalTitle: null, blocks };
+  // The full source is kept as the plan rationale so the strategy (§1), per-phase
+  // intentions (§3), and open questions (§4) are not lost when the store is cleared.
+  return { name, startDate, endDate, peakGoalTitle: null, rationale: md, blocks };
 }
 
 function parseAdaptationLog(md: string): SeedLog[] {
@@ -621,7 +629,8 @@ export async function writeSeed(
       startDate: data.plan.startDate,
       endDate: data.plan.endDate,
       status: "active",
-      createdBy: "ai"
+      createdBy: "ai",
+      rationale: data.plan.rationale
     })
     .returning({ id: trainingPlan.id });
   const planRow = insertedPlan[0];

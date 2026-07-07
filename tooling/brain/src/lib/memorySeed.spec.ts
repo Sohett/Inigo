@@ -189,8 +189,12 @@ describe("parseAthleteStore", () => {
     expect(data.plan.blocks[0]!.weeklyTargets[0]).toEqual({
       weekStart: "2026-07-07",
       plannedTss: 470,
-      focus: "Relancer la structure"
+      focus: "Relancer la structure",
+      keySessions: "VO2",
+      ctlTarget: 50
     });
+    // Full source kept as rationale so strategy/intentions/open questions survive the clear.
+    expect(data.plan.rationale).toBe(MACRO_PLAN);
   });
 
   it("parses adaptation-log entries (skipping the format example) with event ids", () => {

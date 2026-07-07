@@ -61,6 +61,10 @@ export interface WeeklyTarget {
   plannedTss?: number;
   plannedDurationS?: number;
   focus?: string;
+  /** The week's key sessions, as written in the macro-plan (free text). */
+  keySessions?: string;
+  /** Projected end-of-week CTL from the plan (Intervals.icu is the live truth). */
+  ctlTarget?: number;
 }
 
 /** A session proposed for a week, before it is pushed to the Intervals.icu calendar. */

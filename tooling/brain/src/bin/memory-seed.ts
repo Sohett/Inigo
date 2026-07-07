@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createDb } from "@inigo/db";
@@ -21,7 +22,8 @@ import { loadLocalEnv } from "../lib/util";
  * One-off seed of the athlete memory store into Neon (INI-18).
  *
  *   brain:memory:seed [--store=memstore_…]              # dry-run: read + map + plan
- *   brain:memory:seed --apply --phone=+32…              # write to Neon + verify
+ *   brain:memory:seed --apply --phone=+32…              # write to dev Neon + verify
+ *   brain:memory:seed --apply --prod --phone=+32…       # target packages/db/.env.prod
  *   brain:memory:seed --apply --phone=+32… --clear-store   # + delete the 7 migrated files
  *
  * Identity/routing for the athlete row (not secrets) via CLI flags, falling back to
@@ -80,7 +82,15 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  loadLocalEnv(path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../.."));
+  const useProd = hasFlag(argv, "prod");
+  const brainRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+  loadLocalEnv(brainRoot);
+  // DATABASE_URL is owned by @inigo/db (single source for the connection string);
+  // read it from packages/db/.env (or .env.prod with --prod) when brain's env doesn't set it.
+  if (!process.env.DATABASE_URL) {
+    const dbEnv = path.resolve(brainRoot, "../../packages/db", useProd ? ".env.prod" : ".env");
+    if (existsSync(dbEnv)) process.loadEnvFile(dbEnv);
+  }
   const config = loadConfig();
   const client = createBrainClient(config.ANTHROPIC_API_KEY);
   const routing = loadRouting(argv, storeId);
@@ -117,9 +127,10 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
+  console.log(`\nCible Neon : ${new URL(config.DATABASE_URL).host} (${useProd ? "PROD" : "dev"}).`);
   const db = createDb(config.DATABASE_URL);
   const write = await writeSeed(db, data, routing);
-  console.log(`\nÉcrit dans Neon (athlete ${write.athleteId}).`);
+  console.log(`Écrit dans Neon (athlete ${write.athleteId}).`);
 
   const completeness = await checkCompleteness(db, write.athleteId, data);
   console.log("Complétude (attendu vs DB) :");
