@@ -1,0 +1,9 @@
+# Secrets locaux
+.env
+
+# Dumps mémoire : contiennent des données perso de l'athlète → jamais commités.
+# (Le snapshot/ de l'archi, lui, est versionné volontairement.)
+memory/
+
+# Archives de skills générées à l'upload
+*.zip

@@ -1,0 +1,47 @@
+[
+  {
+    "type": "skill",
+    "id": "skill_011bUNcWCzVJhbtVxCNfCC3q",
+    "created_at": "2026-07-03T20:19:44.399180Z",
+    "updated_at": "2026-07-03T20:19:44.399320Z",
+    "display_title": "intervals-icu-workouts",
+    "source": "custom",
+    "latest_version": "1783109983944625"
+  },
+  {
+    "type": "skill",
+    "id": "xlsx",
+    "created_at": "2025-10-14T08:41:11.530827Z",
+    "updated_at": "2026-06-22T20:18:02.461831Z",
+    "display_title": "xlsx",
+    "source": "anthropic",
+    "latest_version": "20260203"
+  },
+  {
+    "type": "skill",
+    "id": "pptx",
+    "created_at": "2025-10-14T08:41:11.530747Z",
+    "updated_at": "2026-06-22T20:18:02.449350Z",
+    "display_title": "pptx",
+    "source": "anthropic",
+    "latest_version": "20260622"
+  },
+  {
+    "type": "skill",
+    "id": "pdf",
+    "created_at": "2025-10-14T08:41:11.530650Z",
+    "updated_at": "2026-06-22T20:18:02.437378Z",
+    "display_title": "pdf",
+    "source": "anthropic",
+    "latest_version": "20260203"
+  },
+  {
+    "type": "skill",
+    "id": "docx",
+    "created_at": "2025-10-14T08:41:11.530393Z",
+    "updated_at": "2026-06-22T20:18:02.423823Z",
+    "display_title": "docx",
+    "source": "anthropic",
+    "latest_version": "20260618"
+  }
+]

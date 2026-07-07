@@ -21,7 +21,25 @@ export const configSchema = z.object({
    * When unset, signature verification is skipped (MVP relies on a non-guessable
    * URL + the gateway's Sender filter).
    */
-  WHATSAPP_WEBHOOK_SECRET: z.string().min(16).optional()
+  WHATSAPP_WEBHOOK_SECRET: z.string().min(16).optional(),
+  /** Neon Postgres connection string (the shared coaching DB). Server-side only. */
+  DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
+  /**
+   * Base64-encoded 32-byte master key for AES-256-GCM sealing of per-athlete secrets
+   * (e.g. Intervals.icu API keys). Server-side only; never logged, never committed.
+   */
+  DB_ENCRYPTION_KEY: z
+    .string()
+    .refine(
+      (value) => {
+        try {
+          return Buffer.from(value, "base64").length === 32;
+        } catch {
+          return false;
+        }
+      },
+      { message: "DB_ENCRYPTION_KEY must be a base64-encoded 32-byte key" }
+    )
 });
 
 export type Config = z.infer<typeof configSchema>;
