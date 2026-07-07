@@ -219,12 +219,6 @@ importers:
       '@anthropic-ai/sdk':
         specifier: ^0.107.0
         version: 0.107.0(zod@4.4.3)
-      '@inigo/db':
-        specifier: workspace:*
-        version: link:../../packages/db
-      drizzle-orm:
-        specifier: ^0.44.0
-        version: 0.44.7(@neondatabase/serverless@1.1.0)
       zod:
         specifier: ^4.4.3
         version: 4.4.3
