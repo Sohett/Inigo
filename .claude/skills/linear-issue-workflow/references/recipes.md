@@ -9,6 +9,7 @@ identifier — substitute the real one.
 - [Reading Linear](#reading-linear)
 - [Refining the issue](#refining-the-issue)
 - [Publishing the plan](#publishing-the-plan)
+- [Move to In Progress](#move-to-in-progress)
 - [Branch hygiene](#branch-hygiene)
 - [Base off main](#base-off-main)
 - [Branching](#branching)
@@ -75,6 +76,20 @@ the workspace renders `>>>` as a plain nested quote instead of a toggle, tell th
 user and switch to whatever their editor expects (e.g. re-create the toggle via
 the `/collapsible` structure). Don't silently leave it as a quote.
 
+## Move to In Progress
+
+Plan signed off and published → mark the issue started so the board is honest:
+
+```
+save_issue  id: "INI-123"  state: "In Progress"   # exact name via list_issue_statuses
+```
+
+The started status name varies per team (`In Progress`, `Started`, …) — confirm
+with `list_issue_statuses` for the issue's team before setting it. Doing this
+explicitly keeps the board right even when you don't branch from Linear's
+suggested name (the branch integration would otherwise be what moves it, and only
+later, in [Branching](#branching)).
+
 ## Branch hygiene
 
 ```bash
@@ -102,7 +117,8 @@ If `--ff-only` refuses (local main diverged), stop and surface it.
 ## Branching
 
 Prefer Linear's suggested name from `get_issue` — it embeds the issue ID, so the
-GitHub integration auto-links the PR and moves the issue to its started status:
+GitHub integration auto-links the PR (the issue is already In Progress from
+[Move to In Progress](#move-to-in-progress)):
 
 ```bash
 git checkout -b sohett/ini-123-short-title    # value from get_issue

@@ -8,8 +8,9 @@ description: >-
   Linear issue before coding. It drives the full loop: pull the issue + related
   context via the Linear MCP, refine the issue as product work, get sign-off on
   a plan, publish that plan to the Linear card in a `claude-code-plan`
-  collapsible, then run a Gitflow implementation loop — verify branch
-  cleanliness, branch off an updated main, commit often, open a draft PR, link
+  collapsible, move the issue to In Progress, then run a Gitflow implementation
+  loop — verify branch cleanliness, branch off an updated main, commit often,
+  open a draft PR, link
   it to the Linear issue, self-review the diff with the code-reviewer agent, and
   promote it to ready-for-review when done. Trigger it even when the user only
   mentions a Linear issue in passing before jumping straight into code.
@@ -89,8 +90,14 @@ at the ticket sees exactly what will be built, before a line of code exists.
    exact collapsible markdown is in `references/recipes.md` → *Publishing the
    plan*. Post it with the Linear MCP `save_comment` tool.
 
-**Checkpoint:** the plan comment is live on the card. Implementation starts now,
-not before.
+3. **Move the issue to In Progress.** The plan is agreed and live on the card, so
+   the work is starting — make the board say so. Do it **explicitly** via the
+   Linear MCP now, rather than waiting for the branch integration to do it in
+   Phase 3 (that only fires if you branch from Linear's suggested name). Recipe:
+   `references/recipes.md` → *Move to In Progress*.
+
+**Checkpoint:** the plan comment is live on the card and the issue is In Progress.
+Implementation starts now, not before.
 
 ---
 
@@ -127,7 +134,7 @@ fast-forward fails, stop and surface it rather than papering over it with a merg
 
 Prefer **Linear's suggested git branch name** — `get_issue` returns it, and it
 embeds the issue ID (e.g. `sohett/ini-123-...`). Using it makes the GitHub↔Linear
-integration auto-link the PR and move the issue into its started status for free.
+integration auto-link the PR (the issue is already In Progress from Phase 2).
 If no Linear branch name is available, fall back to `<type>/<issue-id>-<slug>`
 where `<type>` matches the work (`feat`, `fix`, `chore`, `refactor`, `docs`,
 `test`, `perf`). Recipe: `references/recipes.md` → *Branching*.
