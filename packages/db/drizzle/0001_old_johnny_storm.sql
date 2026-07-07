@@ -1,0 +1,1 @@
+ALTER TABLE "training_plan" ADD COLUMN "rationale" text;

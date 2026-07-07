@@ -22,6 +22,8 @@ export const trainingPlan = pgTable(
     endDate: date("end_date").notNull(),
     status: text("status").$type<PlanStatus>().notNull().default("draft"),
     createdBy: text("created_by").$type<PlanAuthor>(),
+    /** Full macro-plan narrative (strategy, per-phase intentions, open questions). */
+    rationale: text("rationale"),
     ...timestamps()
   },
   (t) => [
