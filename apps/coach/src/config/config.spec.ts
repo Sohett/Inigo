@@ -3,7 +3,6 @@ import { loadConfig } from "./config";
 
 const base: Record<string, string> = {
   ANTHROPIC_API_KEY: "sk-ant-xxx",
-  ANTHROPIC_SESSION_ID: "sesn_123",
   DATABASE_URL: "postgresql://user:pass@host/db?sslmode=require",
   DB_ENCRYPTION_KEY: Buffer.alloc(32).toString("base64")
 };
@@ -11,7 +10,7 @@ const base: Record<string, string> = {
 describe("loadConfig", () => {
   it("parses a valid minimal env (secret optional)", () => {
     const config = loadConfig(base);
-    expect(config.ANTHROPIC_SESSION_ID).toBe("sesn_123");
+    expect(config.ANTHROPIC_API_KEY).toBe("sk-ant-xxx");
     expect(config.WHATSAPP_WEBHOOK_SECRET).toBeUndefined();
     expect(config.DATABASE_URL).toContain("postgresql://");
   });
@@ -37,12 +36,6 @@ describe("loadConfig", () => {
     const { ANTHROPIC_API_KEY, ...rest } = base;
     void ANTHROPIC_API_KEY;
     expect(() => loadConfig(rest)).toThrow(/ANTHROPIC_API_KEY/);
-  });
-
-  it("throws when ANTHROPIC_SESSION_ID is missing", () => {
-    const { ANTHROPIC_SESSION_ID, ...rest } = base;
-    void ANTHROPIC_SESSION_ID;
-    expect(() => loadConfig(rest)).toThrow(/ANTHROPIC_SESSION_ID/);
   });
 
   it("throws when the webhook secret is too short", () => {

@@ -3,7 +3,8 @@ import {
   webhookEnvelopeSchema,
   normaliseInbound,
   messageText,
-  replyChatId
+  replyChatId,
+  senderPhone
 } from "./whatsappPayload";
 
 function normalise(payload: unknown) {
@@ -34,5 +35,35 @@ describe("whatsappPayload", () => {
     expect(messageText({ text: "t" })).toBe("t");
     expect(replyChatId({ chatId: "c", from: "f" })).toBe("c");
     expect(replyChatId({ from: "f" })).toBe("f");
+  });
+
+  describe("senderPhone", () => {
+    it("parses a standard WhatsApp JID to E.164", () => {
+      expect(senderPhone({ from: "32475123456@c.us" })).toBe("+32475123456");
+    });
+
+    it("strips a multi-device suffix", () => {
+      expect(senderPhone({ from: "32475123456:12@c.us" })).toBe("+32475123456");
+    });
+
+    it("falls back to chatId when from is absent", () => {
+      expect(senderPhone({ chatId: "32475123456@c.us" })).toBe("+32475123456");
+    });
+
+    it("keeps a single leading plus (idempotent-ish on already-E.164)", () => {
+      expect(senderPhone({ from: "+32475123456" })).toBe("+32475123456");
+    });
+
+    it("returns null for group JIDs", () => {
+      expect(senderPhone({ from: "120363000000000000@g.us", isGroup: true })).toBeNull();
+    });
+
+    it("returns null when no digits remain", () => {
+      expect(senderPhone({ from: "status@broadcast" })).toBeNull();
+    });
+
+    it("returns null when there is no sender at all", () => {
+      expect(senderPhone({ body: "hi" })).toBeNull();
+    });
   });
 });

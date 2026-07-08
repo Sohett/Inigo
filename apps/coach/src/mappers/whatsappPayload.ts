@@ -73,3 +73,18 @@ export function messageText(message: InboundMessage): string | undefined {
 export function replyChatId(message: InboundMessage): string | undefined {
   return message.chatId ?? message.from;
 }
+
+/**
+ * The sender's phone as E.164 (`+…`), parsed from the WhatsApp JID transport
+ * envelope. This is NOT phone normalisation: WhatsApp already delivers a full
+ * international number, so we only strip the `@…` domain and any `:device` suffix
+ * and prefix `+` (which matches the E.164 form stored in `athlete.phone_num`).
+ * Returns null for group JIDs or when no digits remain (e.g. `status@broadcast`).
+ */
+export function senderPhone(message: InboundMessage): string | null {
+  const jid = message.from ?? message.chatId;
+  if (!jid || jid.endsWith("@g.us")) return null;
+  const local = jid.split("@", 1)[0] ?? "";
+  const digits = (local.split(":", 1)[0] ?? "").replace(/\D/g, "");
+  return digits.length > 0 ? `+${digits}` : null;
+}
