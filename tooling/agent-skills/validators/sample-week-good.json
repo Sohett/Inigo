@@ -1,0 +1,24 @@
+{
+  "week": "2026-W27",
+  "phase": "Build 1 — Base/SST",
+  "generated_by": "constructeur-hebdo",
+  "athlete_ref": { "ftp_w": 305, "ctl": 45.0, "atl": 48.0, "tsb": -3.0 },
+  "phase_targets": { "weekly_tss": [430, 580], "max_z4plus_pct": 15, "ctl_weekly_ramp_max": 5.0 },
+  "health_flags": { "run_paused": true },
+  "days": [
+    { "date": "2026-06-29", "sport": "Ride", "label": "Spin récup", "intensity": "recovery", "duration_min": 40, "tss": 25,
+      "blocks": [ { "pct_ftp": 50, "minutes": 40 } ] },
+    { "date": "2026-06-30", "sport": "VirtualRide", "label": "VO2", "intensity": "vo2", "indoor": true, "duration_min": 55, "tss": 85,
+      "blocks": [ { "pct_ftp": 50, "minutes": 15 }, { "pct_ftp": 110, "minutes": 20 }, { "pct_ftp": 50, "minutes": 20 } ] },
+    { "date": "2026-07-01", "sport": "Ride", "label": "Endurance", "intensity": "endurance", "duration_min": 80, "tss": 60,
+      "blocks": [ { "pct_ftp": 62, "minutes": 80 } ] },
+    { "date": "2026-07-02", "sport": "WeightTraining", "label": "Renfo maison", "intensity": "strength", "duration_min": 60, "tss": 30,
+      "blocks": [] },
+    { "date": "2026-07-03", "sport": "VirtualRide", "label": "Seuil", "intensity": "threshold", "indoor": true, "duration_min": 60, "tss": 80,
+      "blocks": [ { "pct_ftp": 50, "minutes": 15 }, { "pct_ftp": 99, "minutes": 30 }, { "pct_ftp": 55, "minutes": 15 } ] },
+    { "date": "2026-07-04", "sport": "Ride", "label": "Longue", "intensity": "endurance", "duration_min": 220, "tss": 160,
+      "blocks": [ { "pct_ftp": 65, "minutes": 200 }, { "pct_ftp": 75, "minutes": 20 } ] },
+    { "date": "2026-07-05", "sport": "Ride", "label": "Endurance", "intensity": "endurance", "duration_min": 80, "tss": 60,
+      "blocks": [ { "pct_ftp": 60, "minutes": 80 } ] }
+  ]
+}
