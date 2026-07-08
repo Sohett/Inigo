@@ -149,14 +149,16 @@ def validate(week):
         try:
             results.append(fn(week))
         except Exception as e:  # un check qui crashe = fail explicite, jamais un faux pass
-            results.append((fn.__name__, "fail", f"erreur check: {e}"))
+            # id réel du check (les fonctions sont nommées `check_<id>`) pour rester
+            # cohérent avec les résultats normaux et retrouver l'advice.
+            results.append((fn.__name__[len("check_"):], "fail", f"erreur check: {e}"))
     blocking = [r[0] for r in results if r[1] == "fail"]
     report = {
         "verdict": "fail" if blocking else "pass",
         "week": week.get("week"),
         "checks": [{"id": i, "status": s, "detail": d} for (i, s, d) in results],
         "blocking_failures": blocking,
-        "advice": " ".join(ADVICE[b] for b in blocking) or None,
+        "advice": " ".join(ADVICE.get(b, "") for b in blocking) or None,
     }
     return report
 

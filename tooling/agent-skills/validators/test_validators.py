@@ -50,10 +50,22 @@ def test_ramp_rate_caught():
     print("OK  ramp rate excessif -> fail")
 
 
+def test_malformed_input_fails_cleanly():
+    # un check qui crashe (ici phase_targets manquant) doit produire un rapport
+    # `fail` propre, jamais une exception ni un faux pass.
+    w = load("sample-week-good.json")
+    del w["phase_targets"]
+    rep = validate(w)  # ne doit pas lever
+    assert rep["verdict"] == "fail", "entrée malformée doit échouer"
+    assert "weekly_tss" in rep["blocking_failures"], f"attendu weekly_tss ; obtenu {rep['blocking_failures']}"
+    print(f"OK  entrée malformée -> fail propre ({sorted(set(rep['blocking_failures']))})")
+
+
 if __name__ == "__main__":
     fails = 0
     for fn in [test_good_week_passes, test_bad_week_fails_with_expected_reasons,
-               test_undercharge_is_caught, test_ramp_rate_caught]:
+               test_undercharge_is_caught, test_ramp_rate_caught,
+               test_malformed_input_fails_cleanly]:
         try:
             fn()
         except AssertionError as e:
