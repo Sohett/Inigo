@@ -1,19 +1,19 @@
 {
-  "fetchedAt": "2026-07-06T21:50:42.542Z",
+  "fetchedAt": "2026-07-08T10:29:41.328Z",
   "counts": {
     "agents": 6,
     "environments": 1,
     "sessions": 7,
     "vaults": 1,
     "memoryStores": 3,
-    "skills": 5
+    "skills": 6
   },
   "agents": [
     {
       "id": "agent_013Cb3npXSMv7T8X533DL9kt",
       "name": "inigo-coordinateur",
-      "version": 8,
-      "versionCount": 8
+      "version": 10,
+      "versionCount": 10
     },
     {
       "id": "agent_01Sp4ghn8GHc5Lbd9JJptEzR",
@@ -24,8 +24,8 @@
     {
       "id": "agent_01CTK33Z2CLPwtDyq9vKDsVG",
       "name": "inigo-constructeur-hebdo",
-      "version": 5,
-      "versionCount": 5
+      "version": 6,
+      "versionCount": 6
     },
     {
       "id": "agent_01Dbg6WeAF41xSs8bTfiE8XD",
@@ -36,8 +36,8 @@
     {
       "id": "agent_012ethnUdHzvRW9iPxdzzbTx",
       "name": "inigo-readaptateur",
-      "version": 6,
-      "versionCount": 6
+      "version": 7,
+      "versionCount": 7
     }
   ],
   "memoryStores": [
