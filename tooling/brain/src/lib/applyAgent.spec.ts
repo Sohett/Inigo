@@ -36,6 +36,27 @@ describe("applyAgent", () => {
     expect(result.plan.changedFields).toEqual(["system"]);
   });
 
+  it("detects a coordinator roster (multiagent) change", async () => {
+    const coordinator = {
+      ...currentAgent,
+      multiagent: { type: "coordinator", agents: [{ id: "agent_2", type: "agent", version: 5 }] }
+    };
+    server.use(http.get(`${API}/agents/agent_1`, () => HttpResponse.json(coordinator)));
+
+    const result = await applyAgent(
+      client(),
+      {
+        agentId: "agent_1",
+        config: {
+          multiagent: { type: "coordinator", agents: [{ id: "agent_2", type: "agent", version: 6 }] }
+        }
+      },
+      false
+    );
+
+    expect(result.plan.changedFields).toEqual(["multiagent"]);
+  });
+
   it("sends the current version and returns the new one when applied", async () => {
     let sentVersion: unknown = null;
     server.use(

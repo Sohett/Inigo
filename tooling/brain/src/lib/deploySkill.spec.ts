@@ -4,7 +4,13 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { createBrainClient } from "../client";
-import { deploySkill, listSkillFiles, planDeploySkill, readSkillName } from "./deploySkill";
+import {
+  buildUploadables,
+  deploySkill,
+  listSkillFiles,
+  planDeploySkill,
+  readSkillName
+} from "./deploySkill";
 
 const API = "https://api.anthropic.com/v1";
 const server = setupServer();
@@ -26,6 +32,14 @@ describe("skill folder parsing", () => {
     const files = await listSkillFiles(skillDir);
     expect(files).toContain("SKILL.md");
     expect(files.every((f) => !f.endsWith(".zip"))).toBe(true);
+  });
+
+  it("prefixes uploaded files with the skill folder (SKILL.md inside it)", async () => {
+    const files = await listSkillFiles(skillDir);
+    const uploads = await buildUploadables(skillDir, files, "intervals-icu-workouts");
+    const names = uploads.map((u) => (u as { name: string }).name);
+    expect(names).toContain("intervals-icu-workouts/SKILL.md");
+    expect(names.every((n) => n.startsWith("intervals-icu-workouts/"))).toBe(true);
   });
 });
 

@@ -13,6 +13,7 @@ const UPDATABLE_FIELDS = [
   "tools",
   "mcp_servers",
   "skills",
+  "multiagent",
   "description",
   "metadata"
 ] as const;

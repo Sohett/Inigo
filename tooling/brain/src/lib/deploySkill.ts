@@ -90,12 +90,18 @@ export async function planDeploySkill(
   };
 }
 
-async function buildUploadables(skillDir: string, files: string[]): Promise<Uploadable[]> {
+export async function buildUploadables(
+  skillDir: string,
+  files: string[],
+  skillName: string
+): Promise<Uploadable[]> {
   return Promise.all(
     files.map(async (rel) => {
       const buf = await fs.readFile(path.join(skillDir, rel));
-      // The filename carries the relative path so the server preserves structure.
-      return toFile(buf, rel);
+      // The API requires every file under a single top-level folder named after
+      // the skill (SKILL.md must sit directly inside it); the folder becomes the
+      // skill's `directory`. The filename carries that prefixed path.
+      return toFile(buf, `${skillName}/${rel}`);
     })
   );
 }
@@ -117,7 +123,7 @@ export async function deploySkill(
   }
   ensureApply(opts.apply, `deploy skill ${plan.skillName}`);
 
-  const uploadables = await buildUploadables(skillDir, plan.files);
+  const uploadables = await buildUploadables(skillDir, plan.files, plan.skillName);
 
   let skillId: string;
   let version: string | null;
