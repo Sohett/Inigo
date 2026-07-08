@@ -3,6 +3,16 @@ import type { IntervalsIcuClient } from "../../client";
 import { z } from "zod";
 import { dateRangeShape, runTool } from "../result";
 
+const dateOnly = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Intervals.icu rejects a bare `YYYY-MM-DD` `start_date_local` with HTTP 422; it wants a full
+ * local datetime. Pad a date-only value to midnight so callers can pass either form.
+ */
+function normalizeStartDateLocal(value: string): string {
+  return dateOnly.test(value) ? `${value}T00:00:00` : value;
+}
+
 export function registerEventReadTools(server: McpServer, client: IntervalsIcuClient): void {
   server.registerTool(
     "get_events",
@@ -45,7 +55,9 @@ export function registerEventWriteTools(server: McpServer, client: IntervalsIcuC
         eventId: z.string().optional().describe("Provide to update an existing event; omit to create."),
         startDateLocal: z
           .string()
-          .describe("Local start date/datetime (YYYY-MM-DD or ISO datetime)."),
+          .describe(
+            "Local start date or datetime. A bare YYYY-MM-DD is normalized to midnight (Intervals.icu requires a full datetime)."
+          ),
         category: z
           .string()
           .describe("Event category, e.g. WORKOUT, RACE_A, RACE_B, NOTE, HOLIDAY."),
@@ -57,7 +69,7 @@ export function registerEventWriteTools(server: McpServer, client: IntervalsIcuC
     (args) =>
       runTool(() => {
         const event: Record<string, unknown> = {
-          start_date_local: args.startDateLocal,
+          start_date_local: normalizeStartDateLocal(args.startDateLocal),
           category: args.category,
           name: args.name
         };
