@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { athlete } from "@inigo/db";
+import type { athlete } from "@inigo/db";
 import { toAthlete } from "./drizzleAthleteRepository";
 
 type AthleteRow = typeof athlete.$inferSelect;

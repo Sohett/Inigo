@@ -50,8 +50,10 @@ export interface RouteInboundMessage {
  * Routing decisions — including unknown number and no-session — are returned as
  * outcomes. Only infrastructure failures (repository / brain) throw, so the route
  * can answer 200 for a handled delivery and 502 only when something is actually
- * broken. The brain append is the last side effect, so a 502 never leaves a
- * duplicate message on an OpenWA retry.
+ * broken. The brain append is kept as the last side effect, so a failed `setChatId`
+ * never leaves a half-appended message. (The append itself is at-least-once: with no
+ * idempotency key in V0, a dropped response after Anthropic recorded the event can
+ * still re-append on an OpenWA retry.)
  */
 export function createRouteInboundMessage(deps: RouteInboundMessageDeps): RouteInboundMessage {
   return {

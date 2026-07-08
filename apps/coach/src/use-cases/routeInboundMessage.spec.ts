@@ -53,6 +53,25 @@ describe("routeInboundMessage", () => {
     expect(outcome.status).toBe("forwarded");
   });
 
+  it("updates chat_id when the stored one differs (athlete changed chat)", async () => {
+    const { deps, setChatId } = makeDeps(makeAthlete({ chatId: "999@c.us" }));
+    const outcome = await createRouteInboundMessage(deps).execute(inbound);
+
+    expect(setChatId).toHaveBeenCalledWith("a-1", "32475123456@c.us");
+    expect(outcome.status).toBe("forwarded");
+  });
+
+  it("forwards a wrapped {event,data} envelope", async () => {
+    const { deps, appendUserMessage } = makeDeps(makeAthlete());
+    const outcome = await createRouteInboundMessage(deps).execute({
+      event: "message.received",
+      data: { from: "32475123456@c.us", body: "yo" }
+    });
+
+    expect(outcome.status).toBe("forwarded");
+    expect(appendUserMessage).toHaveBeenCalledWith("sesn_abc", "chat_id: 32475123456@c.us\nmessage: yo");
+  });
+
   it("ignores a known number that has no session yet", async () => {
     const { deps, appendUserMessage, setChatId } = makeDeps(makeAthlete({ anthropicSessionId: null }));
     const outcome = await createRouteInboundMessage(deps).execute(inbound);
@@ -116,6 +135,17 @@ describe("routeInboundMessage", () => {
     const findByPhone = vi.fn(() => Promise.reject(new Error("neon down")));
     const appendUserMessage = vi.fn(() => Promise.resolve());
     const deps = { repo: { findByPhone, setChatId: vi.fn(() => Promise.resolve()) }, brain: { appendUserMessage } };
+    await expect(createRouteInboundMessage(deps).execute(inbound)).rejects.toThrow("neon down");
+    expect(appendUserMessage).not.toHaveBeenCalled();
+  });
+
+  it("propagates a setChatId failure without appending (infra → 502 upstream)", async () => {
+    const appendUserMessage = vi.fn(() => Promise.resolve());
+    const setChatId = vi.fn(() => Promise.reject(new Error("neon down")));
+    const deps = {
+      repo: { findByPhone: vi.fn(() => Promise.resolve(makeAthlete({ chatId: null }))), setChatId },
+      brain: { appendUserMessage }
+    };
     await expect(createRouteInboundMessage(deps).execute(inbound)).rejects.toThrow("neon down");
     expect(appendUserMessage).not.toHaveBeenCalled();
   });
