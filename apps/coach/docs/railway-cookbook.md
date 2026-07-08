@@ -177,16 +177,18 @@ curl "$OWA_URL/api/sessions/$OWA_SESSION_ID/webhooks" -H "X-API-Key: $OWA_API_KE
 ### Côté app (Vercel — `apps/coach`)
 ```
 ANTHROPIC_API_KEY        = sk-ant-…
-ANTHROPIC_SESSION_ID     = <id de la session Managed fixe (sesn_…)>
+DATABASE_URL             = postgresql://…@…neon.tech/…?sslmode=require
+DB_ENCRYPTION_KEY        = <clé base64 32 octets>
 WHATSAPP_WEBHOOK_SECRET  = $OWA_WEBHOOK_SECRET   # optionnel
 ```
-(le mapper est fire-and-forget : l'agent envoie la réponse via son MCP OpenWA → pas de
-variable OpenWA ni de store côté app.)
+(le routing est fire-and-forget : l'agent envoie la réponse via son MCP OpenWA → pas de
+variable OpenWA côté app. Plus de session fixe en env : la session est résolue par
+`phone_num` dans Neon.)
 
 ### Côté Managed Agent (contrôle Anthropic, une fois)
 - **Vault `static_bearer`** pour le MCP OpenWA : **URL = `$OWA_URL/mcp`**, **token = `$OWA_API_KEY`**.
-- **Session fixe** créée avec ton agent coach + ce vault (+ celui d'intervals-icu-mcp) →
-  son id → `ANTHROPIC_SESSION_ID`.
+- **Session par athlète** créée avec l'agent coach + ce vault (+ celui d'intervals-icu-mcp) →
+  son id stocké en base dans `athlete.anthropic_session_id` (avec le `phone_num`).
 - **Prompt système** : reçoit `chat_id: …\nmessage: …` → répond via
   `MessageSendText(sessionId="<UUID session OpenWA>", chatId=<fourni>, text=…)`.
 
@@ -195,7 +197,7 @@ variable OpenWA ni de store côté app.)
 ## 8. Vérification bout-en-bout
 1. [ ] Envoie un message WhatsApp au numéro dédié depuis un autre téléphone.
 2. [ ] Logs Railway (OpenWA) : livraison du webhook.
-3. [ ] Logs Vercel (glue) : `handled chat=… sentViaMcp=… fallbackSent=…`.
+3. [ ] Logs Vercel (coach) : `forwarded athlete=… session=… chat=…` (ou `ignored delivery: <raison>`).
 4. [ ] Tu reçois la réponse du coach sur WhatsApp. 🎉
 
 ---

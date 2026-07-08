@@ -7,7 +7,8 @@ humain / déploiement / setup : `README.md`.
 
 App **full-stack unique** : le **backend** (route handlers `app/api/*` + logique `src/`) et,
 plus tard, l'**admin** (pages sous `app/(admin)/…`) vivent ensemble. Aujourd'hui, une seule
-capacité : le **mapper** WhatsApp → event Managed Agent.
+capacité : **router** un message WhatsApp entrant vers la bonne session Managed Agent, résolue
+par le `phone_num` de l'athlète en base (Neon).
 
 Séparation nette du système : le **cerveau** tourne chez Anthropic (Managed Agents),
 **WhatsApp** chez OpenWA/Railway. Cette app ne fait qu'**orchestrer** (stateless) → Vercel
@@ -23,37 +24,52 @@ aura besoin de compute persistant (queue, batch long) — pas avant.
 
 ```
 app/
-  api/webhooks/whatsapp/route.ts   # entrée HTTP fine : (verif HMAC optionnelle) → parse → mapper → 200
+  api/webhooks/whatsapp/route.ts   # entrée HTTP fine : (verif HMAC optionnelle) → parse → use-case → 200
   layout.tsx, page.tsx             # minimal
 src/
-  config/config.ts                 # env zod (ANTHROPIC_API_KEY, ANTHROPIC_SESSION_ID, WHATSAPP_WEBHOOK_SECRET?)
+  config/config.ts                 # env zod (ANTHROPIC_API_KEY, DATABASE_URL, DB_ENCRYPTION_KEY, WHATSAPP_WEBHOOK_SECRET?)
   auth.ts                          # verifyWebhookSignature (HMAC-SHA256 constant-time, X-OpenWA-Signature)
+  domain/athlete.ts                # modèle métier Athlete + enum AthleteStatus (indépendants de @inigo/db)
+  repositories/
+    athleteRepository.ts           # PORT AthleteRepository (findByPhone, setChatId)
+    drizzleAthleteRepository.ts     # ADAPTER Drizzle (requête inline) + toAthlete(row→modèle)
+  use-cases/
+    routeInboundMessage.ts         # LE use-case : une seule fonction publique execute()
   mappers/
-    whatsappToAnthropicManagedAgentsMapper.ts   # LE mapper (fire-and-forget)
-    whatsappPayload.ts             # schémas zod + normalisation du payload OpenWA
+    whatsappPayload.ts             # schémas zod + normalisation du payload OpenWA + senderPhone
   brain/managedAgents.ts           # FRONTIÈRE cerveau : appendUserMessage(sessionId,text) + adaptateur SDK
-  deps.ts                          # singleton lazy { config, brain }
+  deps.ts                          # singleton lazy { config, brain, db, repo }
 # futur : app/(admin)/… , app/api/admin/… , src/services/…
 ```
 
-## Contrat de mapping (le flux)
+## Contrat de routing (le flux)
 
 1. `route.ts` lit le **corps brut** ; si `WHATSAPP_WEBHOOK_SECRET` est set, vérifie
    `X-OpenWA-Signature` (HMAC sur le corps brut) ; sinon skip. Parse le JSON.
-2. `whatsappToAnthropicManagedAgentsMapper` : valide (zod), normalise l'enveloppe
-   (wrappée `{event,data}` ou plate), **ignore** `fromMe` / groupes / non-message /
-   messages sans texte.
-3. Formate `chat_id: <jid>\nmessage: <body>` et **append** à la session fixe via
-   `brain.appendUserMessage`. **Fire-and-forget** : on n'attend pas le run, on ne lit pas
-   la réponse — l'agent répond via son MCP OpenWA (tools exécutés server-side via le vault).
+2. `routeInboundMessage.execute` : valide (zod), normalise l'enveloppe (wrappée
+   `{event,data}` ou plate), **ignore** `fromMe` / groupes / non-message / messages sans texte.
+3. Résout l'athlète via `senderPhone` (JID → E.164) puis `repo.findByPhone`. Les décisions
+   métier sont **retournées** en `RouteOutcome` (union) : numéro inconnu (`unknown_number`),
+   athlète sans session (`no_session`), sender illisible (`invalid_sender`) → route en 200.
+   Seules les erreurs infra (Neon / Anthropic) throw → 502.
+4. Sur un athlète résolu avec session : persiste `chat_id` si nouveau (`repo.setChatId`),
+   formate `chat_id: <jid>\nmessage: <body>` et **append** à **sa** session via
+   `brain.appendUserMessage` (dernier effet de bord → pas de doublon sur retry OpenWA).
+   **Fire-and-forget** : on n'attend pas le run, l'agent répond via son MCP OpenWA
+   (tools exécutés server-side via le vault).
 
 ## Conventions (en plus de la racine)
 
 - **Frontière cerveau** : tout passe par `ManagedAgentBrain` (`src/brain/managedAgents.ts`).
   Un futur backend maison / maillage d'agents implémente cette interface — rien d'autre ne bouge.
-- **Routes minces, logique dans `src/`** → extraction facile si un jour on split backend/admin.
-- **Single-user assumé** : une session fixe (pas de mapping numéro→session, pas de store).
-  Multi-user = ajouter un store (Upstash) + mapping ; ne pas anticiper avant le besoin.
+- **Toute la logique métier vit dans des use-cases** (`src/use-cases/`) exposant une seule
+  fonction publique `execute`. Les routes restent minces (HTTP only).
+- **Accès données via un port `repository`** : le use-case ne dépend que de l'interface
+  (`repositories/athleteRepository.ts`), jamais de l'ORM. L'adapter Drizzle est la seule
+  couche qui connaît `@inigo/db`, et mappe les rows sur les **modèles métier** (`domain/`),
+  indépendants des types DB.
+- **Multi-athlète** : le routing résout l'athlète + sa session par `phone_num` en base (Neon).
+  Plus de session fixe en env ; pas de mapping en mémoire locale.
 - Secrets : env serveur uniquement, validés au boot, jamais en log.
 
 ## Hypothèses à vérifier au bring-up (documentées, non devinées)
@@ -76,6 +92,9 @@ le skill Claude Code `managed-agents-api`.
 ## Tests
 
 - Vitest co-localisés (`*.spec.ts`). `pnpm --filter @inigo/coach run test`.
-- Couvre : config, auth (HMAC), parsing/normalisation du payload, **mapper** (payload →
-  append correct + filtres), brain (fake SDK). Pas de réseau (fakes injectés).
+- Couvre : config, auth (HMAC), parsing/normalisation du payload + `senderPhone`, mapping
+  `toAthlete`, **use-case `routeInboundMessage`** (4 cas de routing + filtres + throws infra,
+  repo & brain fakes), brain (fake SDK). Pas de réseau (fakes injectés).
+- La spec d'intégration de l'adapter Drizzle (`*.integration.spec.ts`) tourne contre une vraie
+  branche Neon et se **skip** sans `DATABASE_URL`, donc `pnpm verify` reste offline.
 - `pnpm verify` (racine) doit être vert avant tout commit.
