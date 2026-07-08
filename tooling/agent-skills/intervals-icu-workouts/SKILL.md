@@ -24,14 +24,26 @@ reference/syntaxe-workout.md
 Une fois la séance rédigée, planifie-la avec le tool
 `intervals-icu-mcp:create_or_update_event` :
 
-- `startDateLocal` : date locale `YYYY-MM-DD` (ou datetime ISO).
+- `startDateLocal` : date locale `YYYY-MM-DD` **ou** datetime ISO (`YYYY-MM-DDT00:00:00`).
+  Le tool normalise une date nue à minuit avant l'appel, donc les deux formes passent.
 - `category` : `"WORKOUT"` pour une séance planifiée.
 - `name` : titre court de la séance.
 - `type` : `"Ride"`, `"Run"` ou `"Swim"`. **Décisif** : c'est lui qui fixe l'interprétation
   des cibles (une même ligne `10m 80%` = % FTP en `Ride`, % d'allure seuil en `Run`).
 - `description` : **le texte de la séance au format ci-dessous**.
 
-Pour modifier une séance existante, passe son `eventId` au même tool.
+Pour modifier une séance existante, passe son `eventId` au même tool. Pour ne pas décaler
+son horaire, récupère l'event avec `get_event` et renvoie son `start_date_local` tel quel.
+
+## Vérifier le rendu
+
+La structure ERG n'est pas un champ que l'on passe directement : c'est le texte de
+`description` que la plateforme parse en étapes. Après l'appel, relis l'event avec
+`get_event` et vérifie que l'objet `workout_doc` renvoyé contient bien des `steps` (liste
+non vide). Si `steps` est vide, le texte n'a pas parsé (souvent une ligne mal formée) et la
+séance est vide côté athlète.
+
+Pour une cible ERG stable, préfère une valeur unique (`110%`) à une plage (`108-112%`).
 
 ## Format d'une ligne
 

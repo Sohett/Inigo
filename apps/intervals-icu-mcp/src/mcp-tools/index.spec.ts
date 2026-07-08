@@ -82,7 +82,19 @@ describe("registerIntervalsIcuTools", () => {
     });
     const content = result.content as { type: string; text: string }[];
     const parsed = JSON.parse(content[0]!.text) as Record<string, unknown>;
-    expect(parsed["start_date_local"]).toBe("2026-07-01");
+    // A bare date is normalized to a full datetime: Intervals.icu 422s on a date-only value.
+    expect(parsed["start_date_local"]).toBe("2026-07-01T00:00:00");
     expect(parsed["category"]).toBe("WORKOUT");
+  });
+
+  it("passes a full datetime start through unchanged", async () => {
+    const client = await connect({ enableWriteTools: true });
+    const result = await client.callTool({
+      name: "create_or_update_event",
+      arguments: { startDateLocal: "2026-07-01T09:30:00", category: "WORKOUT", name: "Intervals" }
+    });
+    const content = result.content as { type: string; text: string }[];
+    const parsed = JSON.parse(content[0]!.text) as Record<string, unknown>;
+    expect(parsed["start_date_local"]).toBe("2026-07-01T09:30:00");
   });
 });
