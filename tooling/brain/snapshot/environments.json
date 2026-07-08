@@ -21,9 +21,7 @@
       },
       "networking": {
         "type": "unrestricted"
-      },
-      "init_script": "",
-      "environment": {}
+      }
     },
     "metadata": {},
     "scope": "organization"

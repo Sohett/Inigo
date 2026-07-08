@@ -145,7 +145,7 @@
     ],
     "stats": {
       "active_seconds": 984.489,
-      "duration_seconds": 45889.852662487
+      "duration_seconds": 177828.527622238
     },
     "status": "idle",
     "title": "Weekly coach planning",
@@ -676,7 +676,7 @@
     ],
     "stats": {
       "active_seconds": 1990.143,
-      "duration_seconds": 264189.193211731
+      "duration_seconds": 396127.868135678
     },
     "status": "idle",
     "title": "Multi-agent archi Inigo v8",
@@ -1186,7 +1186,7 @@
     ],
     "stats": {
       "active_seconds": 1384.017,
-      "duration_seconds": 266884.710045536
+      "duration_seconds": 398823.384972658
     },
     "status": "idle",
     "title": "Multi-agent archi Inigo v6",
@@ -1775,7 +1775,7 @@
     ],
     "stats": {
       "active_seconds": 1569.834,
-      "duration_seconds": 273905.643922909
+      "duration_seconds": 405844.318865245
     },
     "status": "idle",
     "title": "Multi-agent archi Inigo v4",
@@ -2298,7 +2298,7 @@
     ],
     "stats": {
       "active_seconds": 88.042,
-      "duration_seconds": 276129.983133324
+      "duration_seconds": 408068.658109639
     },
     "status": "idle",
     "title": "Multi-agent archi Inigo",
@@ -2406,7 +2406,7 @@
     ],
     "stats": {
       "active_seconds": 248.03300000000002,
-      "duration_seconds": 371144.344587104
+      "duration_seconds": 503083.019580349
     },
     "status": "idle",
     "title": "Inigo Coach V.1.2",
@@ -2495,7 +2495,7 @@
     "resources": [],
     "stats": {
       "active_seconds": 493.374,
-      "duration_seconds": 460923.134217848
+      "duration_seconds": 592861.809203702
     },
     "status": "idle",
     "title": "First try at WhatsApp connection with Inigo Coach",

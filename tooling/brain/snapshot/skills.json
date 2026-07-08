@@ -1,12 +1,21 @@
 [
   {
     "type": "skill",
+    "id": "skill_01YBXkUnFtTZjfaZXfW2kxwQ",
+    "created_at": "2026-07-08T08:01:02.177757Z",
+    "updated_at": "2026-07-08T08:01:02.177856Z",
+    "display_title": "validators",
+    "source": "custom",
+    "latest_version": "1783497661785571"
+  },
+  {
+    "type": "skill",
     "id": "skill_011bUNcWCzVJhbtVxCNfCC3q",
     "created_at": "2026-07-03T20:19:44.399180Z",
-    "updated_at": "2026-07-03T20:19:44.399320Z",
+    "updated_at": "2026-07-08T09:56:38.461369Z",
     "display_title": "intervals-icu-workouts",
     "source": "custom",
-    "latest_version": "1783109983944625"
+    "latest_version": "1783504598035912"
   },
   {
     "type": "skill",

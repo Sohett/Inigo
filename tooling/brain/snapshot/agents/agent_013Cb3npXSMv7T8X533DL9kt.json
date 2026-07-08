@@ -30,7 +30,7 @@
       {
         "id": "agent_01CTK33Z2CLPwtDyq9vKDsVG",
         "type": "agent",
-        "version": 5
+        "version": 6
       },
       {
         "id": "agent_01Dbg6WeAF41xSs8bTfiE8XD",
@@ -40,7 +40,7 @@
       {
         "id": "agent_012ethnUdHzvRW9iPxdzzbTx",
         "type": "agent",
-        "version": 6
+        "version": 7
       }
     ],
     "type": "coordinator"
@@ -49,6 +49,11 @@
   "skills": [
     {
       "skill_id": "skill_011bUNcWCzVJhbtVxCNfCC3q",
+      "type": "custom",
+      "version": "latest"
+    },
+    {
+      "skill_id": "skill_01YBXkUnFtTZjfaZXfW2kxwQ",
       "type": "custom",
       "version": "latest"
     }
@@ -139,6 +144,6 @@
     }
   ],
   "type": "agent",
-  "updated_at": "2026-07-03T20:25:19.475536Z",
-  "version": 8
+  "updated_at": "2026-07-08T08:06:41.691197Z",
+  "version": 10
 }
