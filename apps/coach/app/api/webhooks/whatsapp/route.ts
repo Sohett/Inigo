@@ -1,6 +1,6 @@
 import { getDeps } from "../../../../src/deps";
 import { verifyWebhookSignature, OPENWA_SIGNATURE_HEADER } from "../../../../src/auth";
-import { whatsappToAnthropicManagedAgentsMapper } from "../../../../src/mappers/whatsappToAnthropicManagedAgentsMapper";
+import { createRouteInboundMessage } from "../../../../src/use-cases/routeInboundMessage";
 
 // Webhook deliveries are dynamic and must never be cached.
 export const dynamic = "force-dynamic";
@@ -34,14 +34,14 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   try {
-    const result = await whatsappToAnthropicManagedAgentsMapper(
-      { brain: deps.brain, sessionId: deps.config.ANTHROPIC_SESSION_ID },
-      payload
-    );
-    if (result.status === "forwarded") {
-      console.info(`[coach] forwarded chat=${result.chatId}`);
+    const routeInboundMessage = createRouteInboundMessage({ repo: deps.repo, brain: deps.brain });
+    const outcome = await routeInboundMessage.execute(payload);
+    if (outcome.status === "forwarded") {
+      console.info(
+        `[coach] forwarded athlete=${outcome.athleteId} session=${outcome.sessionId} chat=${outcome.chatId}`
+      );
     } else {
-      console.info(`[coach] ignored delivery: ${result.reason}`);
+      console.info(`[coach] ignored delivery: ${outcome.reason}`);
     }
   } catch (error) {
     console.error("[coach] failed to forward inbound message", error);

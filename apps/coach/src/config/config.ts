@@ -6,16 +6,12 @@ import { z } from "zod";
  * Validated once at startup so a misconfigured deployment fails fast and loudly.
  * Never logs secret values. Deliberately minimal: the WhatsApp reply path is
  * MCP-native (the agent sends via its OpenWA MCP tool), so this service only
- * needs to append inbound messages to a fixed managed-agent session.
+ * needs to append each inbound message to the session resolved for its athlete
+ * (by `phone_num`, in Neon — no fixed session env var).
  */
 export const configSchema = z.object({
   /** Anthropic API key. Server-side only. */
   ANTHROPIC_API_KEY: z.string().min(1, "ANTHROPIC_API_KEY is required"),
-  /**
-   * Id of the pre-created managed-agent session inbound messages are appended to
-   * (single-user MVP: one fixed session = the conversation's memory).
-   */
-  ANTHROPIC_SESSION_ID: z.string().min(1, "ANTHROPIC_SESSION_ID is required"),
   /**
    * Optional shared secret to verify the OpenWA `X-OpenWA-Signature` webhook HMAC.
    * When unset, signature verification is skipped (MVP relies on a non-guessable
