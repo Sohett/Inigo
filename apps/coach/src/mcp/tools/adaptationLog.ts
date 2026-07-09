@@ -1,12 +1,9 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { AdaptationEntry, ScopedAthleteDataStore } from "../store/athleteDataStore";
-import { runTool } from "./result";
+import type { AdaptationEntry, AthleteDataStore } from "../store/athleteDataStore";
+import { athleteIdShape, runTool } from "./result";
 
-export function registerAdaptationLogReadTools(
-  server: McpServer,
-  store: ScopedAthleteDataStore
-): void {
+export function registerAdaptationLogReadTools(server: McpServer, store: AthleteDataStore): void {
   server.registerTool(
     "get_adaptation_log",
     {
@@ -15,6 +12,7 @@ export function registerAdaptationLogReadTools(
         "Read the athlete's coaching journal (append-only): recent adaptation decisions with their " +
         "trigger and rationale, newest first.",
       inputSchema: {
+        ...athleteIdShape,
         limit: z
           .number()
           .int()
@@ -25,14 +23,14 @@ export function registerAdaptationLogReadTools(
         since: z.string().optional().describe("Only entries on/after this ISO date/datetime.")
       }
     },
-    (args) => runTool(() => store.getAdaptationLog({ limit: args.limit, since: args.since }))
+    (args) =>
+      runTool(() =>
+        store.forAthlete(args.athleteId).getAdaptationLog({ limit: args.limit, since: args.since })
+      )
   );
 }
 
-export function registerAdaptationLogWriteTools(
-  server: McpServer,
-  store: ScopedAthleteDataStore
-): void {
+export function registerAdaptationLogWriteTools(server: McpServer, store: AthleteDataStore): void {
   server.registerTool(
     "log_adaptation",
     {
@@ -41,6 +39,7 @@ export function registerAdaptationLogWriteTools(
         "Append one entry to the athlete's coaching journal (append-only, never edits an existing " +
         "entry). Record what was decided/observed and why.",
       inputSchema: {
+        ...athleteIdShape,
         summary: z.string().min(1).describe("What was decided or observed (required)."),
         author: z.string().optional().describe('Who logged it (agent name or "thomas").'),
         trigger: z
@@ -58,7 +57,7 @@ export function registerAdaptationLogWriteTools(
         if (args.trigger !== undefined) entry.trigger = args.trigger;
         if (args.detail !== undefined) entry.detail = args.detail;
         if (args.relatedWeek !== undefined) entry.relatedWeek = args.relatedWeek;
-        return store.logAdaptation(entry);
+        return store.forAthlete(args.athleteId).logAdaptation(entry);
       })
   );
 }

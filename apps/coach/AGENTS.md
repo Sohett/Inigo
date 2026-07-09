@@ -25,7 +25,7 @@ aura besoin de compute persistant (queue, batch long) — pas avant.
 ```
 app/
   api/webhooks/whatsapp/route.ts        # entrée HTTP fine : (verif HMAC optionnelle) → parse → use-case → 200
-  athlete/[athleteId]/api/[transport]/route.ts  # endpoint MCP athlete-data, scopé par athleteId (bearer requis)
+  api/[transport]/route.ts              # endpoint MCP athlete-data statique (/api/mcp), bearer requis
   layout.tsx, page.tsx                  # minimal
 src/
   config/config.ts                 # env zod (ANTHROPIC_API_KEY, DATABASE_URL, DB_ENCRYPTION_KEY, WHATSAPP_WEBHOOK_SECRET?, MCP_BEARER_TOKEN, ENABLE_WRITE_TOOLS)
@@ -59,8 +59,8 @@ src/
 4. Sur un athlète résolu avec session : persiste `chat_id` si nouveau (`repo.setChatId`),
    formate l'enveloppe `inigo_athlete_id: <uuid>\nchat_id: <jid>\nmessage: <body>` et **append**
    à **sa** session via `brain.appendUserMessage` (dernier effet de bord → pas de doublon sur
-   retry OpenWA). `inigo_athlete_id` = l'`athlete.id` interne (Neon), la clé que l'agent utilise
-   pour joindre le MCP athlete-data (`/athlete/{id}/api/mcp`) — **pas** l'id Intervals.icu.
+   retry OpenWA). `inigo_athlete_id` = l'`athlete.id` interne (Neon), que l'agent repasse en
+   argument `athleteId` aux tools du MCP athlete-data (`/api/mcp`) — **pas** l'id Intervals.icu.
    **Fire-and-forget** : on n'attend pas le run, l'agent répond via son MCP OpenWA
    (tools exécutés server-side via le vault).
 
@@ -70,18 +70,17 @@ Un serveur MCP hébergé **dans coach** (choix assumé : pas d'app séparée) do
 (Managed Agent) un accès runtime à la donnée athlète structurée en Neon. Calqué sur
 `intervals-icu-mcp` : `mcp-handler` + `withMcpAuth` + tools fins.
 
-- **Endpoint** : `POST/GET /athlete/{athlete.id}/api/mcp`. **Scopé par l'UUID de l'athlète
-  dans l'URL** → chaque session Managed Agent porte sa propre URL dans son vault, et un store
-  déjà lié à cet athlète (`athleteData.forAthlete(id)`) : une session ne peut toucher qu'à
-  *sa* donnée. L'UUID est validé (`z.uuid()` → 400 sinon).
-- **L'agent connaît son `athlete.id`** parce que le routing l'injecte dans chaque message
-  (`inigo_athlete_id: <uuid>`, cf. contrat de routing) — c'est la même clé que dans l'URL du
-  MCP, et explicitement *l'id Inigo*, pas l'id Intervals.icu.
+- **Endpoint statique** : `POST/GET /api/mcp` (`basePath: "/api"`, comme `intervals-icu-mcp`).
+  **Pas d'URL dynamique par athlète** : un Managed Agent configure une seule URL de serveur MCP,
+  fixe et partagée par toute la topologie d'agents et par tous les athlètes. L'athlète est donc
+  **passé en argument de chaque tool** (`athleteId`), pas dans l'URL.
+- **L'agent sait quel `athleteId` passer** parce que le routing l'injecte dans chaque message
+  (`inigo_athlete_id: <uuid>`, cf. contrat de routing) — explicitement *l'id Inigo*, pas l'id
+  Intervals.icu. Chaque handler de tool fait `store.forAthlete(args.athleteId)` (query scopée).
 - **Auth** : bearer global `MCP_BEARER_TOKEN` (constant-time), `withMcpAuth({ required: true })`
-  → 401 sans token. Le path isole l'athlète ; le bearer prouve que l'appelant est le brain.
-  (Tokens par-athlète = durcissement futur.)
-- **Handler construit par requête** (l'athlète vient du segment d'URL) : `basePath =
-  /athlete/${id}/api` car `mcp-handler` matche l'endpoint comme `${basePath}/mcp`.
+  → 401 sans token. Le bearer prouve que l'appelant est le brain, **pas** quel athlète : avec
+  l'id en argument, l'isolation repose sur le fait que l'agent passe le bon `athleteId`.
+  Durcissement futur : un bearer par athlète qui rejette côté serveur tout `athleteId` ≠ celui du token.
 - **Écritures gated** par `ENABLE_WRITE_TOOLS` (off par défaut, least-privilege).
 
 **Contrat des tools** (noms distincts d'`intervals-icu-mcp` pour garder la frontière lisible) :

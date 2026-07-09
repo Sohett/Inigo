@@ -1,5 +1,5 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { ScopedAthleteDataStore } from "../store/athleteDataStore";
+import type { AthleteDataStore } from "../store/athleteDataStore";
 import { registerProfileReadTools, registerProfileWriteTools } from "./profile";
 import { registerThresholdTools } from "./thresholds";
 import { registerGoalReadTools, registerGoalWriteTools } from "./goals";
@@ -12,13 +12,14 @@ export interface RegisterToolsOptions {
 }
 
 /**
- * Register all athlete-data tools on the given MCP server. The store is already scoped to
- * one athlete, so tools never take an athleteId. Read tools are always registered; write
- * tools only when explicitly enabled (least-privilege by default).
+ * Register all athlete-data tools on the given MCP server. Every tool takes an `athleteId`
+ * argument (the endpoint is a single static server shared by all athletes) and scopes its
+ * query with `store.forAthlete(athleteId)`. Read tools are always registered; write tools
+ * only when explicitly enabled (least-privilege by default).
  */
 export function registerAthleteDataTools(
   server: McpServer,
-  store: ScopedAthleteDataStore,
+  store: AthleteDataStore,
   options: RegisterToolsOptions
 ): void {
   registerProfileReadTools(server, store);

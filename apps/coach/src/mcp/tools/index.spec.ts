@@ -2,13 +2,15 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import type { ScopedAthleteDataStore } from "../store/athleteDataStore";
+import type { AthleteDataStore } from "../store/athleteDataStore";
 import { registerAthleteDataTools, type RegisterToolsOptions } from "./index";
 
-function createMockStore(): ScopedAthleteDataStore {
-  const mock: Partial<Record<keyof ScopedAthleteDataStore, unknown>> = {
+const ATHLETE_ID = "11111111-1111-4111-8111-111111111111";
+
+function createMockStore(): AthleteDataStore {
+  const scoped = {
     getProfile: async () => ({
-      athleteId: "a1",
+      athleteId: ATHLETE_ID,
       displayName: "Thomas",
       timezone: "Europe/Brussels",
       locale: "fr",
@@ -19,11 +21,11 @@ function createMockStore(): ScopedAthleteDataStore {
     getGoals: async () => [{ id: "g1", title: "Race", status: "active" }],
     getTrainingPlan: async () => ({ plan: { id: "p1", name: "Base" }, blocks: [] }),
     getAdaptationLog: async () => [{ id: "l1", summary: "rest day" }],
-    updateProfile: async () => ({ athleteId: "a1", profile: { healthNotes: "updated" } }),
+    updateProfile: async () => ({ athleteId: ATHLETE_ID, profile: { healthNotes: "updated" } }),
     logAdaptation: async () => ({ id: "l2", summary: "logged an adaptation" }),
     upsertGoal: async () => ({ id: "g2", title: "New goal" })
   };
-  return mock as unknown as ScopedAthleteDataStore;
+  return { forAthlete: () => scoped } as unknown as AthleteDataStore;
 }
 
 async function connect(options: RegisterToolsOptions) {
@@ -57,6 +59,13 @@ describe("registerAthleteDataTools", () => {
     );
   });
 
+  it("requires athleteId on every tool", async () => {
+    const { tools } = await readOnlyClient.listTools();
+    for (const tool of tools) {
+      expect(tool.inputSchema.required ?? []).toContain("athleteId");
+    }
+  });
+
   it("does not register write tools when disabled", async () => {
     const { tools } = await readOnlyClient.listTools();
     const names = tools.map((tool) => tool.name);
@@ -74,8 +83,11 @@ describe("registerAthleteDataTools", () => {
     );
   });
 
-  it("calls a read tool and returns JSON content from the store", async () => {
-    const result = await readOnlyClient.callTool({ name: "get_profile", arguments: {} });
+  it("calls a read tool with an athleteId and returns JSON content from the store", async () => {
+    const result = await readOnlyClient.callTool({
+      name: "get_profile",
+      arguments: { athleteId: ATHLETE_ID }
+    });
     const content = result.content as { type: string; text: string }[];
     expect(content[0]?.type).toBe("text");
     const parsed = JSON.parse(content[0]!.text) as { displayName: string };
@@ -86,7 +98,7 @@ describe("registerAthleteDataTools", () => {
     const client = await connect({ enableWriteTools: true });
     const result = await client.callTool({
       name: "log_adaptation",
-      arguments: { summary: "logged an adaptation" }
+      arguments: { athleteId: ATHLETE_ID, summary: "logged an adaptation" }
     });
     const content = result.content as { type: string; text: string }[];
     const parsed = JSON.parse(content[0]!.text) as { summary: string };
@@ -95,7 +107,10 @@ describe("registerAthleteDataTools", () => {
 
   it("rejects upsert_goal with neither id nor title", async () => {
     const client = await connect({ enableWriteTools: true });
-    const result = await client.callTool({ name: "upsert_goal", arguments: {} });
+    const result = await client.callTool({
+      name: "upsert_goal",
+      arguments: { athleteId: ATHLETE_ID }
+    });
     expect(result.isError).toBe(true);
     const content = result.content as { type: string; text: string }[];
     expect(content[0]!.text).toMatch(/requires a title/i);
@@ -105,7 +120,7 @@ describe("registerAthleteDataTools", () => {
     const client = await connect({ enableWriteTools: true });
     const result = await client.callTool({
       name: "upsert_goal",
-      arguments: { id: "11111111-1111-4111-8111-111111111111" }
+      arguments: { athleteId: ATHLETE_ID, id: "22222222-2222-4222-8222-222222222222" }
     });
     expect(result.isError).toBe(true);
     const content = result.content as { type: string; text: string }[];
