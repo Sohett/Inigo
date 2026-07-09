@@ -26,3 +26,15 @@ export function verifyWebhookSignature(
   if (provided.length !== expectedBuffer.length) return false;
   return timingSafeEqual(provided, expectedBuffer);
 }
+
+/**
+ * Constant-time comparison of a presented bearer token against the expected secret.
+ * Used to authenticate the brain on the athlete-data MCP endpoint. Returns false on
+ * a length mismatch without leaking timing information.
+ */
+export function verifyBearerToken(provided: string, expected: string): boolean {
+  const presented = Buffer.from(provided);
+  const secret = Buffer.from(expected);
+  if (presented.length !== secret.length) return false;
+  return timingSafeEqual(presented, secret);
+}

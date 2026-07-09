@@ -4,7 +4,8 @@ import { loadConfig } from "./config";
 const base: Record<string, string> = {
   ANTHROPIC_API_KEY: "sk-ant-xxx",
   DATABASE_URL: "postgresql://user:pass@host/db?sslmode=require",
-  DB_ENCRYPTION_KEY: Buffer.alloc(32).toString("base64")
+  DB_ENCRYPTION_KEY: Buffer.alloc(32).toString("base64"),
+  MCP_BEARER_TOKEN: "a-very-long-mcp-bearer-token"
 };
 
 describe("loadConfig", () => {
@@ -42,5 +43,26 @@ describe("loadConfig", () => {
     expect(() => loadConfig({ ...base, WHATSAPP_WEBHOOK_SECRET: "short" })).toThrow(
       /WHATSAPP_WEBHOOK_SECRET/
     );
+  });
+
+  it("throws when MCP_BEARER_TOKEN is missing", () => {
+    const { MCP_BEARER_TOKEN, ...rest } = base;
+    void MCP_BEARER_TOKEN;
+    expect(() => loadConfig(rest)).toThrow(/MCP_BEARER_TOKEN/);
+  });
+
+  it("throws when MCP_BEARER_TOKEN is too short", () => {
+    expect(() => loadConfig({ ...base, MCP_BEARER_TOKEN: "short" })).toThrow(/MCP_BEARER_TOKEN/);
+  });
+
+  it("defaults ENABLE_WRITE_TOOLS to false", () => {
+    expect(loadConfig(base).ENABLE_WRITE_TOOLS).toBe(false);
+  });
+
+  it("coerces ENABLE_WRITE_TOOLS truthy strings to a boolean", () => {
+    expect(loadConfig({ ...base, ENABLE_WRITE_TOOLS: "true" }).ENABLE_WRITE_TOOLS).toBe(true);
+    expect(loadConfig({ ...base, ENABLE_WRITE_TOOLS: "1" }).ENABLE_WRITE_TOOLS).toBe(true);
+    expect(loadConfig({ ...base, ENABLE_WRITE_TOOLS: "false" }).ENABLE_WRITE_TOOLS).toBe(false);
+    expect(loadConfig({ ...base, ENABLE_WRITE_TOOLS: "0" }).ENABLE_WRITE_TOOLS).toBe(false);
   });
 });

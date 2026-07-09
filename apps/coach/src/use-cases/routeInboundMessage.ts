@@ -90,7 +90,10 @@ export function createRouteInboundMessage(deps: RouteInboundMessageDeps): RouteI
       if (athlete.chatId !== chatId) {
         await deps.repo.setChatId(athlete.id, chatId);
       }
-      await deps.brain.appendUserMessage(athlete.anthropicSessionId, formatTurn(chatId, text));
+      await deps.brain.appendUserMessage(
+        athlete.anthropicSessionId,
+        formatTurn(athlete.id, chatId, text)
+      );
 
       return { status: "forwarded", athleteId: athlete.id, sessionId: athlete.anthropicSessionId, chatId };
     }
@@ -102,10 +105,13 @@ function ignored(reason: IgnoreReason): RouteOutcome {
 }
 
 /**
- * Format a turn so the agent knows which WhatsApp chat to reply to. The agent's
- * system prompt (configured on the control plane) explains this envelope and
- * instructs it to reply via the OpenWA send tool using `chat_id`.
+ * Format a turn the agent can act on. The envelope carries:
+ *  - `inigo_athlete_id`: our internal athlete UUID (`athlete.id` in Neon). This is the
+ *    key the agent uses to reach the athlete-data MCP (`/athlete/{id}/api/mcp`). It is
+ *    deliberately NOT the Intervals.icu athlete id — that one lives in the Intervals MCP.
+ *  - `chat_id`: the WhatsApp chat to reply to (via the OpenWA send tool).
+ * The agent's system prompt (configured on the control plane) explains this envelope.
  */
-export function formatTurn(chatId: string, text: string): string {
-  return `chat_id: ${chatId}\nmessage: ${text}`;
+export function formatTurn(inigoAthleteId: string, chatId: string, text: string): string {
+  return `inigo_athlete_id: ${inigoAthleteId}\nchat_id: ${chatId}\nmessage: ${text}`;
 }

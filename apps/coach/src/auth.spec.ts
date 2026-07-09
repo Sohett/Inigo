@@ -1,6 +1,6 @@
 import { createHmac } from "node:crypto";
 import { describe, it, expect } from "vitest";
-import { verifyWebhookSignature } from "./auth";
+import { verifyBearerToken, verifyWebhookSignature } from "./auth";
 
 const SECRET = "a-very-long-webhook-secret-value";
 
@@ -31,5 +31,22 @@ describe("verifyWebhookSignature", () => {
 
   it("rejects a length-mismatched signature without throwing", () => {
     expect(verifyWebhookSignature("{}", "sha256=short", SECRET)).toBe(false);
+  });
+});
+
+describe("verifyBearerToken", () => {
+  const TOKEN = "a-very-long-mcp-bearer-token";
+
+  it("accepts the exact token", () => {
+    expect(verifyBearerToken(TOKEN, TOKEN)).toBe(true);
+  });
+
+  it("rejects a wrong token of equal length", () => {
+    const wrong = "x".repeat(TOKEN.length);
+    expect(verifyBearerToken(wrong, TOKEN)).toBe(false);
+  });
+
+  it("rejects a length-mismatched token without throwing", () => {
+    expect(verifyBearerToken("short", TOKEN)).toBe(false);
   });
 });
