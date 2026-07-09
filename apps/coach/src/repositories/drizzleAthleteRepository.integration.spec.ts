@@ -14,6 +14,7 @@ import { createDrizzleAthleteRepository } from "./drizzleAthleteRepository";
  */
 const databaseUrl = process.env.DATABASE_URL;
 const TEST_PHONE = "+320000000005"; // reserved test number, never a real athlete
+const TEST_LID = "990000000000005@lid"; // reserved test LID, never a real athlete
 
 describe.skipIf(!databaseUrl)("drizzleAthleteRepository (integration)", () => {
   let db: Db;
@@ -24,7 +25,12 @@ describe.skipIf(!databaseUrl)("drizzleAthleteRepository (integration)", () => {
     await db.delete(athlete).where(eq(athlete.phoneNum, TEST_PHONE));
     const inserted = await db
       .insert(athlete)
-      .values({ phoneNum: TEST_PHONE, displayName: "Repo Integration", anthropicSessionId: "sesn_test" })
+      .values({
+        phoneNum: TEST_PHONE,
+        whatsappLid: TEST_LID,
+        displayName: "Repo Integration",
+        anthropicSessionId: "sesn_test"
+      })
       .returning({ id: athlete.id });
     const row = inserted[0];
     expect(row).toBeDefined();
@@ -49,6 +55,19 @@ describe.skipIf(!databaseUrl)("drizzleAthleteRepository (integration)", () => {
   it("returns null for an unknown phone", async () => {
     const repo = createDrizzleAthleteRepository(db);
     expect(await repo.findByPhone("+329999999999")).toBeNull();
+  });
+
+  it("finds an athlete by WhatsApp LID and maps it to the domain model", async () => {
+    const repo = createDrizzleAthleteRepository(db);
+    const found = await repo.findByLid(TEST_LID);
+    expect(found).not.toBeNull();
+    expect(found!.id).toBe(athleteId);
+    expect(found!.whatsappLid).toBe(TEST_LID);
+  });
+
+  it("returns null for an unknown LID", async () => {
+    const repo = createDrizzleAthleteRepository(db);
+    expect(await repo.findByLid("000000000000000@lid")).toBeNull();
   });
 
   it("persists chat_id", async () => {

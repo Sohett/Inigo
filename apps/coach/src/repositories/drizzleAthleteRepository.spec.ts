@@ -9,6 +9,7 @@ function makeRow(overrides: Partial<AthleteRow> = {}): AthleteRow {
     id: "a-1",
     displayName: "Thomas",
     phoneNum: "+32475123456",
+    whatsappLid: "10325252415590@lid",
     chatId: "32475123456@c.us",
     timezone: "Europe/Brussels",
     locale: "fr",
@@ -28,6 +29,7 @@ describe("toAthlete", () => {
       id: "a-1",
       displayName: "Thomas",
       phoneNum: "+32475123456",
+      whatsappLid: "10325252415590@lid",
       chatId: "32475123456@c.us",
       status: "active",
       anthropicSessionId: "sesn_abc",
@@ -44,7 +46,7 @@ describe("toAthlete", () => {
 
   it("does not leak DB-only columns (timezone, timestamps, memoryStoreId)", () => {
     expect(Object.keys(toAthlete(makeRow())).sort()).toEqual(
-      ["anthropicSessionId", "chatId", "displayName", "id", "managedAgentId", "phoneNum", "status"].sort()
+      ["anthropicSessionId", "chatId", "displayName", "id", "managedAgentId", "phoneNum", "status", "whatsappLid"].sort()
     );
   });
 });

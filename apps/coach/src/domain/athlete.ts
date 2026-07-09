@@ -12,8 +12,13 @@ export type AthleteStatus = "active" | "paused" | "ended";
 export interface Athlete {
   id: string;
   displayName: string | null;
-  /** WhatsApp number in E.164 (`+32…`). The routing key. */
+  /** WhatsApp number in E.164 (`+32…`). A routing key. */
   phoneNum: string;
+  /**
+   * WhatsApp LID JID (`…@lid`) for senders identified by a linked id instead of
+   * a phone number; a routing key alongside `phoneNum`. Null until known.
+   */
+  whatsappLid: string | null;
   /** WhatsApp chat id the agent replies to; null until the first inbound message. */
   chatId: string | null;
   status: AthleteStatus;

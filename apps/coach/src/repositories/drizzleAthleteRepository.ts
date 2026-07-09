@@ -15,6 +15,7 @@ export function toAthlete(row: AthleteRow): Athlete {
     id: row.id,
     displayName: row.displayName,
     phoneNum: row.phoneNum,
+    whatsappLid: row.whatsappLid,
     chatId: row.chatId,
     status: row.status,
     anthropicSessionId: row.anthropicSessionId,
@@ -30,6 +31,11 @@ export function createDrizzleAthleteRepository(db: Db): AthleteRepository {
   return {
     async findByPhone(phoneNum: string): Promise<Athlete | null> {
       const rows = await db.select().from(athlete).where(eq(athlete.phoneNum, phoneNum)).limit(1);
+      const row = rows[0];
+      return row ? toAthlete(row) : null;
+    },
+    async findByLid(whatsappLid: string): Promise<Athlete | null> {
+      const rows = await db.select().from(athlete).where(eq(athlete.whatsappLid, whatsappLid)).limit(1);
       const row = rows[0];
       return row ? toAthlete(row) : null;
     },

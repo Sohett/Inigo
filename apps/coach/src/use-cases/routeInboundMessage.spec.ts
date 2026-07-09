@@ -8,6 +8,7 @@ function makeAthlete(overrides: Partial<Athlete> = {}): Athlete {
     id: "a-1",
     displayName: "Thomas",
     phoneNum: "+32475123456",
+    whatsappLid: null,
     chatId: "32475123456@c.us",
     status: "active",
     anthropicSessionId: "sesn_abc",
@@ -19,13 +20,16 @@ function makeAthlete(overrides: Partial<Athlete> = {}): Athlete {
 function makeDeps(athlete: Athlete | null) {
   const appendUserMessage = vi.fn(() => Promise.resolve());
   const findByPhone = vi.fn((_phone: string) => Promise.resolve(athlete));
+  const findByLid = vi.fn((_lid: string) => Promise.resolve(athlete));
   const setChatId = vi.fn(() => Promise.resolve());
-  const repo: AthleteRepository = { findByPhone, setChatId };
-  return { deps: { repo, brain: { appendUserMessage } }, appendUserMessage, findByPhone, setChatId };
+  const repo: AthleteRepository = { findByPhone, findByLid, setChatId };
+  return { deps: { repo, brain: { appendUserMessage } }, appendUserMessage, findByPhone, findByLid, setChatId };
 }
 
 // A plausible inbound text from an athlete whose stored phone is +32475123456.
 const inbound = { from: "32475123456@c.us", body: "salut", type: "text" };
+// The same athlete arriving via WhatsApp LID addressing (no phone in the payload).
+const lidInbound = { from: "10325252415590@lid", chatId: "10325252415590@lid", body: "ok", type: "text", isLidSender: true };
 
 describe("routeInboundMessage", () => {
   it("forwards a known athlete's message to their resolved session", async () => {
@@ -70,6 +74,39 @@ describe("routeInboundMessage", () => {
 
     expect(outcome.status).toBe("forwarded");
     expect(appendUserMessage).toHaveBeenCalledWith("sesn_abc", "chat_id: 32475123456@c.us\nmessage: yo");
+  });
+
+  it("forwards a LID sender to their session, resolved by LID not phone", async () => {
+    const athlete = makeAthlete({ whatsappLid: "10325252415590@lid", chatId: "10325252415590@lid" });
+    const { deps, appendUserMessage, findByLid, findByPhone } = makeDeps(athlete);
+    const outcome = await createRouteInboundMessage(deps).execute(lidInbound);
+
+    expect(findByLid).toHaveBeenCalledWith("10325252415590@lid");
+    expect(findByPhone).not.toHaveBeenCalled();
+    expect(appendUserMessage).toHaveBeenCalledWith("sesn_abc", "chat_id: 10325252415590@lid\nmessage: ok");
+    expect(outcome).toEqual({
+      status: "forwarded",
+      athleteId: "a-1",
+      sessionId: "sesn_abc",
+      chatId: "10325252415590@lid"
+    });
+  });
+
+  it("ignores a LID sender that matches no athlete", async () => {
+    const { deps, findByLid, findByPhone } = makeDeps(null);
+    const outcome = await createRouteInboundMessage(deps).execute(lidInbound);
+
+    expect(findByLid).toHaveBeenCalledWith("10325252415590@lid");
+    expect(findByPhone).not.toHaveBeenCalled();
+    expect(outcome).toEqual({ status: "ignored", reason: "unknown_number" });
+  });
+
+  it("resolves a phone sender via findByPhone, never findByLid", async () => {
+    const { deps, findByLid, findByPhone } = makeDeps(makeAthlete());
+    await createRouteInboundMessage(deps).execute(inbound);
+
+    expect(findByPhone).toHaveBeenCalledWith("+32475123456");
+    expect(findByLid).not.toHaveBeenCalled();
   });
 
   it("ignores a known number that has no session yet", async () => {
@@ -133,8 +170,12 @@ describe("routeInboundMessage", () => {
 
   it("propagates repository failures (infra → 502 upstream)", async () => {
     const findByPhone = vi.fn(() => Promise.reject(new Error("neon down")));
+    const findByLid = vi.fn(() => Promise.resolve(null));
     const appendUserMessage = vi.fn(() => Promise.resolve());
-    const deps = { repo: { findByPhone, setChatId: vi.fn(() => Promise.resolve()) }, brain: { appendUserMessage } };
+    const deps = {
+      repo: { findByPhone, findByLid, setChatId: vi.fn(() => Promise.resolve()) },
+      brain: { appendUserMessage }
+    };
     await expect(createRouteInboundMessage(deps).execute(inbound)).rejects.toThrow("neon down");
     expect(appendUserMessage).not.toHaveBeenCalled();
   });
@@ -143,7 +184,11 @@ describe("routeInboundMessage", () => {
     const appendUserMessage = vi.fn(() => Promise.resolve());
     const setChatId = vi.fn(() => Promise.reject(new Error("neon down")));
     const deps = {
-      repo: { findByPhone: vi.fn(() => Promise.resolve(makeAthlete({ chatId: null }))), setChatId },
+      repo: {
+        findByPhone: vi.fn(() => Promise.resolve(makeAthlete({ chatId: null }))),
+        findByLid: vi.fn(() => Promise.resolve(null)),
+        setChatId
+      },
       brain: { appendUserMessage }
     };
     await expect(createRouteInboundMessage(deps).execute(inbound)).rejects.toThrow("neon down");
@@ -153,7 +198,11 @@ describe("routeInboundMessage", () => {
   it("propagates brain failures (infra → 502 upstream)", async () => {
     const appendUserMessage = vi.fn(() => Promise.reject(new Error("anthropic 500")));
     const deps = {
-      repo: { findByPhone: vi.fn(() => Promise.resolve(makeAthlete())), setChatId: vi.fn(() => Promise.resolve()) },
+      repo: {
+        findByPhone: vi.fn(() => Promise.resolve(makeAthlete())),
+        findByLid: vi.fn(() => Promise.resolve(null)),
+        setChatId: vi.fn(() => Promise.resolve())
+      },
       brain: { appendUserMessage }
     };
     await expect(createRouteInboundMessage(deps).execute(inbound)).rejects.toThrow("anthropic 500");
