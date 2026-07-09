@@ -1,9 +1,9 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { GoalInput, ScopedAthleteDataStore } from "../store/athleteDataStore";
-import { runTool } from "./result";
+import type { AthleteDataStore, GoalInput } from "../store/athleteDataStore";
+import { athleteIdShape, runTool } from "./result";
 
-export function registerGoalReadTools(server: McpServer, store: ScopedAthleteDataStore): void {
+export function registerGoalReadTools(server: McpServer, store: AthleteDataStore): void {
   server.registerTool(
     "get_goals",
     {
@@ -12,17 +12,18 @@ export function registerGoalReadTools(server: McpServer, store: ScopedAthleteDat
         "Read the athlete's structured goals (season targets, races, performance/health goals), " +
         "filtered by status (default active), soonest target date first.",
       inputSchema: {
+        ...athleteIdShape,
         status: z
           .enum(["active", "achieved", "abandoned"])
           .optional()
           .describe("Filter by status. Defaults to active.")
       }
     },
-    (args) => runTool(() => store.getGoals(args.status))
+    (args) => runTool(() => store.forAthlete(args.athleteId).getGoals(args.status))
   );
 }
 
-export function registerGoalWriteTools(server: McpServer, store: ScopedAthleteDataStore): void {
+export function registerGoalWriteTools(server: McpServer, store: AthleteDataStore): void {
   server.registerTool(
     "upsert_goal",
     {
@@ -32,6 +33,7 @@ export function registerGoalWriteTools(server: McpServer, store: ScopedAthleteDa
         "when creating. A goal can link to an Intervals.icu event via `intervalsEventId` without " +
         "duplicating the calendar entry.",
       inputSchema: {
+        ...athleteIdShape,
         id: z.string().uuid().optional().describe("Goal id to update; omit to create a new goal."),
         title: z.string().min(1).optional().describe("Goal title (required when creating)."),
         description: z.string().optional(),
@@ -60,7 +62,7 @@ export function registerGoalWriteTools(server: McpServer, store: ScopedAthleteDa
         if (input.id && Object.keys(input).filter((key) => key !== "id").length === 0) {
           throw new Error("upsert_goal with an id requires at least one field to update.");
         }
-        const result = await store.upsertGoal(input);
+        const result = await store.forAthlete(args.athleteId).upsertGoal(input);
         if (input.id && result === null) {
           throw new Error(`Goal ${input.id} not found for this athlete.`);
         }

@@ -6,7 +6,7 @@ vers la **bonne session de Managed Agent Anthropic**, résolue par le **`phone_n
 l'athlète en base (Neon). L'agent répond ensuite **lui-même** sur WhatsApp via son outil
 MCP OpenWA (`MessageSendText`).
 
-Il expose aussi un **serveur MCP `athlete-data`** (`/athlete/{id}/api/mcp`) : c'est par là
+Il expose aussi un **serveur MCP `athlete-data`** (`/api/mcp`) : c'est par là
 que le brain **lit et écrit la donnée coaching structurée** de l'athlète en base (profil,
 seuils, objectifs, plan, journal d'adaptation), en complément d'`intervals-icu-mcp` qui porte
 la donnée d'entraînement live.
@@ -69,9 +69,10 @@ Validées au boot par `src/config/config.ts`. Copie `.env.example` → `.env` **
 
 ## MCP athlete-data (accès du brain à la donnée coaching)
 
-Endpoint **scopé par athlète** : `GET/POST /athlete/{athlete.id}/api/mcp`. L'athlète est fixé
-par le segment d'URL (UUID `athlete.id`), donc chaque session Managed Agent porte sa propre URL
-et ne peut lire/écrire que *sa* donnée. Auth par **bearer** `MCP_BEARER_TOKEN` (401 sinon).
+Endpoint **statique** : `GET/POST /api/mcp` (un Managed Agent configure une seule URL de serveur
+MCP, fixe et partagée). L'athlète n'est donc **pas** dans l'URL : chaque tool prend un argument
+`athleteId` (l'UUID Inigo, = `inigo_athlete_id` du message), et la requête est scopée à cet
+athlète (`store.forAthlete(athleteId)`). Auth par **bearer** `MCP_BEARER_TOKEN` (401 sinon).
 Les tools d'écriture ne sont montés que si `ENABLE_WRITE_TOOLS=true` (off par défaut).
 
 Tools : lecture `get_profile`, `get_thresholds`, `get_goals`, `get_training_plan`,
@@ -83,9 +84,10 @@ historisés, objectifs, plan, journal). `intervals-icu-mcp` porte la *vérité l
 CTL/ATL/TSB, courbes, calendrier planifié). La FTP de décision vient d'ici (`get_thresholds`) ;
 Intervals reste le calcul live.
 
-**Côté Managed Agent** : ajouter à la session de l'athlète un vault `static_bearer`
-(`url=https://<coach>/athlete/{athlete.id}/api/mcp`, `token=MCP_BEARER_TOKEN`) et déclarer le
-serveur dans les `mcp_servers` de l'agent.
+**Côté Managed Agent** : ajouter à la session un vault `static_bearer`
+(`url=https://<coach>/api/mcp`, `token=MCP_BEARER_TOKEN`) et déclarer le serveur dans les
+`mcp_servers` de l'agent. Le bearer prouve que l'appelant est le brain, pas quel athlète :
+l'isolation repose sur l'`athleteId` passé par l'agent (durcissement futur : bearer par athlète).
 
 ## Lancer en local
 
@@ -98,18 +100,25 @@ curl -X POST http://localhost:3000/api/webhooks/whatsapp \
   -d '{"chatId":"628@c.us","body":"salut coach","type":"text"}'
 # -> {"ok":true} ; le message est append à la session (voir logs).
 
-# Lister les tools du MCP athlete-data (UUID d'un athlète en base) :
-curl -X POST "http://localhost:3000/athlete/$ATHLETE_ID/api/mcp" \
+# Lister les tools du MCP athlete-data :
+curl -X POST "http://localhost:3000/api/mcp" \
   -H "authorization: Bearer $MCP_BEARER_TOKEN" \
   -H "accept: application/json, text/event-stream" \
   -H "content-type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+
+# Lire le profil d'un athlète (athleteId = UUID Inigo en base) :
+curl -X POST "http://localhost:3000/api/mcp" \
+  -H "authorization: Bearer $MCP_BEARER_TOKEN" \
+  -H "accept: application/json, text/event-stream" \
+  -H "content-type: application/json" \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"get_profile","arguments":{"athleteId":"'$ATHLETE_ID'"}}}'
 ```
 
 ## Déploiement
 
 Vercel (Next.js). Variables via le dashboard Vercel (dont `MCP_BEARER_TOKEN`, requis, à poser
-**avant** deploy). Endpoints : `/api/webhooks/whatsapp` et `/athlete/{id}/api/mcp`.
+**avant** deploy). Endpoints : `/api/webhooks/whatsapp` et `/api/mcp`.
 
 ## Contribuer
 
