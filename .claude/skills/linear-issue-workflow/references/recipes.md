@@ -17,6 +17,7 @@ identifier — substitute the real one.
 - [Draft PR](#draft-pr)
 - [Linking the PR](#linking-the-pr)
 - [Review](#review)
+- [Acceptance check](#acceptance-check)
 - [Ready for review](#ready-for-review)
 
 ---
@@ -213,9 +214,45 @@ Only a clean or consciously-triaged review unlocks
 the session, run the `/code-review` skill on the working diff instead — same
 intent, less specialised.
 
+## Acceptance check
+
+Map each acceptance criterion on the card to evidence in the diff, then post a ✅
+checklist as a PR comment. Pull the criteria from the issue you refined in Phase 1
+(`get_issue`), and read the shipped change to confirm each is actually delivered:
+
+```bash
+git diff main...HEAD          # the shipped change, criterion by criterion
+gh pr view <number>           # confirm the PR number / current state
+```
+
+Post the verdict — GitHub renders ✅ and `- [x]` boxes inline, so it reads as a
+visual sign-off:
+
+```bash
+gh pr comment <number> --body "$(cat <<'EOF'
+## ✅ Revue d'acceptance — INI-123
+
+**Métier / produit** — la PR livre ce que la carte demande
+- [x] <critère d'acceptance 1> — `path/file.ts:42` / test `foo.spec.ts`
+- [x] <critère d'acceptance 2> — <preuve>
+- [ ] <critère hors scope> — reporté, voir INI-456
+
+**Code** — revue code-reviewer clean / triée (3g)
+**Specs tech** — TS, lint, archi, SOLID OK (`pnpm verify` + revue)
+**Tests** — suite verte, pas de régression (`pnpm verify`)
+EOF
+)"
+```
+
+Any unchecked box blocks [Ready for review](#ready-for-review): finish the missing
+work, or leave it unchecked with a one-line reason and confirm the waiver with the
+user. Where a criterion is a runtime behaviour, drive it and observe it before
+ticking — don't infer "done" from the code.
+
 ## Ready for review
 
-Only when `pnpm verify` is green and you've self-reviewed the diff:
+Only when `pnpm verify` is green, the code-reviewer pass is clean, and the
+acceptance checklist is all-✅ (or consciously waived):
 
 ```bash
 gh pr ready <number>
