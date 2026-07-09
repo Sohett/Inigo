@@ -82,8 +82,24 @@ export function createAthleteDataStore(db: Db) {
             .limit(1);
           const identity = identityRows[0];
           if (!identity) return null;
+          // Explicit projection (like the identity select above): `athlete_profile` holds
+          // only coaching data today, but projecting deliberately keeps the "no secret/PII"
+          // guarantee resilient if a column is ever added — the caller chooses what is exposed.
           const profileRows = await db
-            .select()
+            .select({
+              birthDate: athleteProfile.birthDate,
+              sex: athleteProfile.sex,
+              heightCm: athleteProfile.heightCm,
+              weightKg: athleteProfile.weightKg,
+              weightTargetKg: athleteProfile.weightTargetKg,
+              restingHr: athleteProfile.restingHr,
+              maxHr: athleteProfile.maxHr,
+              constraints: athleteProfile.constraints,
+              constraintsNotes: athleteProfile.constraintsNotes,
+              healthNotes: athleteProfile.healthNotes,
+              coachingTargets: athleteProfile.coachingTargets,
+              updatedAt: athleteProfile.updatedAt
+            })
             .from(athleteProfile)
             .where(eq(athleteProfile.athleteId, athleteId))
             .limit(1);

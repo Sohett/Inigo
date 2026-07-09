@@ -100,4 +100,15 @@ describe("registerAthleteDataTools", () => {
     const content = result.content as { type: string; text: string }[];
     expect(content[0]!.text).toMatch(/requires a title/i);
   });
+
+  it("rejects upsert_goal with an id but no fields to update", async () => {
+    const client = await connect({ enableWriteTools: true });
+    const result = await client.callTool({
+      name: "upsert_goal",
+      arguments: { id: "11111111-1111-4111-8111-111111111111" }
+    });
+    expect(result.isError).toBe(true);
+    const content = result.content as { type: string; text: string }[];
+    expect(content[0]!.text).toMatch(/at least one field to update/i);
+  });
 });

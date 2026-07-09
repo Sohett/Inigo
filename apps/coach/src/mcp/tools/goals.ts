@@ -57,6 +57,9 @@ export function registerGoalWriteTools(server: McpServer, store: ScopedAthleteDa
         if (!input.id && !input.title) {
           throw new Error("upsert_goal requires a title when creating a new goal.");
         }
+        if (input.id && Object.keys(input).filter((key) => key !== "id").length === 0) {
+          throw new Error("upsert_goal with an id requires at least one field to update.");
+        }
         const result = await store.upsertGoal(input);
         if (input.id && result === null) {
           throw new Error(`Goal ${input.id} not found for this athlete.`);
