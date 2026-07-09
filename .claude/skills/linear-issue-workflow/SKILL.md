@@ -11,7 +11,8 @@ description: >-
   collapsible, move the issue to In Progress, then run a Gitflow implementation
   loop — verify branch cleanliness, branch off an updated main, commit often,
   open a draft PR, link
-  it to the Linear issue, self-review the diff with the code-reviewer agent, and
+  it to the Linear issue, self-review the diff with the code-reviewer agent, check
+  the PR delivers what the card asked via a ✅ acceptance checklist on the PR, and
   promote it to ready-for-review when done. Trigger it even when the user only
   mentions a Linear issue in passing before jumping straight into code.
 ---
@@ -105,8 +106,8 @@ Implementation starts now, not before.
 
 Short-lived feature branch off `main`, back into `main` via a PR. This repo has
 no `develop` branch, so "Gitflow" here means: clean base, one focused branch per
-issue, frequent commits, draft PR early, an independent review pass, and ready
-only when truly done.
+issue, frequent commits, draft PR early, an independent review pass, an acceptance
+check against the card, and ready only when truly done.
 
 ### 3a — Branch hygiene (before anything else)
 
@@ -186,10 +187,42 @@ Re-run the review after non-trivial fixes. A clean (or consciously-triaged)
 review is what "PR clean" actually means, and it's the precondition for the next
 step.
 
-### 3h — Promote to ready-for-review
+### 3h — Acceptance check: does the PR do what the card asked?
+
+The code-reviewer pass proves the change is *well-built*; it does not prove it's
+the *right* change. Before promoting, close the loop back to the card: does this
+PR actually deliver what INI-123 asked for, end-to-end? This is the
+product/business axis of review, and it's yours to judge in the main context —
+you carry the ticket's intent from Phase 1, a fresh reviewer agent doesn't.
+
+Walk each acceptance criterion (the problem statement and scope you refined in
+Phase 1) against the diff. For every criterion, point to the concrete evidence
+that satisfies it — a `file:line`, or better, a test that exercises it. Where a
+criterion is a runtime behaviour, actually drive it and observe it rather than
+inferring "done" from the code (repo rule: verified, not assumed). A criterion
+that's only half-met is not met.
+
+Then post the verdict as a **visual ✅ checklist on the PR** (`gh pr comment`), so
+the reviewer sees up front that the four review axes hold:
+
+- **Métier/produit** — one ✅ line per acceptance criterion, each with its evidence.
+- **Code** — the 3g code-reviewer pass is clean or consciously triaged.
+- **Specs tech** — TS, lint, archi, SOLID hold (from `pnpm verify` + 3g).
+- **Tests** — suite green, no regression (from `pnpm verify`).
+
+Recipe: `references/recipes.md` → *Acceptance check*.
+
+If any box can't be ticked, it's not ready: finish the missing work (back to 3d),
+or, when it's a deliberate out-of-scope, leave the box unchecked with a one-line
+reason and confirm the call with the user. An all-✅ (or consciously-waived)
+checklist is the gate for the next step — the visual sign-off that unlocks
+ready-for-review.
+
+### 3i — Promote to ready-for-review
 
 Only when the branch is genuinely finished: plan fully implemented, `pnpm verify`
-green, and the code-reviewer pass from 3g is clean with its findings addressed.
+green, the code-reviewer pass from 3g clean with its findings addressed, and the
+acceptance checklist from 3h all-✅ (or consciously waived).
 Then flip the draft to ready (`gh pr ready <number>`). Draft → ready is a
 deliberate act that means "I'd put my name on this" — treat it that way. Move the
 Linear issue to its review status if the integration didn't already.
