@@ -37,7 +37,10 @@ describe("routeInboundMessage", () => {
     const outcome = await createRouteInboundMessage(deps).execute(inbound);
 
     expect(findByPhone).toHaveBeenCalledWith("+32475123456");
-    expect(appendUserMessage).toHaveBeenCalledWith("sesn_abc", "chat_id: 32475123456@c.us\nmessage: salut");
+    expect(appendUserMessage).toHaveBeenCalledWith(
+      "sesn_abc",
+      "inigo_athlete_id: a-1\nchat_id: 32475123456@c.us\nmessage: salut"
+    );
     expect(outcome).toEqual({
       status: "forwarded",
       athleteId: "a-1",
@@ -73,7 +76,10 @@ describe("routeInboundMessage", () => {
     });
 
     expect(outcome.status).toBe("forwarded");
-    expect(appendUserMessage).toHaveBeenCalledWith("sesn_abc", "chat_id: 32475123456@c.us\nmessage: yo");
+    expect(appendUserMessage).toHaveBeenCalledWith(
+      "sesn_abc",
+      "inigo_athlete_id: a-1\nchat_id: 32475123456@c.us\nmessage: yo"
+    );
   });
 
   it("forwards a LID sender to their session, resolved by LID not phone", async () => {
@@ -83,7 +89,10 @@ describe("routeInboundMessage", () => {
 
     expect(findByLid).toHaveBeenCalledWith("10325252415590@lid");
     expect(findByPhone).not.toHaveBeenCalled();
-    expect(appendUserMessage).toHaveBeenCalledWith("sesn_abc", "chat_id: 10325252415590@lid\nmessage: ok");
+    expect(appendUserMessage).toHaveBeenCalledWith(
+      "sesn_abc",
+      "inigo_athlete_id: a-1\nchat_id: 10325252415590@lid\nmessage: ok"
+    );
     expect(outcome).toEqual({
       status: "forwarded",
       athleteId: "a-1",
