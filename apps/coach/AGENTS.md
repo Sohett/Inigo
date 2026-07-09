@@ -24,11 +24,12 @@ aura besoin de compute persistant (queue, batch long) — pas avant.
 
 ```
 app/
-  api/webhooks/whatsapp/route.ts   # entrée HTTP fine : (verif HMAC optionnelle) → parse → use-case → 200
-  layout.tsx, page.tsx             # minimal
+  api/webhooks/whatsapp/route.ts        # entrée HTTP fine : (verif HMAC optionnelle) → parse → use-case → 200
+  athlete/[athleteId]/api/[transport]/route.ts  # endpoint MCP athlete-data, scopé par athleteId (bearer requis)
+  layout.tsx, page.tsx                  # minimal
 src/
-  config/config.ts                 # env zod (ANTHROPIC_API_KEY, DATABASE_URL, DB_ENCRYPTION_KEY, WHATSAPP_WEBHOOK_SECRET?)
-  auth.ts                          # verifyWebhookSignature (HMAC-SHA256 constant-time, X-OpenWA-Signature)
+  config/config.ts                 # env zod (ANTHROPIC_API_KEY, DATABASE_URL, DB_ENCRYPTION_KEY, WHATSAPP_WEBHOOK_SECRET?, MCP_BEARER_TOKEN, ENABLE_WRITE_TOOLS)
+  auth.ts                          # verifyWebhookSignature (webhook) + verifyBearerToken (MCP), constant-time
   domain/athlete.ts                # modèle métier Athlete + enum AthleteStatus (indépendants de @inigo/db)
   repositories/
     athleteRepository.ts           # PORT AthleteRepository (findByPhone, setChatId)
@@ -38,7 +39,10 @@ src/
   mappers/
     whatsappPayload.ts             # schémas zod + normalisation du payload OpenWA + senderPhone
   brain/managedAgents.ts           # FRONTIÈRE cerveau : appendUserMessage(sessionId,text) + adaptateur SDK
-  deps.ts                          # singleton lazy { config, brain, db, repo }
+  mcp/
+    store/athleteDataStore.ts      # accès Neon scopé par athlete (createDb → forAthlete(id)) ; seul autre layer @inigo/db-aware
+    tools/{index,result,profile,thresholds,goals,plan,adaptationLog}.ts  # tools MCP fins (reads + writes gated)
+  deps.ts                          # singleton lazy { config, brain, db, repo, athleteData }
 # futur : app/(admin)/… , app/api/admin/… , src/services/…
 ```
 
@@ -53,10 +57,53 @@ src/
    athlète sans session (`no_session`), sender illisible (`invalid_sender`) → route en 200.
    Seules les erreurs infra (Neon / Anthropic) throw → 502.
 4. Sur un athlète résolu avec session : persiste `chat_id` si nouveau (`repo.setChatId`),
-   formate `chat_id: <jid>\nmessage: <body>` et **append** à **sa** session via
-   `brain.appendUserMessage` (dernier effet de bord → pas de doublon sur retry OpenWA).
+   formate l'enveloppe `inigo_athlete_id: <uuid>\nchat_id: <jid>\nmessage: <body>` et **append**
+   à **sa** session via `brain.appendUserMessage` (dernier effet de bord → pas de doublon sur
+   retry OpenWA). `inigo_athlete_id` = l'`athlete.id` interne (Neon), la clé que l'agent utilise
+   pour joindre le MCP athlete-data (`/athlete/{id}/api/mcp`) — **pas** l'id Intervals.icu.
    **Fire-and-forget** : on n'attend pas le run, l'agent répond via son MCP OpenWA
    (tools exécutés server-side via le vault).
+
+## MCP athlete-data (le brain lit/écrit la donnée coaching)
+
+Un serveur MCP hébergé **dans coach** (choix assumé : pas d'app séparée) donne au brain
+(Managed Agent) un accès runtime à la donnée athlète structurée en Neon. Calqué sur
+`intervals-icu-mcp` : `mcp-handler` + `withMcpAuth` + tools fins.
+
+- **Endpoint** : `POST/GET /athlete/{athlete.id}/api/mcp`. **Scopé par l'UUID de l'athlète
+  dans l'URL** → chaque session Managed Agent porte sa propre URL dans son vault, et un store
+  déjà lié à cet athlète (`athleteData.forAthlete(id)`) : une session ne peut toucher qu'à
+  *sa* donnée. L'UUID est validé (`z.uuid()` → 400 sinon).
+- **L'agent connaît son `athlete.id`** parce que le routing l'injecte dans chaque message
+  (`inigo_athlete_id: <uuid>`, cf. contrat de routing) — c'est la même clé que dans l'URL du
+  MCP, et explicitement *l'id Inigo*, pas l'id Intervals.icu.
+- **Auth** : bearer global `MCP_BEARER_TOKEN` (constant-time), `withMcpAuth({ required: true })`
+  → 401 sans token. Le path isole l'athlète ; le bearer prouve que l'appelant est le brain.
+  (Tokens par-athlète = durcissement futur.)
+- **Handler construit par requête** (l'athlète vient du segment d'URL) : `basePath =
+  /athlete/${id}/api` car `mcp-handler` matche l'endpoint comme `${basePath}/mcp`.
+- **Écritures gated** par `ENABLE_WRITE_TOOLS` (off par défaut, least-privilege).
+
+**Contrat des tools** (noms distincts d'`intervals-icu-mcp` pour garder la frontière lisible) :
+
+| Tool | Type | Effet |
+| -- | -- | -- |
+| `get_profile` | read | identité *sûre* (display_name, tz, locale, status) + `athlete_profile`. **Aucun** secret/PII (pas de phone, LID, chat_id, session/agent/memory ids). |
+| `get_thresholds` | read | dernier `athlete_threshold` par sport (FTP, HR, zones…). Filtre `sport?`. |
+| `get_goals` | read | `goal` filtrés (`status?`, défaut active). |
+| `get_training_plan` | read | plan courant + `plan_block` ordonnés (weekly targets). |
+| `get_adaptation_log` | read | journal (`limit?` 20, `since?`), plus récent d'abord. |
+| `update_profile` | write | upsert notes/prefs (`weightTargetKg`, `constraints`, `constraintsNotes`, `healthNotes`, `coachingTargets`). |
+| `log_adaptation` | write | append au journal (`summary` requis). |
+| `upsert_goal` | write | create/update d'un `goal` (update scopé par athleteId). |
+
+**Frontière athlete-data ⟂ intervals-icu (à respecter dans les prompts d'agents) :**
+- **athlete-data (Neon, ce MCP)** = *couche coaching* : profil structuré, seuils **historisés**,
+  objectifs, macro-plan/blocs, contraintes, santé, cibles de coaching, journal d'adaptation.
+- **intervals-icu** = *vérité quantifiée live* : activités, PMC du jour (CTL/ATL/TSB via
+  `get_fitness`), courbes puissance/FC/allure, **calendrier des séances planifiées**, FTP/zones
+  *calculées* par Intervals. Règle FTP : décision coaching = `athlete_threshold` (ce MCP) ;
+  Intervals reste le calcul live.
 
 ## Conventions (en plus de la racine)
 
@@ -65,9 +112,9 @@ src/
 - **Toute la logique métier vit dans des use-cases** (`src/use-cases/`) exposant une seule
   fonction publique `execute`. Les routes restent minces (HTTP only).
 - **Accès données via un port `repository`** : le use-case ne dépend que de l'interface
-  (`repositories/athleteRepository.ts`), jamais de l'ORM. L'adapter Drizzle est la seule
-  couche qui connaît `@inigo/db`, et mappe les rows sur les **modèles métier** (`domain/`),
-  indépendants des types DB.
+  (`repositories/athleteRepository.ts`), jamais de l'ORM. Deux couches seulement connaissent
+  `@inigo/db` : l'adapter Drizzle du routing (rows → **modèles métier** `domain/`), et le store
+  MCP (`src/mcp/store/athleteDataStore.ts`, requêtes scopées par athlete pour les tools).
 - **Multi-athlète** : le routing résout l'athlète + sa session par `phone_num` en base (Neon).
   Plus de session fixe en env ; pas de mapping en mémoire locale.
 - Secrets : env serveur uniquement, validés au boot, jamais en log.
@@ -92,9 +139,11 @@ le skill Claude Code `managed-agents-api`.
 ## Tests
 
 - Vitest co-localisés (`*.spec.ts`). `pnpm --filter @inigo/coach run test`.
-- Couvre : config, auth (HMAC), parsing/normalisation du payload + `senderPhone`, mapping
-  `toAthlete`, **use-case `routeInboundMessage`** (4 cas de routing + filtres + throws infra,
-  repo & brain fakes), brain (fake SDK). Pas de réseau (fakes injectés).
-- La spec d'intégration de l'adapter Drizzle (`*.integration.spec.ts`) tourne contre une vraie
-  branche Neon et se **skip** sans `DATABASE_URL`, donc `pnpm verify` reste offline.
+- Couvre : config (dont `MCP_BEARER_TOKEN`/`ENABLE_WRITE_TOOLS`), auth (HMAC + bearer),
+  parsing/normalisation du payload + `senderPhone`, mapping `toAthlete`, **use-case
+  `routeInboundMessage`** (4 cas de routing + filtres + throws infra, repo & brain fakes),
+  brain (fake SDK). Côté MCP : intégration `InMemoryTransport` (reads présents, writes gated
+  on/off, un call renvoie du JSON), route (401 sans bearer, 400 UUID invalide). Pas de réseau.
+- Les specs d'intégration Neon (`*.integration.spec.ts` : adapter Drizzle **et** store MCP)
+  tournent contre une vraie branche et se **skip** sans `DATABASE_URL`, donc `pnpm verify` reste offline.
 - `pnpm verify` (racine) doit être vert avant tout commit.

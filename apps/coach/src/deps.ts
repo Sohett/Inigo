@@ -6,12 +6,14 @@ import {
   createDrizzleAthleteRepository
 } from "./repositories/drizzleAthleteRepository";
 import type { AthleteRepository } from "./repositories/athleteRepository";
+import { createAthleteDataStore, type AthleteDataStore } from "./mcp/store/athleteDataStore";
 
 export interface Deps {
   config: Config;
   brain: ManagedAgentBrain;
   db: Db;
   repo: AthleteRepository;
+  athleteData: AthleteDataStore;
 }
 
 let cached: Deps | null = null;
@@ -32,7 +34,8 @@ export function getDeps(): Deps {
       config,
       brain: createManagedAgentBrain(anthropic),
       db,
-      repo: createDrizzleAthleteRepository(db)
+      repo: createDrizzleAthleteRepository(db),
+      athleteData: createAthleteDataStore(db)
     };
   }
   return cached;
