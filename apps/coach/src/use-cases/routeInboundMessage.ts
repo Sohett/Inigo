@@ -1,11 +1,13 @@
 import type { ManagedAgentBrain } from "../brain/managedAgents";
+import type { Athlete } from "../domain/athlete";
 import type { AthleteRepository } from "../repositories/athleteRepository";
 import {
   webhookEnvelopeSchema,
   normaliseInbound,
   messageText,
   replyChatId,
-  senderPhone
+  senderPhone,
+  senderLid
 } from "../mappers/whatsappPayload";
 
 /**
@@ -21,7 +23,7 @@ export const IgnoreReason = {
   NoText: "no_text",
   /** (d) The sender JID held no usable phone digits. */
   InvalidSender: "invalid_sender",
-  /** (c) No athlete is registered for this phone. */
+  /** (c) No athlete is registered for this phone or WhatsApp LID. */
   UnknownNumber: "unknown_number",
   /** (b) The athlete exists but has no Managed Agent session yet. */
   NoSession: "no_session"
@@ -45,7 +47,7 @@ export interface RouteInboundMessage {
 /**
  * The routing use-case: one public `execute`. It parses the OpenWA webhook payload,
  * filters what shouldn't reach the coach, resolves the athlete + session from the
- * sender's phone, and appends the message to the *right* Managed Agent session.
+ * sender's phone or WhatsApp LID, and appends the message to the *right* Managed Agent session.
  *
  * Routing decisions — including unknown number and no-session — are returned as
  * outcomes. Only infrastructure failures (repository / brain) throw, so the route
@@ -70,10 +72,17 @@ export function createRouteInboundMessage(deps: RouteInboundMessageDeps): RouteI
       const chatId = replyChatId(message);
       if (!text || !chatId) return ignored(IgnoreReason.NoText);
 
-      const phone = senderPhone(message);
-      if (!phone) return ignored(IgnoreReason.InvalidSender);
-
-      const athlete = await deps.repo.findByPhone(phone);
+      // The sender arrives either as a LID (WhatsApp privacy addressing) or a phone
+      // JID. A LID is an opaque token, not a phone, so each has its own routing key.
+      const lid = senderLid(message);
+      let athlete: Athlete | null;
+      if (lid) {
+        athlete = await deps.repo.findByLid(lid);
+      } else {
+        const phone = senderPhone(message);
+        if (!phone) return ignored(IgnoreReason.InvalidSender);
+        athlete = await deps.repo.findByPhone(phone);
+      }
       if (!athlete) return ignored(IgnoreReason.UnknownNumber);
       if (!athlete.anthropicSessionId) return ignored(IgnoreReason.NoSession);
 

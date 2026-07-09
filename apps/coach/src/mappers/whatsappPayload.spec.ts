@@ -4,7 +4,8 @@ import {
   normaliseInbound,
   messageText,
   replyChatId,
-  senderPhone
+  senderPhone,
+  senderLid
 } from "./whatsappPayload";
 
 function normalise(payload: unknown) {
@@ -58,12 +59,39 @@ describe("whatsappPayload", () => {
       expect(senderPhone({ from: "120363000000000000@g.us", isGroup: true })).toBeNull();
     });
 
+    it("returns null for LID senders (their digits are not a phone)", () => {
+      expect(senderPhone({ from: "10325252415590@lid", isLidSender: true })).toBeNull();
+    });
+
     it("returns null when no digits remain", () => {
       expect(senderPhone({ from: "status@broadcast" })).toBeNull();
     });
 
     it("returns null when there is no sender at all", () => {
       expect(senderPhone({ body: "hi" })).toBeNull();
+    });
+  });
+
+  describe("senderLid", () => {
+    it("returns the full LID JID for a LID sender", () => {
+      expect(senderLid({ from: "10325252415590@lid", isLidSender: true })).toBe("10325252415590@lid");
+    });
+
+    it("strips a multi-device suffix but keeps the @lid domain", () => {
+      expect(senderLid({ from: "10325252415590:7@lid" })).toBe("10325252415590@lid");
+    });
+
+    it("falls back to chatId when from is absent", () => {
+      expect(senderLid({ chatId: "10325252415590@lid" })).toBe("10325252415590@lid");
+    });
+
+    it("returns null for a phone JID", () => {
+      expect(senderLid({ from: "32475123456@c.us" })).toBeNull();
+    });
+
+    it("returns null for group JIDs and when there is no sender", () => {
+      expect(senderLid({ from: "120363000000000000@g.us" })).toBeNull();
+      expect(senderLid({ body: "hi" })).toBeNull();
     });
   });
 });

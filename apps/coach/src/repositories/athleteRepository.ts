@@ -8,6 +8,8 @@ import type { Athlete } from "../domain/athlete";
 export interface AthleteRepository {
   /** Resolve the athlete whose E.164 phone matches, or null if none is registered. */
   findByPhone(phoneNum: string): Promise<Athlete | null>;
+  /** Resolve the athlete whose WhatsApp LID matches, or null if none is registered. */
+  findByLid(whatsappLid: string): Promise<Athlete | null>;
   /** Persist the WhatsApp chat id learned on an inbound message. Idempotent. */
   setChatId(athleteId: string, chatId: string): Promise<void>;
 }

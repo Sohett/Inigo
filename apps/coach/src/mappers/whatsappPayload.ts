@@ -18,7 +18,8 @@ export const inboundMessageSchema = z
     text: z.string().optional(),
     type: z.string().optional(),
     fromMe: z.boolean().optional(),
-    isGroup: z.boolean().optional()
+    isGroup: z.boolean().optional(),
+    isLidSender: z.boolean().optional()
   })
   .passthrough();
 
@@ -79,12 +80,27 @@ export function replyChatId(message: InboundMessage): string | undefined {
  * envelope. This is NOT phone normalisation: WhatsApp already delivers a full
  * international number, so we only strip the `@…` domain and any `:device` suffix
  * and prefix `+` (which matches the E.164 form stored in `athlete.phone_num`).
- * Returns null for group JIDs or when no digits remain (e.g. `status@broadcast`).
+ * Returns null for group JIDs, for LID senders (their digits are an opaque token,
+ * not a phone — see `senderLid`), or when no digits remain (e.g. `status@broadcast`).
  */
 export function senderPhone(message: InboundMessage): string | null {
   const jid = message.from ?? message.chatId;
-  if (!jid || jid.endsWith("@g.us")) return null;
+  if (!jid || jid.endsWith("@g.us") || jid.endsWith("@lid")) return null;
   const local = jid.split("@", 1)[0] ?? "";
   const digits = (local.split(":", 1)[0] ?? "").replace(/\D/g, "");
   return digits.length > 0 ? `+${digits}` : null;
+}
+
+/**
+ * The sender's WhatsApp LID (`…@lid`) when identified by a linked id instead of a
+ * phone number (WhatsApp's privacy addressing), else null. Returns the full JID
+ * with any `:device` suffix stripped — the `@lid` domain is kept so a LID can never
+ * be confused with a phone number. This is the routing key for LID senders, matched
+ * against `athlete.whatsapp_lid` (see `findByLid`).
+ */
+export function senderLid(message: InboundMessage): string | null {
+  const jid = message.from ?? message.chatId;
+  if (!jid || !jid.endsWith("@lid")) return null;
+  const id = (jid.split("@", 1)[0] ?? "").split(":", 1)[0] ?? "";
+  return id.length > 0 ? `${id}@lid` : null;
 }
