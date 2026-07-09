@@ -15,6 +15,13 @@
       "when": 1783450946888,
       "tag": "0001_old_johnny_storm",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783586541689,
+      "tag": "0002_aspiring_excalibur",
+      "breakpoints": true
     }
   ]
 }
