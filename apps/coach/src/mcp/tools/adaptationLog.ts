@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AthleteDataRepository } from "../repository/athleteDataRepository";
-import type { AdaptationLogInput } from "../domain";
+import type { AdaptationLogInput } from "../../domain/coaching";
 import { athleteIdShape, runTool } from "./result";
 
 export function registerAdaptationLogReadTools(server: McpServer, store: AthleteDataRepository): void {

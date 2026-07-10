@@ -24,7 +24,7 @@ import type {
   Threshold,
   TrainingPlan,
   TrainingPlanInput
-} from "../domain";
+} from "../../domain/coaching";
 
 /**
  * Neon access layer for the athlete-data MCP. This is the single seam that knows the

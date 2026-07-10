@@ -30,7 +30,9 @@ app/
 src/
   config/config.ts                 # env zod (ANTHROPIC_API_KEY, DATABASE_URL, DB_ENCRYPTION_KEY, WHATSAPP_WEBHOOK_SECRET?, MCP_BEARER_TOKEN)
   auth.ts                          # verifyWebhookSignature (webhook) + verifyBearerToken (MCP), constant-time
-  domain/athlete.ts                # modèle métier Athlete + enum AthleteStatus (indépendants de @inigo/db)
+  domain/
+    athlete.ts                     # modèle métier Athlete + enum AthleteStatus (routing ; indépendants de @inigo/db)
+    coaching.ts                    # modèles métier de la donnée coaching (contrat de sortie des tools MCP) + inputs
   repositories/
     athleteRepository.ts           # PORT AthleteRepository (findByPhone, setChatId)
     drizzleAthleteRepository.ts     # ADAPTER Drizzle (requête inline) + toAthlete(row→modèle)
@@ -40,8 +42,7 @@ src/
     whatsappPayload.ts             # schémas zod + normalisation du payload OpenWA + senderPhone
   brain/managedAgents.ts           # FRONTIÈRE cerveau : appendUserMessage(sessionId,text) + adaptateur SDK
   mcp/
-    domain.ts                      # modèles métier (contrat de sortie des tools) + inputs
-    repository/athleteDataRepository.ts  # accès Neon scopé par athlete (createDb → forAthlete(id)), mappe rows→modèles ; seul autre layer @inigo/db-aware
+    repository/athleteDataRepository.ts  # accès Neon scopé par athlete (createDb → forAthlete(id)), mappe rows→modèles (domain/coaching) ; seul autre layer @inigo/db-aware
     tools/{index,result,profile,thresholds,goals,plan,adaptationLog}.ts  # tools MCP fins (reads + writes gated)
   deps.ts                          # singleton lazy { config, brain, db, repo, athleteData }
 # futur : app/(admin)/… , app/api/admin/… , src/services/…
@@ -122,7 +123,7 @@ Un serveur MCP hébergé **dans coach** (choix assumé : pas d'app séparée) do
 - **Accès données via un port `repository`** : le use-case ne dépend que de l'interface
   (`repositories/athleteRepository.ts`), jamais de l'ORM. Deux couches seulement connaissent
   `@inigo/db` : l'adapter Drizzle du routing (rows → **modèles métier** `domain/`), et le
-  repository MCP (`src/mcp/repository/athleteDataRepository.ts`) qui mappe rows→modèles (`domain.ts`).
+  repository MCP (`src/mcp/repository/athleteDataRepository.ts`) qui mappe rows→modèles (`domain/coaching.ts`).
 - **Multi-athlète** : le routing résout l'athlète + sa session par `phone_num` en base (Neon).
   Plus de session fixe en env ; pas de mapping en mémoire locale.
 - Secrets : env serveur uniquement, validés au boot, jamais en log.

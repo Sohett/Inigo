@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AthleteDataRepository } from "../repository/athleteDataRepository";
-import type { GoalInput } from "../domain";
+import type { GoalInput } from "../../domain/coaching";
 import { athleteIdShape, runTool } from "./result";
 
 export function registerGoalReadTools(server: McpServer, store: AthleteDataRepository): void {
