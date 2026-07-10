@@ -12,6 +12,7 @@
     "brain:memory:audit": "tsx src/bin/memory-audit.ts",
     "brain:skill:deploy": "tsx src/bin/skill-deploy.ts",
     "brain:agent:apply": "tsx src/bin/agent-apply.ts",
+    "brain:deploy": "tsx src/bin/deploy.ts",
     "brain:vault:cred:add": "tsx src/bin/vault-cred-add.ts"
   },
   "dependencies": {

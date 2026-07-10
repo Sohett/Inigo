@@ -1,0 +1,20 @@
+{
+  "coordinator": "agent_013Cb3npXSMv7T8X533DL9kt",
+  "subAgents": [
+    "agent_01Sp4ghn8GHc5Lbd9JJptEzR",
+    "agent_01CTK33Z2CLPwtDyq9vKDsVG",
+    "agent_01Dbg6WeAF41xSs8bTfiE8XD",
+    "agent_012ethnUdHzvRW9iPxdzzbTx"
+  ],
+  "session": {
+    "environmentId": "env_01AZaYzuAgRrayUXudep4dtG",
+    "vaultIds": ["vlt_011CcZTB2pGvyiFispE829k8"],
+    "resources": [
+      {
+        "type": "memory_store",
+        "memory_store_id": "memstore_01Ad3wALLarbS97RbVjT1Hbo",
+        "access": "read_only"
+      }
+    ]
+  }
+}
