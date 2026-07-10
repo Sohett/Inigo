@@ -73,17 +73,9 @@
       "type": "mcp_toolset"
     },
     {
-      "configs": [
-        {
-          "enabled": true,
-          "name": "get_training_plan",
-          "permission_policy": {
-            "type": "always_allow"
-          }
-        }
-      ],
+      "configs": [],
       "default_config": {
-        "enabled": false,
+        "enabled": true,
         "permission_policy": {
           "type": "always_allow"
         }

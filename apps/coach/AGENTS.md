@@ -85,6 +85,10 @@ Un serveur MCP hébergé **dans coach** (choix assumé : pas d'app séparée) do
   (401 sinon) et chaque write est **scopé par `athleteId`** (un update ne peut jamais toucher la
   donnée d'un autre athlète). Le flag `ENABLE_WRITE_TOOLS` a été retiré (les writes ne sont plus
   optionnels).
+- **Côté agents brain, le toolset `inigo-coach-data` donne accès à TOUS les tools** (`configs: []` +
+  `default_config.enabled: true`) — pas de liste par tool à maintenir à chaque évolution du MCP. La
+  frontière de sécurité reste le bearer + le scoping par `athleteId` ; l'agent n'appelle de toute
+  façon que les tools dont il a besoin (guidé par son prompt).
 
 **Contrat des tools** (noms distincts d'`intervals-icu-mcp` pour garder la frontière lisible) :
 
