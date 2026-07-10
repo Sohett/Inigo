@@ -1,14 +1,5 @@
 [
   {
-    "created_at": "2026-07-03T16:57:41.622760Z",
-    "description": "# Validateurs déterministes — spécification\n\nLe **gate**. Aucune séance n'atteint Intervals.icu sans passer ces checks. Ce sont du **code, pas du jugement LLM** : mêmes entrées → même verdict, reproductible et testable.\n\nFlux : un agent produit `runtime/proposed-week.json` → coordinateur exécute `python validators/run.py runtime/proposed-week.json` → lit `runtime/validation-report.json` (contrat dans `../01-INTERFACE-CONTRACT.md §5`).\n\n## Schéma d'entrée : `proposed-week.json`\n\n```json\n{\n  \"week\": \"2026-W27\",\n  \"phase\": \"Build 1 — Base/SST\",\n  \"generated_by\": \"constructeur-hebdo\",\n  \"athlete_ref\": { \"ftp_w\": 305, \"ctl\": 45.0, \"atl\": 48.0, \"tsb\": -3.0 },\n  \"phase_targets\": {\n    \"weekly_tss\": [430, 580],\n    \"max_z4plus_pct\": 15,\n    \"ctl_weekly_ramp_max\": 5.0\n  },\n  \"days\": [\n    {\n      \"date\": \"2026-06-29\", \"sport\": \"Ride\", \"label\": \"Repos / spin\",\n      \"intensity\": \"recovery\", \"duration_min\": 40, \"tss\": 25,\n      \"blocks\": [ {\"pct_ftp\": 50, \"minutes\": 40, \"cadence\": 90} ]\n    }\n    // ... 7 jours\n  ]\n}\n``",
-    "id": "memstore_01WiKQJoq5GVWZhecDeCDfLf",
-    "metadata": {},
-    "name": "validators",
-    "type": "memory_store",
-    "updated_at": "2026-07-03T16:57:41.622760Z"
-  },
-  {
     "created_at": "2026-07-02T14:21:22.566786Z",
     "description": "La **science** du système, séparée des prompts pour être mise à jour seule quand la recherche évolue (ex. plus de Z2 façon Pogačar, protocoles Rønnestad). Les agents lisent ; ils ne devinent jamais. Chaque décision d'entraînement cite un fichier d'ici.",
     "id": "memstore_01Ad3wALLarbS97RbVjT1Hbo",
@@ -16,14 +7,5 @@
     "name": "Inigo Knowledge Base",
     "type": "memory_store",
     "updated_at": "2026-07-02T14:21:22.566786Z"
-  },
-  {
-    "created_at": "2026-07-02T14:09:04.922481Z",
-    "description": "Athlete model with health, goals, physio, ...",
-    "id": "memstore_01RWCKeRy4fPqFRMKUf9d18E",
-    "metadata": {},
-    "name": "[ATHLETE] Inigo - Thomas Sohet",
-    "type": "memory_store",
-    "updated_at": "2026-07-02T14:09:04.922481Z"
   }
 ]
