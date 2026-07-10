@@ -24,6 +24,7 @@ pnpm --filter @inigo/brain run brain:memory:audit    # dump mémoire -> memory/ 
 # Écritures (dry-run sans --apply)
 pnpm --filter @inigo/brain run brain:skill:deploy <nom> [--apply] [--attach --agent=<id>]
 pnpm --filter @inigo/brain run brain:agent:apply <agent_id> [--file=<path>] [--apply]
+pnpm --filter @inigo/brain run brain:deploy [--manifest=<path>] [--apply]
 pnpm --filter @inigo/brain run brain:vault:cred:add --vault=<id> --name=<VAR> \
   (--value-env=<ENV> | --value=<literal>) --hosts=h1,h2 [--display=<label>] [--apply]
 ```
@@ -35,6 +36,13 @@ pnpm --filter @inigo/brain run brain:vault:cred:add --vault=<id> --name=<VAR> \
   (privé, non secret) ; `snapshot/sessions.json` ne contient que des métadonnées.
 - **Mettre à jour un agent** : `brain:pull` → éditer `snapshot/agents/<id>.json` → `brain:agent:apply
   <id> --apply` (nouvelle version, protégé contre les conflits de version 409).
+- **Déployer le brain** (`brain:deploy`, piloté par `deploy.manifest.json`) : `brain:pull` d'abord
+  (le snapshot = état désiré) → applique les sous-agents du manifeste, **re-pin** leurs nouvelles
+  versions dans le roster `multiagent` du coordinateur et l'applique, puis **crée une nouvelle
+  session** sur le coordinateur (une session fige la config à sa création : une nouvelle version
+  n'est prise en compte qu'en (re)créant une session). Dry-run par défaut ; `--apply` pour exécuter,
+  puis re-`brain:pull`. La migration des athlètes vers la nouvelle session est gérée côté coach
+  (lazy au routing), hors de ce script.
 - **Déployer un skill** : éditer `tooling/agent-skills/<nom>/` → `brain:skill:deploy <nom> --apply`.
 - **Auditer la mémoire** : `brain:memory:audit` → lire `memory/` → produire des recommandations.
 
