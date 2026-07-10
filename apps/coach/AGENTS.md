@@ -28,7 +28,7 @@ app/
   api/[transport]/route.ts              # endpoint MCP athlete-data statique (/api/mcp), bearer requis
   layout.tsx, page.tsx                  # minimal
 src/
-  config/config.ts                 # env zod (ANTHROPIC_API_KEY, DATABASE_URL, DB_ENCRYPTION_KEY, WHATSAPP_WEBHOOK_SECRET?, MCP_BEARER_TOKEN, ENABLE_WRITE_TOOLS)
+  config/config.ts                 # env zod (ANTHROPIC_API_KEY, DATABASE_URL, DB_ENCRYPTION_KEY, WHATSAPP_WEBHOOK_SECRET?, MCP_BEARER_TOKEN)
   auth.ts                          # verifyWebhookSignature (webhook) + verifyBearerToken (MCP), constant-time
   domain/athlete.ts                # modèle métier Athlete + enum AthleteStatus (indépendants de @inigo/db)
   repositories/
@@ -81,7 +81,10 @@ Un serveur MCP hébergé **dans coach** (choix assumé : pas d'app séparée) do
   → 401 sans token. Le bearer prouve que l'appelant est le brain, **pas** quel athlète : avec
   l'id en argument, l'isolation repose sur le fait que l'agent passe le bon `athleteId`.
   Durcissement futur : un bearer par athlète qui rejette côté serveur tout `athleteId` ≠ celui du token.
-- **Écritures gated** par `ENABLE_WRITE_TOOLS` (off par défaut, least-privilege).
+- **Écritures toujours montées** : l'accès au endpoint est gardé par le bearer `MCP_BEARER_TOKEN`
+  (401 sinon) et chaque write est **scopé par `athleteId`** (un update ne peut jamais toucher la
+  donnée d'un autre athlète). Le flag `ENABLE_WRITE_TOOLS` a été retiré (les writes ne sont plus
+  optionnels).
 
 **Contrat des tools** (noms distincts d'`intervals-icu-mcp` pour garder la frontière lisible) :
 
@@ -95,6 +98,7 @@ Un serveur MCP hébergé **dans coach** (choix assumé : pas d'app séparée) do
 | `update_profile` | write | upsert notes/prefs (`weightTargetKg`, `constraints`, `constraintsNotes`, `healthNotes`, `coachingTargets`). |
 | `log_adaptation` | write | append au journal (`summary` requis). |
 | `upsert_goal` | write | create/update d'un `goal` (update scopé par athleteId). |
+| `save_training_plan` | write | create (sans `id`) / update (`id`) du `training_plan` **+** ses `plan_block` en une écriture atomique (`db.batch`). Blocs en **replace-all** (`order_index` recalculé) ; `status=active` archive les autres plans actifs ; update scopé par athleteId (jamais le plan d'un autre). Dates I/O en `YYYY-MM-DD`. |
 
 **Frontière athlete-data ⟂ intervals-icu (à respecter dans les prompts d'agents) :**
 - **athlete-data (Neon, ce MCP)** = *couche coaching* : profil structuré, seuils **historisés**,
@@ -138,11 +142,14 @@ le skill Claude Code `managed-agents-api`.
 ## Tests
 
 - Vitest co-localisés (`*.spec.ts`). `pnpm --filter @inigo/coach run test`.
-- Couvre : config (dont `MCP_BEARER_TOKEN`/`ENABLE_WRITE_TOOLS`), auth (HMAC + bearer),
+- Couvre : config (dont `MCP_BEARER_TOKEN`), auth (HMAC + bearer),
   parsing/normalisation du payload + `senderPhone`, mapping `toAthlete`, **use-case
   `routeInboundMessage`** (4 cas de routing + filtres + throws infra, repo & brain fakes),
-  brain (fake SDK). Côté MCP : intégration `InMemoryTransport` (reads présents, writes gated
-  on/off, un call renvoie du JSON), route (401 sans bearer, 400 UUID invalide). Pas de réseau.
+  brain (fake SDK). Côté MCP : intégration `InMemoryTransport` (reads + writes présents dont
+  `save_training_plan`, un call renvoie du JSON, validation de date rejetée), route (401 sans
+  bearer, 400 UUID invalide). Pas de réseau. Le store `saveTrainingPlan` (create, update
+  replace-all, archivage de l'actif, scoping cross-athlète) est couvert par la spec d'intégration
+  Neon (skip sans `DATABASE_URL`).
 - Les specs d'intégration Neon (`*.integration.spec.ts` : adapter Drizzle **et** store MCP)
   tournent contre une vraie branche et se **skip** sans `DATABASE_URL`, donc `pnpm verify` reste offline.
 - `pnpm verify` (racine) doit être vert avant tout commit.

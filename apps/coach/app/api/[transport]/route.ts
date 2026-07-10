@@ -13,10 +13,8 @@ export const dynamic = "force-dynamic";
 // and the store scopes the query to that athlete.
 const handler = createMcpHandler(
   (server) => {
-    const { athleteData, config } = getDeps();
-    registerAthleteDataTools(server, athleteData, {
-      enableWriteTools: config.ENABLE_WRITE_TOOLS
-    });
+    const { athleteData } = getDeps();
+    registerAthleteDataTools(server, athleteData);
   },
   {
     serverInfo: { name: "athlete-data-mcp", version: "0.1.0" },

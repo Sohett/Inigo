@@ -1,4 +1,6 @@
-import { and, asc, desc, eq, gte } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
+import { and, asc, desc, eq, gte, inArray, ne } from "drizzle-orm";
+import type { BatchItem } from "drizzle-orm/batch";
 import {
   adaptationLog,
   athlete,
@@ -16,7 +18,11 @@ import type {
   GoalPriority,
   GoalStatus,
   GoalType,
-  Sport
+  PhaseType,
+  PlanAuthor,
+  PlanStatus,
+  Sport,
+  WeeklyTarget
 } from "@inigo/db";
 
 /**
@@ -57,6 +63,64 @@ export interface GoalInput {
   priority?: GoalPriority;
   status?: GoalStatus;
   intervalsEventId?: string;
+}
+
+/** A block of a training plan on write. `orderIndex` is derived from the array position. */
+export interface PlanBlockInput {
+  name?: string;
+  phaseType?: PhaseType;
+  startDate: string;
+  endDate: string;
+  focus?: string;
+  weeklyTargets?: WeeklyTarget[];
+}
+
+/**
+ * A training-plan write: create (no `id`) or update (`id` present). On write the plan is
+ * scoped to the athlete; `blocks` fully replaces the plan's existing blocks (replace-all).
+ */
+export interface TrainingPlanInput {
+  id?: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+  status?: PlanStatus;
+  goalId?: string | null;
+  rationale?: string;
+  createdBy?: PlanAuthor;
+  blocks: PlanBlockInput[];
+}
+
+/**
+ * Neon's HTTP driver parses `date` columns into local-time `Date` objects even though
+ * Drizzle types them as `string`. Normalise both shapes back to a plain `YYYY-MM-DD`
+ * with local getters — never `toISOString`, which would re-apply the timezone offset and
+ * shift the day.
+ */
+function toDateString(value: string | Date | null): string | null {
+  if (value === null) return null;
+  if (value instanceof Date) {
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, "0");
+    const day = String(value.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+  return value.slice(0, 10);
+}
+
+type PlanRow = typeof trainingPlan.$inferSelect;
+type BlockRow = typeof planBlock.$inferSelect;
+
+/** Shape a plan + its ordered blocks for a tool response, normalising the date columns. */
+function shapeTrainingPlan(plan: PlanRow, blocks: BlockRow[]) {
+  return {
+    plan: { ...plan, startDate: toDateString(plan.startDate), endDate: toDateString(plan.endDate) },
+    blocks: blocks.map((block) => ({
+      ...block,
+      startDate: toDateString(block.startDate),
+      endDate: toDateString(block.endDate)
+    }))
+  };
 }
 
 export function createAthleteDataStore(db: Db) {
@@ -157,7 +221,7 @@ export function createAthleteDataStore(db: Db) {
             .from(planBlock)
             .where(eq(planBlock.planId, plan.id))
             .orderBy(asc(planBlock.orderIndex));
-          return { plan, blocks };
+          return shapeTrainingPlan(plan, blocks);
         },
 
         /** Most recent adaptation-log entries, newest first (default 20), optionally since a date. */
@@ -215,6 +279,128 @@ export function createAthleteDataStore(db: Db) {
             .values({ athleteId, ...values, title: values.title ?? "" })
             .returning();
           return rows[0] ?? null;
+        },
+
+        /**
+         * Create a training plan (no `id`) or update an existing one (`id` present), together
+         * with its ordered blocks in one atomic write. Blocks are **replace-all**: the provided
+         * list fully replaces the plan's blocks, `order_index` recomputed from the array order.
+         * Making the plan `active` archives the athlete's other active plans.
+         *
+         * Scoped to the athlete: on update, ownership is checked first and the write returns
+         * null if the plan is unknown or not owned — a session can never touch another athlete's
+         * plan or blocks. Neon's HTTP driver has no interactive transaction, so atomicity comes
+         * from `db.batch` (a single non-interactive Postgres transaction).
+         */
+        async saveTrainingPlan(input: TrainingPlanInput) {
+          const planId = input.id ?? randomUUID();
+
+          // On update, confirm ownership BEFORE building the batch. The block delete is scoped
+          // by plan_id alone; without this guard a batch aimed at another athlete's plan id
+          // would still delete their blocks when it commits.
+          if (input.id) {
+            const owned = await db
+              .select({ id: trainingPlan.id })
+              .from(trainingPlan)
+              .where(and(eq(trainingPlan.id, input.id), eq(trainingPlan.athleteId, athleteId)))
+              .limit(1);
+            if (!owned[0]) return null;
+          }
+
+          const statements: BatchItem<"pg">[] = [];
+
+          // A single active plan per athlete: making this one active archives the others.
+          if (input.status === "active") {
+            statements.push(
+              db
+                .update(trainingPlan)
+                .set({ status: "archived", updatedAt: new Date() })
+                .where(
+                  and(
+                    eq(trainingPlan.athleteId, athleteId),
+                    eq(trainingPlan.status, "active"),
+                    ne(trainingPlan.id, planId)
+                  )
+                )
+            );
+          }
+
+          if (input.id) {
+            const set: Partial<typeof trainingPlan.$inferInsert> = {
+              name: input.name,
+              startDate: input.startDate,
+              endDate: input.endDate,
+              updatedAt: new Date()
+            };
+            if (input.status !== undefined) set.status = input.status;
+            if (input.goalId !== undefined) set.goalId = input.goalId;
+            if (input.rationale !== undefined) set.rationale = input.rationale;
+            if (input.createdBy !== undefined) set.createdBy = input.createdBy;
+            statements.push(
+              db
+                .update(trainingPlan)
+                .set(set)
+                .where(and(eq(trainingPlan.id, planId), eq(trainingPlan.athleteId, athleteId)))
+            );
+            // Replace-all: drop the plan's existing blocks. Scoped by subquery so it can only
+            // ever hit blocks of a plan this athlete owns (defence in depth over the guard above).
+            statements.push(
+              db.delete(planBlock).where(
+                inArray(
+                  planBlock.planId,
+                  db
+                    .select({ id: trainingPlan.id })
+                    .from(trainingPlan)
+                    .where(and(eq(trainingPlan.id, planId), eq(trainingPlan.athleteId, athleteId)))
+                )
+              )
+            );
+          } else {
+            statements.push(
+              db.insert(trainingPlan).values({
+                id: planId,
+                athleteId,
+                name: input.name,
+                startDate: input.startDate,
+                endDate: input.endDate,
+                status: input.status ?? "draft",
+                goalId: input.goalId ?? null,
+                rationale: input.rationale ?? null,
+                createdBy: input.createdBy ?? "ai"
+              })
+            );
+          }
+
+          input.blocks.forEach((block, index) => {
+            statements.push(
+              db.insert(planBlock).values({
+                planId,
+                name: block.name ?? null,
+                phaseType: block.phaseType ?? null,
+                startDate: block.startDate,
+                endDate: block.endDate,
+                focus: block.focus ?? null,
+                orderIndex: index,
+                weeklyTargets: block.weeklyTargets ?? null
+              })
+            );
+          });
+
+          await db.batch(statements as [BatchItem<"pg">, ...BatchItem<"pg">[]]);
+
+          const savedRows = await db
+            .select()
+            .from(trainingPlan)
+            .where(eq(trainingPlan.id, planId))
+            .limit(1);
+          const savedPlan = savedRows[0];
+          if (!savedPlan) return null;
+          const savedBlocks = await db
+            .select()
+            .from(planBlock)
+            .where(eq(planBlock.planId, planId))
+            .orderBy(asc(planBlock.orderIndex));
+          return shapeTrainingPlan(savedPlan, savedBlocks);
         }
       };
     }

@@ -6,6 +6,8 @@ import {
   athleteThreshold,
   createDb,
   goal,
+  planBlock,
+  trainingPlan,
   type Db
 } from "@inigo/db";
 import { createAthleteDataStore } from "./athleteDataStore";
@@ -102,5 +104,134 @@ describe.skipIf(!databaseUrl)("athleteDataStore (integration)", () => {
     const otherStore = createAthleteDataStore(db).forAthlete(MISSING_ATHLETE);
     const result = await otherStore.upsertGoal({ id: goals[0]!.id, status: "abandoned" });
     expect(result).toBeNull();
+  });
+
+  it("creates a training plan with blocks and reads it back (dates as YYYY-MM-DD)", async () => {
+    const store = createAthleteDataStore(db).forAthlete(athleteId);
+    const saved = await store.saveTrainingPlan({
+      name: "Test season",
+      startDate: "2026-07-06",
+      endDate: "2026-09-20",
+      status: "active",
+      createdBy: "ai",
+      rationale: "test macro rationale",
+      blocks: [
+        {
+          name: "Base",
+          phaseType: "base",
+          startDate: "2026-07-06",
+          endDate: "2026-07-19",
+          focus: "volume",
+          weeklyTargets: [{ weekStart: "2026-07-06", plannedTss: 500 }]
+        },
+        { name: "Build", phaseType: "build", startDate: "2026-07-20", endDate: "2026-08-02" }
+      ]
+    });
+    expect(saved).not.toBeNull();
+    // Dates normalised with no timezone shift (Neon parses `date` into local Date objects).
+    expect(saved!.plan.startDate).toBe("2026-07-06");
+    expect(saved!.plan.endDate).toBe("2026-09-20");
+    expect(saved!.blocks).toHaveLength(2);
+    expect(saved!.blocks[0]!.orderIndex).toBe(0);
+    expect(saved!.blocks[0]!.startDate).toBe("2026-07-06");
+
+    const readBack = await store.getTrainingPlan();
+    expect(readBack!.plan.name).toBe("Test season");
+    expect(readBack!.plan.rationale).toBe("test macro rationale");
+    expect(readBack!.blocks).toHaveLength(2);
+    expect(readBack!.plan.startDate).toBe("2026-07-06");
+  });
+
+  it("updates a plan and replaces/reorders its blocks atomically", async () => {
+    const store = createAthleteDataStore(db).forAthlete(athleteId);
+    const created = await store.saveTrainingPlan({
+      name: "Replace me",
+      startDate: "2026-07-06",
+      endDate: "2026-09-20",
+      status: "active",
+      blocks: [
+        { name: "one", startDate: "2026-07-06", endDate: "2026-07-12" },
+        { name: "two", startDate: "2026-07-13", endDate: "2026-07-19" }
+      ]
+    });
+    const planId = created!.plan.id;
+
+    const updated = await store.saveTrainingPlan({
+      id: planId,
+      name: "Replaced",
+      startDate: "2026-07-06",
+      endDate: "2026-09-20",
+      rationale: "updated rationale",
+      blocks: [{ name: "only", startDate: "2026-07-06", endDate: "2026-07-12" }]
+    });
+    expect(updated!.plan.id).toBe(planId);
+    expect(updated!.plan.name).toBe("Replaced");
+    expect(updated!.plan.rationale).toBe("updated rationale");
+    expect(updated!.blocks).toHaveLength(1);
+    expect(updated!.blocks[0]!.name).toBe("only");
+    expect(updated!.blocks[0]!.orderIndex).toBe(0);
+  });
+
+  it("archives the previous active plan when a new one is set active", async () => {
+    const store = createAthleteDataStore(db).forAthlete(athleteId);
+    const first = await store.saveTrainingPlan({
+      name: "First active",
+      startDate: "2026-01-01",
+      endDate: "2026-02-01",
+      status: "active",
+      blocks: [{ startDate: "2026-01-01", endDate: "2026-01-07" }]
+    });
+    const second = await store.saveTrainingPlan({
+      name: "Second active",
+      startDate: "2026-03-01",
+      endDate: "2026-04-01",
+      status: "active",
+      blocks: [{ startDate: "2026-03-01", endDate: "2026-03-07" }]
+    });
+
+    const current = await store.getTrainingPlan();
+    expect(current!.plan.id).toBe(second!.plan.id);
+
+    const firstRow = await db
+      .select()
+      .from(trainingPlan)
+      .where(eq(trainingPlan.id, first!.plan.id))
+      .limit(1);
+    expect(firstRow[0]!.status).toBe("archived");
+  });
+
+  it("cannot save over another athlete's plan and leaves its blocks intact (scoping)", async () => {
+    const owner = createAthleteDataStore(db).forAthlete(athleteId);
+    const created = await owner.saveTrainingPlan({
+      name: "Owned",
+      startDate: "2026-05-01",
+      endDate: "2026-06-01",
+      status: "active",
+      blocks: [
+        { name: "keep-1", startDate: "2026-05-01", endDate: "2026-05-07" },
+        { name: "keep-2", startDate: "2026-05-08", endDate: "2026-05-14" }
+      ]
+    });
+    const planId = created!.plan.id;
+
+    const intruder = createAthleteDataStore(db).forAthlete(MISSING_ATHLETE);
+    const result = await intruder.saveTrainingPlan({
+      id: planId,
+      name: "Hijacked",
+      startDate: "2026-05-01",
+      endDate: "2026-06-01",
+      blocks: [{ startDate: "2026-05-01", endDate: "2026-05-07" }]
+    });
+    expect(result).toBeNull();
+
+    // The owner's plan and its two blocks are untouched (the delete never ran).
+    const ownRow = await db
+      .select()
+      .from(trainingPlan)
+      .where(eq(trainingPlan.id, planId))
+      .limit(1);
+    expect(ownRow[0]!.name).toBe("Owned");
+    const ownBlocks = await db.select().from(planBlock).where(eq(planBlock.planId, planId));
+    expect(ownBlocks).toHaveLength(2);
   });
 });
