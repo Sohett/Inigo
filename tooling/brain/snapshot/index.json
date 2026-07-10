@@ -3,7 +3,6 @@
   "counts": {
     "agents": 5,
     "environments": 1,
-    "sessions": 8,
     "vaults": 1,
     "memoryStores": 1,
     "skills": 6
@@ -12,32 +11,27 @@
     {
       "id": "agent_013Cb3npXSMv7T8X533DL9kt",
       "name": "inigo-coordinateur",
-      "version": 12,
-      "versionCount": 12
+      "version": 12
     },
     {
       "id": "agent_01Sp4ghn8GHc5Lbd9JJptEzR",
       "name": "inigo-architecte-macro",
-      "version": 3,
-      "versionCount": 3
+      "version": 3
     },
     {
       "id": "agent_01CTK33Z2CLPwtDyq9vKDsVG",
       "name": "inigo-constructeur-hebdo",
-      "version": 6,
-      "versionCount": 6
+      "version": 6
     },
     {
       "id": "agent_01Dbg6WeAF41xSs8bTfiE8XD",
       "name": "inigo-analyste-post-seance",
-      "version": 3,
-      "versionCount": 3
+      "version": 3
     },
     {
       "id": "agent_012ethnUdHzvRW9iPxdzzbTx",
       "name": "inigo-readaptateur",
-      "version": 7,
-      "versionCount": 7
+      "version": 7
     }
   ],
   "memoryStores": [

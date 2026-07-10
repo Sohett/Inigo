@@ -19,9 +19,9 @@ async function main(): Promise<void> {
 
   console.log(`Snapshot écrit dans ${outDir}`);
   console.log(
-    `  agents=${snapshot.agents.length} environments=${snapshot.environments.length} ` +
-      `sessions=${snapshot.sessions.length} vaults=${snapshot.vaults.length} ` +
-      `memoryStores=${snapshot.memoryStores.length} skills=${snapshot.skills.length}`
+    `  agents=${snapshot.agentDetails.length} environments=${snapshot.environments.length} ` +
+      `vaults=${snapshot.vaults.length} memoryStores=${snapshot.memoryStores.length} ` +
+      `skills=${snapshot.skills.length}`
   );
   for (const note of snapshot.notes) console.log(`  note: ${note}`);
   if (snapshot.errors.length > 0) {

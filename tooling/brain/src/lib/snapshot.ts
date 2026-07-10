@@ -14,14 +14,13 @@ type Agent = Awaited<ReturnType<BrainClient["beta"]["agents"]["retrieve"]>>;
 export interface AgentDetail {
   id: string;
   config: Agent;
-  versions: Agent[];
 }
 
 export interface BrainSnapshot {
+  /** Every agent in the workspace (used to enumerate + count; not written to disk). */
   agents: unknown[];
   agentDetails: AgentDetail[];
   environments: unknown[];
-  sessions: unknown[];
   vaults: unknown[];
   memoryStores: unknown[];
   skills: unknown[];
@@ -29,20 +28,15 @@ export interface BrainSnapshot {
   errors: SnapshotError[];
 }
 
-/** Cap on how many sessions to pull (metadata only); truncation is surfaced. */
-const SESSION_LIMIT = 200;
-
 async function collectList<T>(
   resource: string,
   iter: AsyncIterable<T>,
-  errors: SnapshotError[],
-  max = Number.POSITIVE_INFINITY
+  errors: SnapshotError[]
 ): Promise<T[]> {
   const out: T[] = [];
   try {
     for await (const item of iter) {
       out.push(item);
-      if (out.length >= max) break;
     }
   } catch (err) {
     errors.push({ resource, message: errorMessage(err) });
@@ -51,12 +45,14 @@ async function collectList<T>(
 }
 
 /**
- * Read-only: collect the whole brain architecture from the workspace — every
- * agent (+ full config and version history for the target agent(s)),
- * environments, sessions (capped), vaults, memory stores and skills.
+ * Read-only: collect the brain architecture we version — every agent's full,
+ * editable config (the target agent + its multiagent roster), plus environments,
+ * vaults, memory stores and skills.
  *
- * Never mutates anything. Individual resource failures are captured in `errors`
- * rather than aborting the whole snapshot.
+ * Deliberately NOT collected: per-agent version history (kept server-side, the
+ * current `version` is enough) and sessions (ephemeral runtime, inspected on
+ * demand via `ant`/SDK — not versioned architecture). Never mutates anything;
+ * individual resource failures are captured in `errors` rather than aborting.
  */
 export async function collectSnapshot(
   client: BrainClient,
@@ -71,15 +67,6 @@ export async function collectSnapshot(
     client.beta.environments.list(),
     errors
   );
-  const sessions = await collectList<unknown>(
-    "sessions",
-    client.beta.sessions.list(),
-    errors,
-    SESSION_LIMIT
-  );
-  if (sessions.length >= SESSION_LIMIT) {
-    notes.push(`sessions tronquées à ${SESSION_LIMIT} (il en existe peut-être davantage).`);
-  }
   const vaults = await collectList<unknown>("vaults", client.beta.vaults.list(), errors);
   const memoryStores = await collectList<unknown>(
     "memoryStores",
@@ -104,12 +91,7 @@ export async function collectSnapshot(
     fetched.add(id);
     try {
       const config = await client.beta.agents.retrieve(id);
-      const versions = await collectList<Agent>(
-        `agents/${id}/versions`,
-        client.beta.agents.versions.list(id),
-        errors
-      );
-      agentDetails.push({ id, config, versions });
+      agentDetails.push({ id, config });
 
       // Follow the multiagent coordinator roster (sub-agents referenced by id).
       const roster = (config as { multiagent?: { agents?: { id?: string }[] } | null }).multiagent;
@@ -125,7 +107,6 @@ export async function collectSnapshot(
     agents,
     agentDetails,
     environments,
-    sessions,
     vaults,
     memoryStores,
     skills,
@@ -137,7 +118,7 @@ export async function collectSnapshot(
 interface SnapshotSummary {
   fetchedAt: string;
   counts: Record<string, number>;
-  agents: { id: string; name: unknown; version: unknown; versionCount: number }[];
+  agents: { id: string; name: unknown; version: unknown }[];
   memoryStores: { id: unknown; name: unknown }[];
   vaults: { id: unknown; name: unknown }[];
   notes: string[];
@@ -148,16 +129,15 @@ function buildSummary(snapshot: BrainSnapshot, fetchedAt: string): SnapshotSumma
   return {
     fetchedAt,
     counts: {
-      agents: snapshot.agents.length,
+      agents: snapshot.agentDetails.length,
       environments: snapshot.environments.length,
-      sessions: snapshot.sessions.length,
       vaults: snapshot.vaults.length,
       memoryStores: snapshot.memoryStores.length,
       skills: snapshot.skills.length
     },
     agents: snapshot.agentDetails.map((d) => {
       const c = d.config as { name?: unknown; version?: unknown };
-      return { id: d.id, name: c.name, version: c.version, versionCount: d.versions.length };
+      return { id: d.id, name: c.name, version: c.version };
     }),
     memoryStores: snapshot.memoryStores.map((s) => {
       const m = s as { id?: unknown; name?: unknown };
@@ -175,6 +155,11 @@ function buildSummary(snapshot: BrainSnapshot, fetchedAt: string): SnapshotSumma
 /**
  * Write the snapshot to `dir` as git-diff-friendly JSON files. `fetchedAt` is
  * passed in (not read from the clock) so the writer stays deterministic.
+ *
+ * One file per agent under `agents/<id>.json` is the editable source of truth;
+ * `index.json` is the summary. We deliberately do NOT write a flat `agents.json`
+ * list (redundant with the per-agent files), per-agent version history, or
+ * sessions (ephemeral runtime).
  */
 export async function writeSnapshot(
   snapshot: BrainSnapshot,
@@ -182,16 +167,13 @@ export async function writeSnapshot(
   fetchedAt: string
 ): Promise<void> {
   await writeJsonFile(path.join(dir, "index.json"), buildSummary(snapshot, fetchedAt));
-  await writeJsonFile(path.join(dir, "agents.json"), snapshot.agents);
   await writeJsonFile(path.join(dir, "environments.json"), snapshot.environments);
-  await writeJsonFile(path.join(dir, "sessions.json"), snapshot.sessions);
   await writeJsonFile(path.join(dir, "vaults.json"), snapshot.vaults);
   await writeJsonFile(path.join(dir, "memory-stores.json"), snapshot.memoryStores);
   await writeJsonFile(path.join(dir, "skills.json"), snapshot.skills);
 
   for (const detail of snapshot.agentDetails) {
     await writeJsonFile(path.join(dir, "agents", `${detail.id}.json`), detail.config);
-    await writeJsonFile(path.join(dir, "agents", `${detail.id}.versions.json`), detail.versions);
   }
 
   if (snapshot.errors.length > 0) {
