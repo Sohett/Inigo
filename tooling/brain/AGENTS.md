@@ -41,5 +41,8 @@ Outillage dev local pour opérer le brain (Claude Managed Agents). Complète l'`
 
 ## Sorties
 
-- `snapshot/` : miroir git-tracké de l'archi (à commiter volontairement).
+- `snapshot/` : miroir git-tracké de l'archi (à commiter volontairement) — **un fichier par agent**
+  `agents/<id>.json` (source éditable) + `index.json` (résumé) + `environments`/`vaults`/
+  `memory-stores`/`skills`. Pas de `agents.json` à plat, pas de `*.versions.json`, pas de
+  `sessions.json` (runtime éphémère, non versionné).
 - `memory/` : dumps mémoire, **gitignore** (données perso athlète).

@@ -30,9 +30,11 @@ pnpm --filter @inigo/brain run brain:vault:cred:add --vault=<id> --name=<VAR> \
 
 ## Workflows
 
-- **Comprendre / versionner l'archi** : `brain:pull`, puis commiter `snapshot/` (config d'agent,
-  versions, environments, vaults, memory stores, skills). Le `system` prompt de l'agent y figure
-  (privé, non secret) ; `snapshot/sessions.json` ne contient que des métadonnées.
+- **Comprendre / versionner l'archi** : `brain:pull`, puis commiter `snapshot/` — **un fichier
+  éditable par agent** (`agents/<id>.json`, avec son `system` prompt, privé non secret) + `index.json`
+  (résumé) + `environments`/`vaults`/`memory-stores`/`skills`. Pas de liste `agents.json` à plat, pas
+  d'historique de versions, pas de sessions : les sessions sont du **runtime éphémère** (à inspecter
+  via `ant`/SDK au besoin), pas de l'archi versionnée.
 - **Mettre à jour un agent** : `brain:pull` → éditer `snapshot/agents/<id>.json` → `brain:agent:apply
   <id> --apply` (nouvelle version, protégé contre les conflits de version 409).
 - **Déployer un skill** : éditer `tooling/agent-skills/<nom>/` → `brain:skill:deploy <nom> --apply`.

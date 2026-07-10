@@ -48,7 +48,6 @@ Validées au boot par `src/config/config.ts`. Copie `.env.example` → `.env` **
 | `DB_ENCRYPTION_KEY` | Clé base64 32 octets (AES-256-GCM) pour sceller les secrets par athlète |
 | `WHATSAPP_WEBHOOK_SECRET` | Optionnel : vérif HMAC `X-OpenWA-Signature` si renseigné |
 | `MCP_BEARER_TOKEN` | Bearer que le brain présente au MCP athlete-data (min 16 car., server-side) |
-| `ENABLE_WRITE_TOOLS` | Active les tools d'écriture du MCP athlete-data (`false` par défaut) |
 
 ## Setup (résumé)
 
@@ -73,11 +72,13 @@ Endpoint **statique** : `GET/POST /api/mcp` (un Managed Agent configure une seul
 MCP, fixe et partagée). L'athlète n'est donc **pas** dans l'URL : chaque tool prend un argument
 `athleteId` (l'UUID Inigo, = `inigo_athlete_id` du message), et la requête est scopée à cet
 athlète (`store.forAthlete(athleteId)`). Auth par **bearer** `MCP_BEARER_TOKEN` (401 sinon).
-Les tools d'écriture ne sont montés que si `ENABLE_WRITE_TOOLS=true` (off par défaut).
+Lectures et écritures sont toutes montées ; chaque écriture est scopée par `athleteId` (un update
+ne touche jamais la donnée d'un autre athlète) et l'accès reste gardé par le bearer.
 
 Tools : lecture `get_profile`, `get_thresholds`, `get_goals`, `get_training_plan`,
-`get_adaptation_log` ; écriture `update_profile`, `log_adaptation`, `upsert_goal`. `get_profile`
-n'expose **aucun** secret ni donnée de routing (ni `phone_num`, ni ids de session).
+`get_adaptation_log` ; écriture `update_profile`, `log_adaptation`, `upsert_goal`,
+`save_training_plan` (crée/met à jour le macro-plan + ses blocs, en une écriture atomique).
+`get_profile` n'expose **aucun** secret ni donnée de routing (ni `phone_num`, ni ids de session).
 
 **Frontière avec `intervals-icu-mcp`** : ce MCP porte la *couche coaching* (profil, seuils
 historisés, objectifs, plan, journal). `intervals-icu-mcp` porte la *vérité live* (activités,

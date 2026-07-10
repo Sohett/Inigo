@@ -38,17 +38,9 @@ export const configSchema = z.object({
     ),
   /**
    * Bearer token the brain (Managed Agent) must present to reach the athlete-data
-   * MCP endpoint (`/athlete/{id}/api/mcp`). Server-side only, min 16 chars.
+   * MCP endpoint (`/api/mcp`). Server-side only, min 16 chars.
    */
-  MCP_BEARER_TOKEN: z.string().min(16, "MCP_BEARER_TOKEN must be at least 16 characters"),
-  /**
-   * When false (default), the athlete-data MCP write tools (update_profile,
-   * log_adaptation, upsert_goal) are not registered — least-privilege by default.
-   */
-  ENABLE_WRITE_TOOLS: z
-    .enum(["true", "false", "1", "0"])
-    .default("false")
-    .transform((value) => value === "true" || value === "1")
+  MCP_BEARER_TOKEN: z.string().min(16, "MCP_BEARER_TOKEN must be at least 16 characters")
 });
 
 export type Config = z.infer<typeof configSchema>;

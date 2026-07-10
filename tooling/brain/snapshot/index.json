@@ -1,57 +1,43 @@
 {
-  "fetchedAt": "2026-07-08T10:29:41.328Z",
+  "fetchedAt": "2026-07-10T08:03:55.153Z",
   "counts": {
-    "agents": 6,
+    "agents": 5,
     "environments": 1,
-    "sessions": 7,
     "vaults": 1,
-    "memoryStores": 3,
+    "memoryStores": 1,
     "skills": 6
   },
   "agents": [
     {
       "id": "agent_013Cb3npXSMv7T8X533DL9kt",
       "name": "inigo-coordinateur",
-      "version": 10,
-      "versionCount": 10
+      "version": 12
     },
     {
       "id": "agent_01Sp4ghn8GHc5Lbd9JJptEzR",
       "name": "inigo-architecte-macro",
-      "version": 3,
-      "versionCount": 3
+      "version": 3
     },
     {
       "id": "agent_01CTK33Z2CLPwtDyq9vKDsVG",
       "name": "inigo-constructeur-hebdo",
-      "version": 6,
-      "versionCount": 6
+      "version": 6
     },
     {
       "id": "agent_01Dbg6WeAF41xSs8bTfiE8XD",
       "name": "inigo-analyste-post-seance",
-      "version": 3,
-      "versionCount": 3
+      "version": 3
     },
     {
       "id": "agent_012ethnUdHzvRW9iPxdzzbTx",
       "name": "inigo-readaptateur",
-      "version": 7,
-      "versionCount": 7
+      "version": 7
     }
   ],
   "memoryStores": [
     {
-      "id": "memstore_01WiKQJoq5GVWZhecDeCDfLf",
-      "name": "validators"
-    },
-    {
       "id": "memstore_01Ad3wALLarbS97RbVjT1Hbo",
       "name": "Inigo Knowledge Base"
-    },
-    {
-      "id": "memstore_01RWCKeRy4fPqFRMKUf9d18E",
-      "name": "[ATHLETE] Inigo - Thomas Sohet"
     }
   ],
   "vaults": [
