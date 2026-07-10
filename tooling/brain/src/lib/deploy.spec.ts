@@ -74,6 +74,7 @@ describe("deployBrain", () => {
       { id: "agent_a", version: 4 },
       { id: "agent_b", version: 6 }
     ]);
+    expect(report.coordinator.unpinnedSubAgents).toEqual([]);
     expect(report.session.created).toBe(false);
   });
 
@@ -118,5 +119,64 @@ describe("deployBrain", () => {
     // The session runs on the coordinator (its latest version).
     expect(sessionBody?.agent).toBe("agent_coord");
     expect(report.session).toEqual({ created: true, sessionId: "sesn_deploy", agentVersion: 11 });
+  });
+
+  it("handles a coordinator with no multiagent roster: nothing re-pinned, sub-agent flagged", async () => {
+    const coordNoRoster = { id: "agent_coord2", version: 5, system: "c" };
+    const noRosterManifest = deployManifestSchema.parse({
+      coordinator: "agent_coord2",
+      subAgents: ["agent_a"],
+      session: { environmentId: "env_1" }
+    });
+    server.use(
+      http.get(`${API}/agents/agent_a`, () => HttpResponse.json(currentSubA)),
+      http.get(`${API}/agents/agent_coord2`, () => HttpResponse.json(coordNoRoster))
+    );
+
+    const report = await deployBrain(
+      client(),
+      {
+        manifest: noRosterManifest,
+        agentConfigs: { agent_a: { system: "a-new" }, agent_coord2: { ...coordNoRoster } }
+      },
+      false
+    );
+
+    expect(report.coordinator.repinned).toEqual([]);
+    expect(report.coordinator.unpinnedSubAgents).toEqual(["agent_a"]);
+  });
+
+  it("flags a manifest sub-agent absent from the coordinator roster (bumped but not re-pinned)", async () => {
+    const coordRosterA = {
+      id: "agent_coord3",
+      version: 5,
+      multiagent: { type: "coordinator", agents: [{ id: "agent_a", type: "agent", version: 3 }] }
+    };
+    const partialManifest = deployManifestSchema.parse({
+      coordinator: "agent_coord3",
+      subAgents: ["agent_a", "agent_c"],
+      session: { environmentId: "env_1" }
+    });
+    server.use(
+      http.get(`${API}/agents/agent_a`, () => HttpResponse.json(currentSubA)),
+      http.get(`${API}/agents/agent_c`, () => HttpResponse.json({ id: "agent_c", version: 2, system: "c-old" })),
+      http.get(`${API}/agents/agent_coord3`, () => HttpResponse.json(coordRosterA))
+    );
+
+    const report = await deployBrain(
+      client(),
+      {
+        manifest: partialManifest,
+        agentConfigs: {
+          agent_a: { system: "a-new" },
+          agent_c: { system: "c-new" },
+          agent_coord3: structuredClone(coordRosterA) as unknown as Record<string, unknown>
+        }
+      },
+      false
+    );
+
+    expect(report.coordinator.repinned).toEqual([{ id: "agent_a", version: 4 }]);
+    expect(report.coordinator.unpinnedSubAgents).toEqual(["agent_c"]);
   });
 });

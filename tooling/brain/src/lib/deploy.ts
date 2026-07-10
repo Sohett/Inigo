@@ -18,6 +18,8 @@ export const deployManifestSchema = z.object({
   session: z.object({
     environmentId: z.string().min(1),
     vaultIds: z.array(z.string().min(1)).optional(),
+    // `resources` keeps the SDK's snake_case shape (memory_store_id, …): it is forwarded
+    // verbatim to beta.sessions.create, unlike the camelCase keys above which we map.
     resources: z
       .array(
         z.object({
@@ -48,7 +50,12 @@ export interface AgentDeployReport {
 
 export interface DeployReport {
   subAgents: AgentDeployReport[];
-  coordinator: AgentDeployReport & { repinned: Array<{ id: string; version: number }> };
+  coordinator: AgentDeployReport & {
+    repinned: Array<{ id: string; version: number }>;
+    /** Manifest sub-agents applied but NOT present in the coordinator roster — they were
+     * bumped yet the coordinator won't pick them up (roster drift or a null multiagent). */
+    unpinnedSubAgents: string[];
+  };
   session: { created: boolean; sessionId?: string; agentVersion?: number };
 }
 
@@ -121,6 +128,8 @@ export async function deployBrain(
     throw new Error(`Deploy manifest references coordinator ${manifest.coordinator} with no snapshot config.`);
   }
   const repinned = repinRoster(coordinatorConfig, versions);
+  const pinnedIds = new Set(repinned.map((entry) => entry.id));
+  const unpinnedSubAgents = manifest.subAgents.filter((id) => !pinnedIds.has(id));
   const coordResult = await applyAgent(
     client,
     { agentId: manifest.coordinator, config: coordinatorConfig },
@@ -150,7 +159,8 @@ export async function deployBrain(
       fromVersion: coordResult.plan.currentVersion,
       toVersion: coordTo,
       changed: coordResult.plan.changedFields,
-      repinned
+      repinned,
+      unpinnedSubAgents
     },
     session: {
       created: session.created,

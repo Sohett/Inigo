@@ -24,12 +24,20 @@ function printReport(report: DeployReport, apply: boolean): void {
   if (coord.repinned.length > 0) {
     console.log(`    re-pin : ${coord.repinned.map((r) => `${r.id}=v${r.version}`).join(", ")}`);
   }
+  if (coord.unpinnedSubAgents.length > 0) {
+    // No-silent-failure: a bumped sub-agent the coordinator won't pick up defeats the deploy.
+    console.warn(
+      `  ⚠️  Sous-agent(s) appliqué(s) mais ABSENT(S) du roster du coordinateur (non re-pinné, ` +
+        `sans effet runtime) : ${coord.unpinnedSubAgents.join(", ")}. Vérifie multiagent.agents.`
+    );
+  }
   if (report.session.created) {
     console.log(`  Session créée : ${report.session.sessionId} (coordinateur v${report.session.agentVersion})`);
   } else {
     console.log("  Session : non créée (dry-run).");
   }
   if (!apply) {
+    console.log("  → Versions estimées (l'--apply utilise les versions réelles renvoyées par l'API).");
     console.log("  → Relance avec --apply pour exécuter le deploy.");
   } else {
     console.log("  → Pense à re-lancer brain:pull pour resynchroniser le snapshot.");
