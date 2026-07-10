@@ -295,9 +295,12 @@ export function createAthleteDataStore(db: Db) {
         async saveTrainingPlan(input: TrainingPlanInput) {
           const planId = input.id ?? randomUUID();
 
-          // On update, confirm ownership BEFORE building the batch. The block delete is scoped
-          // by plan_id alone; without this guard a batch aimed at another athlete's plan id
-          // would still delete their blocks when it commits.
+          // On update, confirm ownership BEFORE building the batch and bail out entirely if the
+          // plan is not this athlete's. This guard is load-bearing, not a nicety: the block
+          // INSERTs below carry only plan_id, so without it a write aimed at another athlete's
+          // plan id would delete the victim's blocks and insert this caller's under the victim's
+          // plan. Returning null here is also the sole "not owned" signal the tool maps to
+          // not-found.
           if (input.id) {
             const owned = await db
               .select({ id: trainingPlan.id })
@@ -342,8 +345,9 @@ export function createAthleteDataStore(db: Db) {
                 .set(set)
                 .where(and(eq(trainingPlan.id, planId), eq(trainingPlan.athleteId, athleteId)))
             );
-            // Replace-all: drop the plan's existing blocks. Scoped by subquery so it can only
-            // ever hit blocks of a plan this athlete owns (defence in depth over the guard above).
+            // Replace-all: drop the plan's existing blocks. Scoped by subquery to this athlete's
+            // plan as a second layer, but the real cross-tenant guard is the ownership pre-check
+            // above (the block INSERTs below are scoped by plan_id only) — not a substitute for it.
             statements.push(
               db.delete(planBlock).where(
                 inArray(
@@ -394,7 +398,13 @@ export function createAthleteDataStore(db: Db) {
             .where(eq(trainingPlan.id, planId))
             .limit(1);
           const savedPlan = savedRows[0];
-          if (!savedPlan) return null;
+          if (!savedPlan) {
+            // The batch just committed an insert/update for planId, so the row must exist. A miss
+            // is an internal invariant violation, not a "not owned" case — throw rather than
+            // return null (null is reserved for the ownership pre-check, which the tool maps to
+            // not-found), so a create can never silently resolve to a null "success".
+            throw new Error("saveTrainingPlan: plan not found after write.");
+          }
           const savedBlocks = await db
             .select()
             .from(planBlock)

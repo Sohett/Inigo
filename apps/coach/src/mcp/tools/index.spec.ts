@@ -7,7 +7,7 @@ import { registerAthleteDataTools } from "./index";
 
 const ATHLETE_ID = "11111111-1111-4111-8111-111111111111";
 
-function createMockStore(): AthleteDataStore {
+function createMockStore(overrides: Record<string, unknown> = {}): AthleteDataStore {
   const scoped = {
     getProfile: async () => ({
       athleteId: ATHLETE_ID,
@@ -27,14 +27,15 @@ function createMockStore(): AthleteDataStore {
     saveTrainingPlan: async () => ({
       plan: { id: "p1", name: "Saved plan", status: "active" },
       blocks: [{ id: "b1", orderIndex: 0, phaseType: "build" }]
-    })
+    }),
+    ...overrides
   };
   return { forAthlete: () => scoped } as unknown as AthleteDataStore;
 }
 
-async function connect() {
+async function connect(overrides: Record<string, unknown> = {}) {
   const server = new McpServer({ name: "test", version: "0.0.0" });
-  registerAthleteDataTools(server, createMockStore());
+  registerAthleteDataTools(server, createMockStore(overrides));
 
   const client = new Client({ name: "test-client", version: "0.0.0" });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
@@ -117,6 +118,26 @@ describe("registerAthleteDataTools", () => {
     const parsed = JSON.parse(content[0]!.text) as { plan: { name: string }; blocks: unknown[] };
     expect(parsed.plan.name).toBe("Saved plan");
     expect(parsed.blocks).toHaveLength(1);
+  });
+
+  it("surfaces an error when save_training_plan targets a plan not owned (store returns null)", async () => {
+    // On an update the store returns null when the plan is not this athlete's; the tool must
+    // surface that as an error, never a null "success".
+    const notOwnedClient = await connect({ saveTrainingPlan: async () => null });
+    const result = await notOwnedClient.callTool({
+      name: "save_training_plan",
+      arguments: {
+        athleteId: ATHLETE_ID,
+        id: "33333333-3333-4333-8333-333333333333",
+        name: "Someone else's plan",
+        startDate: "2026-07-06",
+        endDate: "2026-09-20",
+        blocks: [{ startDate: "2026-07-06", endDate: "2026-07-12" }]
+      }
+    });
+    expect(result.isError).toBe(true);
+    const content = result.content as { type: string; text: string }[];
+    expect(content[0]!.text).toMatch(/not found for this athlete/i);
   });
 
   it("rejects save_training_plan when a date is not a plain YYYY-MM-DD", async () => {
