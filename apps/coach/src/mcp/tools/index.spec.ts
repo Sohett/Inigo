@@ -2,12 +2,12 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import type { AthleteDataStore } from "../store/athleteDataStore";
+import type { AthleteDataRepository } from "../repository/athleteDataRepository";
 import { registerAthleteDataTools } from "./index";
 
 const ATHLETE_ID = "11111111-1111-4111-8111-111111111111";
 
-function createMockStore(overrides: Record<string, unknown> = {}): AthleteDataStore {
+function createMockStore(overrides: Record<string, unknown> = {}): AthleteDataRepository {
   const scoped = {
     getProfile: async () => ({
       athleteId: ATHLETE_ID,
@@ -19,18 +19,20 @@ function createMockStore(overrides: Record<string, unknown> = {}): AthleteDataSt
     }),
     getThresholds: async () => [{ sport: "bike", ftpWatts: 282 }],
     getGoals: async () => [{ id: "g1", title: "Race", status: "active" }],
-    getTrainingPlan: async () => ({ plan: { id: "p1", name: "Base" }, blocks: [] }),
+    getTrainingPlan: async () => ({ id: "p1", name: "Base", blocks: [] }),
     getAdaptationLog: async () => [{ id: "l1", summary: "rest day" }],
     updateProfile: async () => ({ athleteId: ATHLETE_ID, profile: { healthNotes: "updated" } }),
     logAdaptation: async () => ({ id: "l2", summary: "logged an adaptation" }),
     upsertGoal: async () => ({ id: "g2", title: "New goal" }),
     saveTrainingPlan: async () => ({
-      plan: { id: "p1", name: "Saved plan", status: "active" },
-      blocks: [{ id: "b1", orderIndex: 0, phaseType: "build" }]
+      id: "p1",
+      name: "Saved plan",
+      status: "active",
+      blocks: [{ orderIndex: 0, phaseType: "build" }]
     }),
     ...overrides
   };
-  return { forAthlete: () => scoped } as unknown as AthleteDataStore;
+  return { forAthlete: () => scoped } as unknown as AthleteDataRepository;
 }
 
 async function connect(overrides: Record<string, unknown> = {}) {
@@ -115,8 +117,8 @@ describe("registerAthleteDataTools", () => {
       }
     });
     const content = result.content as { type: string; text: string }[];
-    const parsed = JSON.parse(content[0]!.text) as { plan: { name: string }; blocks: unknown[] };
-    expect(parsed.plan.name).toBe("Saved plan");
+    const parsed = JSON.parse(content[0]!.text) as { name: string; blocks: unknown[] };
+    expect(parsed.name).toBe("Saved plan");
     expect(parsed.blocks).toHaveLength(1);
   });
 

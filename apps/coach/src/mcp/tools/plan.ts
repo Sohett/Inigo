@@ -1,9 +1,10 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { AthleteDataStore, TrainingPlanInput } from "../store/athleteDataStore";
+import type { AthleteDataRepository } from "../repository/athleteDataRepository";
+import type { TrainingPlanInput } from "../domain";
 import { athleteIdShape, runTool } from "./result";
 
-export function registerPlanTools(server: McpServer, store: AthleteDataStore): void {
+export function registerPlanTools(server: McpServer, store: AthleteDataRepository): void {
   server.registerTool(
     "get_training_plan",
     {
@@ -41,7 +42,7 @@ const planBlockSchema = z.object({
   weeklyTargets: z.array(weeklyTargetSchema).optional().describe("Per-week targets inside the block.")
 });
 
-export function registerPlanWriteTools(server: McpServer, store: AthleteDataStore): void {
+export function registerPlanWriteTools(server: McpServer, store: AthleteDataRepository): void {
   server.registerTool(
     "save_training_plan",
     {

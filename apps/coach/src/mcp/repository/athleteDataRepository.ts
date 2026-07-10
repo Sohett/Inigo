@@ -11,85 +11,31 @@ import {
   trainingPlan,
   type Db
 } from "@inigo/db";
+import type { GoalStatus, Sport } from "@inigo/db";
 import type {
-  AdaptationTrigger,
-  AthleteConstraints,
-  CoachingTargets,
-  GoalPriority,
-  GoalStatus,
-  GoalType,
-  PhaseType,
-  PlanAuthor,
-  PlanStatus,
-  Sport,
-  WeeklyTarget
-} from "@inigo/db";
+  AdaptationLogEntry,
+  AdaptationLogInput,
+  CoachProfile,
+  Goal,
+  GoalInput,
+  PlanBlock,
+  ProfileDetails,
+  ProfilePatch,
+  Threshold,
+  TrainingPlan,
+  TrainingPlanInput
+} from "../domain";
 
 /**
  * Neon access layer for the athlete-data MCP. This is the single seam that knows the
  * `@inigo/db` schema (mirroring `drizzleAthleteRepository` for routing): every query is
  * scoped to one `athleteId`, so a session can only ever touch its own athlete's data.
  *
- * Reads are typed by Drizzle; writes take pre-shaped values (the tools validate inputs
- * with zod before calling in). Nothing here exposes secrets or routing PII — the safe
- * projection for identity lives in `getProfile`.
+ * Reads are mapped from DB rows onto the coaching models in `domain.ts` (row→model, like
+ * `toAthlete` for routing), so the DB shape never leaks to the agent; writes take pre-shaped
+ * values (the tools validate inputs with zod before calling in). Nothing here exposes secrets
+ * or routing PII — the safe projection for identity lives in `getProfile`.
  */
-
-/** Fields a write may set on the 1:1 profile — "simple notes/preferences" only. */
-export interface ProfilePatch {
-  weightTargetKg?: string;
-  constraints?: AthleteConstraints;
-  constraintsNotes?: string;
-  healthNotes?: string;
-  coachingTargets?: CoachingTargets;
-}
-
-/** An append to the coaching journal. `summary` is required; the rest is optional context. */
-export interface AdaptationEntry {
-  summary: string;
-  author?: string;
-  trigger?: AdaptationTrigger;
-  detail?: Record<string, unknown>;
-  relatedWeek?: string;
-}
-
-/** A goal create (no `id`) or update (`id` present); scoped to the athlete on write. */
-export interface GoalInput {
-  id?: string;
-  title?: string;
-  description?: string;
-  type?: GoalType;
-  targetDate?: string;
-  priority?: GoalPriority;
-  status?: GoalStatus;
-  intervalsEventId?: string;
-}
-
-/** A block of a training plan on write. `orderIndex` is derived from the array position. */
-export interface PlanBlockInput {
-  name?: string;
-  phaseType?: PhaseType;
-  startDate: string;
-  endDate: string;
-  focus?: string;
-  weeklyTargets?: WeeklyTarget[];
-}
-
-/**
- * A training-plan write: create (no `id`) or update (`id` present). On write the plan is
- * scoped to the athlete; `blocks` fully replaces the plan's existing blocks (replace-all).
- */
-export interface TrainingPlanInput {
-  id?: string;
-  name: string;
-  startDate: string;
-  endDate: string;
-  status?: PlanStatus;
-  goalId?: string | null;
-  rationale?: string;
-  createdBy?: PlanAuthor;
-  blocks: PlanBlockInput[];
-}
 
 /**
  * Neon's HTTP driver parses `date` columns into local-time `Date` objects even though
@@ -97,6 +43,8 @@ export interface TrainingPlanInput {
  * with local getters — never `toISOString`, which would re-apply the timezone offset and
  * shift the day.
  */
+function toDateString(value: string | Date): string;
+function toDateString(value: string | Date | null): string | null;
 function toDateString(value: string | Date | null): string | null {
   if (value === null) return null;
   if (value instanceof Date) {
@@ -108,22 +56,94 @@ function toDateString(value: string | Date | null): string | null {
   return value.slice(0, 10);
 }
 
+/**
+ * A `timestamptz` column is a real instant: serialise it as full ISO 8601 (unlike `date`,
+ * which is calendar-only). Neon's driver returns a `Date`; a string is normalised defensively.
+ */
+function toIsoString(value: Date | string): string {
+  return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
+}
+
+type ThresholdRow = typeof athleteThreshold.$inferSelect;
+type GoalRow = typeof goal.$inferSelect;
+type AdaptationLogRow = typeof adaptationLog.$inferSelect;
 type PlanRow = typeof trainingPlan.$inferSelect;
 type BlockRow = typeof planBlock.$inferSelect;
 
-/** Shape a plan + its ordered blocks for a tool response, normalising the date columns. */
-function shapeTrainingPlan(plan: PlanRow, blocks: BlockRow[]) {
+/** Threshold row → coaching model. Drops id/athleteId/createdAt (persistence internals). */
+function toThreshold(row: ThresholdRow): Threshold {
   return {
-    plan: { ...plan, startDate: toDateString(plan.startDate), endDate: toDateString(plan.endDate) },
-    blocks: blocks.map((block) => ({
-      ...block,
-      startDate: toDateString(block.startDate),
-      endDate: toDateString(block.endDate)
-    }))
+    sport: row.sport,
+    effectiveDate: toDateString(row.effectiveDate),
+    ftpWatts: row.ftpWatts,
+    thresholdHr: row.thresholdHr,
+    maxHr: row.maxHr,
+    thresholdPaceSPerKm: row.thresholdPaceSPerKm,
+    powerZones: row.powerZones,
+    hrZones: row.hrZones,
+    source: row.source
   };
 }
 
-export function createAthleteDataStore(db: Db) {
+/** Goal row → coaching model. Drops athleteId and the created/updated timestamps. */
+function toGoal(row: GoalRow): Goal {
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description,
+    type: row.type,
+    targetDate: toDateString(row.targetDate),
+    priority: row.priority,
+    status: row.status,
+    intervalsEventId: row.intervalsEventId
+  };
+}
+
+/** Adaptation-log row → journal model. Drops athleteId and the plan/proposition/event FKs. */
+function toAdaptationLogEntry(row: AdaptationLogRow): AdaptationLogEntry {
+  return {
+    id: row.id,
+    occurredAt: toIsoString(row.occurredAt),
+    summary: row.summary,
+    author: row.author,
+    trigger: row.trigger,
+    detail: row.detail,
+    relatedWeek: toDateString(row.relatedWeek)
+  };
+}
+
+/** Plan-block row → model. Drops id/planId; `orderIndex` carries the block order. */
+function toPlanBlock(row: BlockRow): PlanBlock {
+  return {
+    name: row.name,
+    phaseType: row.phaseType,
+    startDate: toDateString(row.startDate),
+    endDate: toDateString(row.endDate),
+    focus: row.focus,
+    orderIndex: row.orderIndex,
+    weeklyTargets: row.weeklyTargets
+  };
+}
+
+/**
+ * Plan + its ordered blocks → the flat `TrainingPlan` model, normalising the date columns.
+ * Drops athleteId and the timestamps; nests the mapped blocks under `blocks`.
+ */
+function toTrainingPlan(plan: PlanRow, blocks: BlockRow[]): TrainingPlan {
+  return {
+    id: plan.id,
+    name: plan.name,
+    startDate: toDateString(plan.startDate),
+    endDate: toDateString(plan.endDate),
+    status: plan.status,
+    createdBy: plan.createdBy,
+    goalId: plan.goalId,
+    rationale: plan.rationale,
+    blocks: blocks.map(toPlanBlock)
+  };
+}
+
+export function createAthleteDataRepository(db: Db) {
   return {
     /** Bind every query to one athlete. The returned methods never take an athleteId. */
     forAthlete(athleteId: string) {
@@ -133,7 +153,7 @@ export function createAthleteDataStore(db: Db) {
          * is unknown. Never selects phone_num, whatsapp_lid, chat_id, or the session/
          * agent/memory pointers — those are routing internals, not coaching data.
          */
-        async getProfile() {
+        async getProfile(): Promise<CoachProfile | null> {
           const identityRows = await db
             .select({
               displayName: athlete.displayName,
@@ -167,11 +187,34 @@ export function createAthleteDataStore(db: Db) {
             .from(athleteProfile)
             .where(eq(athleteProfile.athleteId, athleteId))
             .limit(1);
-          return { athleteId, ...identity, profile: profileRows[0] ?? null };
+          const profileRow = profileRows[0];
+          const profile: ProfileDetails | null = profileRow
+            ? {
+                birthDate: toDateString(profileRow.birthDate),
+                sex: profileRow.sex,
+                heightCm: profileRow.heightCm,
+                weightKg: profileRow.weightKg,
+                weightTargetKg: profileRow.weightTargetKg,
+                restingHr: profileRow.restingHr,
+                maxHr: profileRow.maxHr,
+                constraints: profileRow.constraints,
+                constraintsNotes: profileRow.constraintsNotes,
+                healthNotes: profileRow.healthNotes,
+                coachingTargets: profileRow.coachingTargets
+              }
+            : null;
+          return {
+            athleteId,
+            displayName: identity.displayName ?? "",
+            timezone: identity.timezone,
+            locale: identity.locale ?? "fr",
+            status: identity.status,
+            profile
+          };
         },
 
         /** Current thresholds = the latest row per sport (optionally filtered to one sport). */
-        async getThresholds(sport?: Sport) {
+        async getThresholds(sport?: Sport): Promise<Threshold[]> {
           const rows = await db
             .select()
             .from(athleteThreshold)
@@ -181,24 +224,25 @@ export function createAthleteDataStore(db: Db) {
                 : eq(athleteThreshold.athleteId, athleteId)
             )
             .orderBy(desc(athleteThreshold.effectiveDate));
-          const latestPerSport = new Map<string, (typeof rows)[number]>();
+          const latestPerSport = new Map<string, ThresholdRow>();
           for (const row of rows) {
             if (!latestPerSport.has(row.sport)) latestPerSport.set(row.sport, row);
           }
-          return [...latestPerSport.values()];
+          return [...latestPerSport.values()].map(toThreshold);
         },
 
         /** Goals for the athlete, filtered by status (default `active`), soonest target first. */
-        async getGoals(status: GoalStatus = "active") {
-          return db
+        async getGoals(status: GoalStatus = "active"): Promise<Goal[]> {
+          const rows = await db
             .select()
             .from(goal)
             .where(and(eq(goal.athleteId, athleteId), eq(goal.status, status)))
             .orderBy(asc(goal.targetDate));
+          return rows.map(toGoal);
         },
 
         /** The current plan (active if any, else most recent) with its ordered blocks. */
-        async getTrainingPlan() {
+        async getTrainingPlan(): Promise<TrainingPlan | null> {
           const activeRows = await db
             .select()
             .from(trainingPlan)
@@ -221,11 +265,13 @@ export function createAthleteDataStore(db: Db) {
             .from(planBlock)
             .where(eq(planBlock.planId, plan.id))
             .orderBy(asc(planBlock.orderIndex));
-          return shapeTrainingPlan(plan, blocks);
+          return toTrainingPlan(plan, blocks);
         },
 
         /** Most recent adaptation-log entries, newest first (default 20), optionally since a date. */
-        async getAdaptationLog(options: { limit?: number; since?: string } = {}) {
+        async getAdaptationLog(
+          options: { limit?: number; since?: string } = {}
+        ): Promise<AdaptationLogEntry[]> {
           const limit = options.limit ?? 20;
           const where = options.since
             ? and(
@@ -233,16 +279,17 @@ export function createAthleteDataStore(db: Db) {
                 gte(adaptationLog.occurredAt, new Date(options.since))
               )
             : eq(adaptationLog.athleteId, athleteId);
-          return db
+          const rows = await db
             .select()
             .from(adaptationLog)
             .where(where)
             .orderBy(desc(adaptationLog.occurredAt))
             .limit(limit);
+          return rows.map(toAdaptationLogEntry);
         },
 
         /** Upsert the 1:1 profile (PK = athlete_id); only the provided fields change. */
-        async updateProfile(patch: ProfilePatch) {
+        async updateProfile(patch: ProfilePatch): Promise<CoachProfile | null> {
           await db
             .insert(athleteProfile)
             .values({ athleteId, ...patch })
@@ -251,12 +298,13 @@ export function createAthleteDataStore(db: Db) {
         },
 
         /** Append one entry to the coaching journal (adaptation_log is append-only). */
-        async logAdaptation(entry: AdaptationEntry) {
+        async logAdaptation(entry: AdaptationLogInput): Promise<AdaptationLogEntry | null> {
           const rows = await db
             .insert(adaptationLog)
             .values({ athleteId, ...entry })
             .returning();
-          return rows[0] ?? null;
+          const row = rows[0];
+          return row ? toAdaptationLogEntry(row) : null;
         },
 
         /**
@@ -264,7 +312,7 @@ export function createAthleteDataStore(db: Db) {
          * with `athleteId`, so a session can never edit another athlete's goal (returns null
          * if the id is unknown or not owned).
          */
-        async upsertGoal(input: GoalInput) {
+        async upsertGoal(input: GoalInput): Promise<Goal | null> {
           const { id, ...values } = input;
           if (id) {
             const rows = await db
@@ -272,13 +320,15 @@ export function createAthleteDataStore(db: Db) {
               .set(values)
               .where(and(eq(goal.id, id), eq(goal.athleteId, athleteId)))
               .returning();
-            return rows[0] ?? null;
+            const row = rows[0];
+            return row ? toGoal(row) : null;
           }
           const rows = await db
             .insert(goal)
             .values({ athleteId, ...values, title: values.title ?? "" })
             .returning();
-          return rows[0] ?? null;
+          const row = rows[0];
+          return row ? toGoal(row) : null;
         },
 
         /**
@@ -292,7 +342,7 @@ export function createAthleteDataStore(db: Db) {
          * plan or blocks. Neon's HTTP driver has no interactive transaction, so atomicity comes
          * from `db.batch` (a single non-interactive Postgres transaction).
          */
-        async saveTrainingPlan(input: TrainingPlanInput) {
+        async saveTrainingPlan(input: TrainingPlanInput): Promise<TrainingPlan | null> {
           const planId = input.id ?? randomUUID();
 
           // On update, confirm ownership BEFORE building the batch and bail out entirely if the
@@ -410,12 +460,12 @@ export function createAthleteDataStore(db: Db) {
             .from(planBlock)
             .where(eq(planBlock.planId, planId))
             .orderBy(asc(planBlock.orderIndex));
-          return shapeTrainingPlan(savedPlan, savedBlocks);
+          return toTrainingPlan(savedPlan, savedBlocks);
         }
       };
     }
   };
 }
 
-export type AthleteDataStore = ReturnType<typeof createAthleteDataStore>;
-export type ScopedAthleteDataStore = ReturnType<AthleteDataStore["forAthlete"]>;
+export type AthleteDataRepository = ReturnType<typeof createAthleteDataRepository>;
+export type ScopedAthleteDataRepository = ReturnType<AthleteDataRepository["forAthlete"]>;

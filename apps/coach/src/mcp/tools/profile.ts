@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { AthleteDataStore, ProfilePatch } from "../store/athleteDataStore";
+import type { AthleteDataRepository } from "../repository/athleteDataRepository";
+import type { ProfilePatch } from "../domain";
 import { athleteIdShape, runTool } from "./result";
 
 const constraintsShape = z
@@ -28,7 +29,7 @@ const coachingTargetsShape = z
   })
   .describe("Coaching config derived from goals (peak event, CTL peak target, ramp max, TSB window).");
 
-export function registerProfileReadTools(server: McpServer, store: AthleteDataStore): void {
+export function registerProfileReadTools(server: McpServer, store: AthleteDataRepository): void {
   server.registerTool(
     "get_profile",
     {
@@ -45,7 +46,7 @@ export function registerProfileReadTools(server: McpServer, store: AthleteDataSt
   );
 }
 
-export function registerProfileWriteTools(server: McpServer, store: AthleteDataStore): void {
+export function registerProfileWriteTools(server: McpServer, store: AthleteDataRepository): void {
   server.registerTool(
     "update_profile",
     {

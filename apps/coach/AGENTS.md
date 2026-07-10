@@ -40,7 +40,8 @@ src/
     whatsappPayload.ts             # schémas zod + normalisation du payload OpenWA + senderPhone
   brain/managedAgents.ts           # FRONTIÈRE cerveau : appendUserMessage(sessionId,text) + adaptateur SDK
   mcp/
-    store/athleteDataStore.ts      # accès Neon scopé par athlete (createDb → forAthlete(id)) ; seul autre layer @inigo/db-aware
+    domain.ts                      # modèles métier (contrat de sortie des tools) + inputs
+    repository/athleteDataRepository.ts  # accès Neon scopé par athlete (createDb → forAthlete(id)), mappe rows→modèles ; seul autre layer @inigo/db-aware
     tools/{index,result,profile,thresholds,goals,plan,adaptationLog}.ts  # tools MCP fins (reads + writes gated)
   deps.ts                          # singleton lazy { config, brain, db, repo, athleteData }
 # futur : app/(admin)/… , app/api/admin/… , src/services/…
@@ -120,8 +121,8 @@ Un serveur MCP hébergé **dans coach** (choix assumé : pas d'app séparée) do
   fonction publique `execute`. Les routes restent minces (HTTP only).
 - **Accès données via un port `repository`** : le use-case ne dépend que de l'interface
   (`repositories/athleteRepository.ts`), jamais de l'ORM. Deux couches seulement connaissent
-  `@inigo/db` : l'adapter Drizzle du routing (rows → **modèles métier** `domain/`), et le store
-  MCP (`src/mcp/store/athleteDataStore.ts`, requêtes scopées par athlete pour les tools).
+  `@inigo/db` : l'adapter Drizzle du routing (rows → **modèles métier** `domain/`), et le
+  repository MCP (`src/mcp/repository/athleteDataRepository.ts`) qui mappe rows→modèles (`domain.ts`).
 - **Multi-athlète** : le routing résout l'athlète + sa session par `phone_num` en base (Neon).
   Plus de session fixe en env ; pas de mapping en mémoire locale.
 - Secrets : env serveur uniquement, validés au boot, jamais en log.

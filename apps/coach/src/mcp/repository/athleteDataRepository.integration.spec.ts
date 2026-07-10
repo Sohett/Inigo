@@ -10,7 +10,7 @@ import {
   trainingPlan,
   type Db
 } from "@inigo/db";
-import { createAthleteDataStore } from "./athleteDataStore";
+import { createAthleteDataRepository } from "./athleteDataRepository";
 
 /**
  * Live round-trip of the store queries against a real Neon branch. Skipped unless
@@ -24,7 +24,7 @@ const databaseUrl = process.env.DATABASE_URL;
 const TEST_PHONE = "+320000000010"; // reserved test number, never a real athlete
 const MISSING_ATHLETE = "00000000-0000-4000-8000-000000000000";
 
-describe.skipIf(!databaseUrl)("athleteDataStore (integration)", () => {
+describe.skipIf(!databaseUrl)("athleteDataRepository (integration)", () => {
   let db: Db;
   let athleteId: string;
 
@@ -50,7 +50,7 @@ describe.skipIf(!databaseUrl)("athleteDataStore (integration)", () => {
   });
 
   it("reads the profile with safe fields only (no PII/secrets)", async () => {
-    const store = createAthleteDataStore(db).forAthlete(athleteId);
+    const store = createAthleteDataRepository(db).forAthlete(athleteId);
     const profile = await store.getProfile();
     expect(profile).not.toBeNull();
     expect(profile!.displayName).toBe("Store Integration");
@@ -60,38 +60,38 @@ describe.skipIf(!databaseUrl)("athleteDataStore (integration)", () => {
   });
 
   it("returns null for an unknown athlete", async () => {
-    const store = createAthleteDataStore(db).forAthlete(MISSING_ATHLETE);
+    const store = createAthleteDataRepository(db).forAthlete(MISSING_ATHLETE);
     expect(await store.getProfile()).toBeNull();
   });
 
   it("reads the latest threshold per sport", async () => {
-    const store = createAthleteDataStore(db).forAthlete(athleteId);
+    const store = createAthleteDataRepository(db).forAthlete(athleteId);
     const thresholds = await store.getThresholds();
     expect(thresholds.find((t) => t.sport === "bike")?.ftpWatts).toBe(282);
   });
 
   it("reads active goals", async () => {
-    const store = createAthleteDataStore(db).forAthlete(athleteId);
+    const store = createAthleteDataRepository(db).forAthlete(athleteId);
     const goals = await store.getGoals();
     expect(goals.some((g) => g.title === "Seed goal")).toBe(true);
   });
 
   it("updates profile notes (upsert)", async () => {
-    const store = createAthleteDataStore(db).forAthlete(athleteId);
+    const store = createAthleteDataRepository(db).forAthlete(athleteId);
     await store.updateProfile({ healthNotes: "updated health" });
     const profile = await store.getProfile();
     expect(profile!.profile?.healthNotes).toBe("updated health");
   });
 
   it("appends an adaptation-log entry and reads it back", async () => {
-    const store = createAthleteDataStore(db).forAthlete(athleteId);
+    const store = createAthleteDataRepository(db).forAthlete(athleteId);
     await store.logAdaptation({ summary: "integration entry", author: "test" });
     const log = await store.getAdaptationLog();
     expect(log.some((e) => e.summary === "integration entry")).toBe(true);
   });
 
   it("creates then updates a goal", async () => {
-    const store = createAthleteDataStore(db).forAthlete(athleteId);
+    const store = createAthleteDataRepository(db).forAthlete(athleteId);
     const created = await store.upsertGoal({ title: "Created goal", status: "active" });
     expect(created?.id).toBeDefined();
     const updated = await store.upsertGoal({ id: created!.id, status: "achieved" });
@@ -99,15 +99,15 @@ describe.skipIf(!databaseUrl)("athleteDataStore (integration)", () => {
   });
 
   it("does not update another athlete's goal (scoping)", async () => {
-    const ours = createAthleteDataStore(db).forAthlete(athleteId);
+    const ours = createAthleteDataRepository(db).forAthlete(athleteId);
     const goals = await ours.getGoals();
-    const otherStore = createAthleteDataStore(db).forAthlete(MISSING_ATHLETE);
+    const otherStore = createAthleteDataRepository(db).forAthlete(MISSING_ATHLETE);
     const result = await otherStore.upsertGoal({ id: goals[0]!.id, status: "abandoned" });
     expect(result).toBeNull();
   });
 
   it("creates a training plan with blocks and reads it back (dates as YYYY-MM-DD)", async () => {
-    const store = createAthleteDataStore(db).forAthlete(athleteId);
+    const store = createAthleteDataRepository(db).forAthlete(athleteId);
     const saved = await store.saveTrainingPlan({
       name: "Test season",
       startDate: "2026-07-06",
@@ -129,21 +129,21 @@ describe.skipIf(!databaseUrl)("athleteDataStore (integration)", () => {
     });
     expect(saved).not.toBeNull();
     // Dates normalised with no timezone shift (Neon parses `date` into local Date objects).
-    expect(saved!.plan.startDate).toBe("2026-07-06");
-    expect(saved!.plan.endDate).toBe("2026-09-20");
+    expect(saved!.startDate).toBe("2026-07-06");
+    expect(saved!.endDate).toBe("2026-09-20");
     expect(saved!.blocks).toHaveLength(2);
     expect(saved!.blocks[0]!.orderIndex).toBe(0);
     expect(saved!.blocks[0]!.startDate).toBe("2026-07-06");
 
     const readBack = await store.getTrainingPlan();
-    expect(readBack!.plan.name).toBe("Test season");
-    expect(readBack!.plan.rationale).toBe("test macro rationale");
+    expect(readBack!.name).toBe("Test season");
+    expect(readBack!.rationale).toBe("test macro rationale");
     expect(readBack!.blocks).toHaveLength(2);
-    expect(readBack!.plan.startDate).toBe("2026-07-06");
+    expect(readBack!.startDate).toBe("2026-07-06");
   });
 
   it("updates a plan and replaces/reorders its blocks atomically", async () => {
-    const store = createAthleteDataStore(db).forAthlete(athleteId);
+    const store = createAthleteDataRepository(db).forAthlete(athleteId);
     const created = await store.saveTrainingPlan({
       name: "Replace me",
       startDate: "2026-07-06",
@@ -154,7 +154,7 @@ describe.skipIf(!databaseUrl)("athleteDataStore (integration)", () => {
         { name: "two", startDate: "2026-07-13", endDate: "2026-07-19" }
       ]
     });
-    const planId = created!.plan.id;
+    const planId = created!.id;
 
     const updated = await store.saveTrainingPlan({
       id: planId,
@@ -164,16 +164,16 @@ describe.skipIf(!databaseUrl)("athleteDataStore (integration)", () => {
       rationale: "updated rationale",
       blocks: [{ name: "only", startDate: "2026-07-06", endDate: "2026-07-12" }]
     });
-    expect(updated!.plan.id).toBe(planId);
-    expect(updated!.plan.name).toBe("Replaced");
-    expect(updated!.plan.rationale).toBe("updated rationale");
+    expect(updated!.id).toBe(planId);
+    expect(updated!.name).toBe("Replaced");
+    expect(updated!.rationale).toBe("updated rationale");
     expect(updated!.blocks).toHaveLength(1);
     expect(updated!.blocks[0]!.name).toBe("only");
     expect(updated!.blocks[0]!.orderIndex).toBe(0);
   });
 
   it("archives the previous active plan when a new one is set active", async () => {
-    const store = createAthleteDataStore(db).forAthlete(athleteId);
+    const store = createAthleteDataRepository(db).forAthlete(athleteId);
     const first = await store.saveTrainingPlan({
       name: "First active",
       startDate: "2026-01-01",
@@ -190,18 +190,18 @@ describe.skipIf(!databaseUrl)("athleteDataStore (integration)", () => {
     });
 
     const current = await store.getTrainingPlan();
-    expect(current!.plan.id).toBe(second!.plan.id);
+    expect(current!.id).toBe(second!.id);
 
     const firstRow = await db
       .select()
       .from(trainingPlan)
-      .where(eq(trainingPlan.id, first!.plan.id))
+      .where(eq(trainingPlan.id, first!.id))
       .limit(1);
     expect(firstRow[0]!.status).toBe("archived");
   });
 
   it("cannot save over another athlete's plan and leaves its blocks intact (scoping)", async () => {
-    const owner = createAthleteDataStore(db).forAthlete(athleteId);
+    const owner = createAthleteDataRepository(db).forAthlete(athleteId);
     const created = await owner.saveTrainingPlan({
       name: "Owned",
       startDate: "2026-05-01",
@@ -212,9 +212,9 @@ describe.skipIf(!databaseUrl)("athleteDataStore (integration)", () => {
         { name: "keep-2", startDate: "2026-05-08", endDate: "2026-05-14" }
       ]
     });
-    const planId = created!.plan.id;
+    const planId = created!.id;
 
-    const intruder = createAthleteDataStore(db).forAthlete(MISSING_ATHLETE);
+    const intruder = createAthleteDataRepository(db).forAthlete(MISSING_ATHLETE);
     const result = await intruder.saveTrainingPlan({
       id: planId,
       name: "Hijacked",

@@ -1,5 +1,5 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { AthleteDataStore } from "../store/athleteDataStore";
+import type { AthleteDataRepository } from "../repository/athleteDataRepository";
 import { registerProfileReadTools, registerProfileWriteTools } from "./profile";
 import { registerThresholdTools } from "./thresholds";
 import { registerGoalReadTools, registerGoalWriteTools } from "./goals";
@@ -13,7 +13,7 @@ import { registerAdaptationLogReadTools, registerAdaptationLogWriteTools } from 
  * every write is scoped to its athlete and the whole endpoint is gated by the MCP bearer,
  * which is the access boundary.
  */
-export function registerAthleteDataTools(server: McpServer, store: AthleteDataStore): void {
+export function registerAthleteDataTools(server: McpServer, store: AthleteDataRepository): void {
   registerProfileReadTools(server, store);
   registerThresholdTools(server, store);
   registerGoalReadTools(server, store);

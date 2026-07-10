@@ -1,9 +1,10 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { AdaptationEntry, AthleteDataStore } from "../store/athleteDataStore";
+import type { AthleteDataRepository } from "../repository/athleteDataRepository";
+import type { AdaptationLogInput } from "../domain";
 import { athleteIdShape, runTool } from "./result";
 
-export function registerAdaptationLogReadTools(server: McpServer, store: AthleteDataStore): void {
+export function registerAdaptationLogReadTools(server: McpServer, store: AthleteDataRepository): void {
   server.registerTool(
     "get_adaptation_log",
     {
@@ -30,7 +31,7 @@ export function registerAdaptationLogReadTools(server: McpServer, store: Athlete
   );
 }
 
-export function registerAdaptationLogWriteTools(server: McpServer, store: AthleteDataStore): void {
+export function registerAdaptationLogWriteTools(server: McpServer, store: AthleteDataRepository): void {
   server.registerTool(
     "log_adaptation",
     {
@@ -52,7 +53,7 @@ export function registerAdaptationLogWriteTools(server: McpServer, store: Athlet
     },
     (args) =>
       runTool(() => {
-        const entry: AdaptationEntry = { summary: args.summary };
+        const entry: AdaptationLogInput = { summary: args.summary };
         if (args.author !== undefined) entry.author = args.author;
         if (args.trigger !== undefined) entry.trigger = args.trigger;
         if (args.detail !== undefined) entry.detail = args.detail;

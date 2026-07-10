@@ -1,9 +1,9 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { AthleteDataStore } from "../store/athleteDataStore";
+import type { AthleteDataRepository } from "../repository/athleteDataRepository";
 import { athleteIdShape, runTool } from "./result";
 
-export function registerThresholdTools(server: McpServer, store: AthleteDataStore): void {
+export function registerThresholdTools(server: McpServer, store: AthleteDataRepository): void {
   server.registerTool(
     "get_thresholds",
     {
