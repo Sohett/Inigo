@@ -30,8 +30,8 @@ les **tools** sont de fines couches `input zod → client → sortie MCP`.
 - Enregistrer un tool via `server.registerTool(name, { title, description, inputSchema }, handler)`.
 - Encapsuler l'appel client dans `runTool(() => client.xxx())` pour la gestion uniforme
   succès/erreur.
-- Les **tools d'écriture** (events) ne sont enregistrés que si `options.enableWriteTools`
-  (mappé sur `ENABLE_WRITE_TOOLS`, défaut off — least privilege).
+- Les **tools d'écriture** (events + `update_sport_settings`) ne sont enregistrés que si
+  `options.enableWriteTools` (mappé sur `ENABLE_WRITE_TOOLS`, défaut off — least privilege).
 
 ## Ajouter un nouveau tool MCP
 
@@ -73,4 +73,8 @@ que de deviner. Endpoints ci-dessous vérifiés contre cette spec.
   30 derniers jours si non fourni.
 - **`delete_events_by_range`** : `category` (array) est requis par l'API (garde-fou
   contre la suppression de tout le calendrier).
+- **`update_sport_settings`** (écriture) : `PUT /athlete/{id}/sport-settings/{sport}` où
+  `{sport}` est un type d'activité (`Ride`/`Run`/`Swim`). Le param query `recalcHrZones` est
+  **requis** par l'API. Le client fait un **read-merge-write** (GET puis PUT de l'objet fusionné)
+  pour ne pas écraser les ~50 champs non touchés.
 - **Arrays en query** (`curves`, `category`, `types`) : encodés en paramètres répétés.

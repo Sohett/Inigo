@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { IntervalsIcuClient } from "../client";
-import { registerAthleteTools } from "./tools/athlete";
+import { registerAthleteTools, registerAthleteWriteTools } from "./tools/athlete";
 import { registerActivityTools } from "./tools/activities";
 import { registerWellnessTools } from "./tools/wellness";
 import { registerFitnessTools } from "./tools/fitness";
@@ -9,7 +9,7 @@ import { registerGearTools } from "./tools/gear";
 import { registerEventReadTools, registerEventWriteTools } from "./tools/events";
 
 export interface RegisterToolsOptions {
-  /** When true, register the event write tools (create/update/delete). */
+  /** When true, register the write tools (event create/update/delete, sport-settings update). */
   enableWriteTools: boolean;
 }
 
@@ -32,6 +32,7 @@ export function registerIntervalsIcuTools(
 
   if (options.enableWriteTools) {
     registerEventWriteTools(server, client);
+    registerAthleteWriteTools(server, client);
   }
 }
 

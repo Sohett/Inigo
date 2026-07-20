@@ -9,7 +9,12 @@ function createMockClient(): IntervalsIcuClient {
   const mock: Partial<Record<keyof IntervalsIcuClient, unknown>> = {
     getActivities: async () => [{ id: "i1", name: "Easy Run", type: "Run" }],
     getAthleteProfile: async () => ({ id: "i123", name: "Thomas" }),
-    upsertEvent: async (event: Record<string, unknown>) => ({ id: 99, ...event })
+    upsertEvent: async (event: Record<string, unknown>) => ({ id: 99, ...event }),
+    updateSportSettings: async (
+      sport: string,
+      patch: Record<string, unknown>,
+      recalcHrZones: boolean
+    ) => ({ sport, patch, recalcHrZones })
   };
   return mock as unknown as IntervalsIcuClient;
 }
@@ -55,6 +60,7 @@ describe("registerIntervalsIcuTools", () => {
     const names = tools.map((tool) => tool.name);
     expect(names).not.toContain("create_or_update_event");
     expect(names).not.toContain("delete_event");
+    expect(names).not.toContain("update_sport_settings");
   });
 
   it("registers write tools when enabled", async () => {
@@ -62,8 +68,30 @@ describe("registerIntervalsIcuTools", () => {
     const { tools } = await client.listTools();
     const names = tools.map((tool) => tool.name);
     expect(names).toEqual(
-      expect.arrayContaining(["create_or_update_event", "delete_event", "delete_events_by_range"])
+      expect.arrayContaining([
+        "create_or_update_event",
+        "delete_event",
+        "delete_events_by_range",
+        "update_sport_settings"
+      ])
     );
+  });
+
+  it("maps update_sport_settings args to a patch and defaults recalc off", async () => {
+    const client = await connect({ enableWriteTools: true });
+    const result = await client.callTool({
+      name: "update_sport_settings",
+      arguments: { sport: "Ride", ftp: 265 }
+    });
+    const content = result.content as { type: string; text: string }[];
+    const parsed = JSON.parse(content[0]!.text) as {
+      sport: string;
+      patch: Record<string, unknown>;
+      recalcHrZones: boolean;
+    };
+    expect(parsed.sport).toBe("Ride");
+    expect(parsed.patch).toEqual({ ftp: 265 });
+    expect(parsed.recalcHrZones).toBe(false);
   });
 
   it("calls a tool and returns JSON content from the client", async () => {

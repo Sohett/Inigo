@@ -129,6 +129,65 @@ describe("IntervalsIcuClient", () => {
     expect(methods).toEqual(["POST", "PUT"]);
   });
 
+  it("updates sport settings with a read-merge-write that preserves untouched fields", async () => {
+    const methods: string[] = [];
+    let putBody: Record<string, unknown> | null = null;
+    let putUrl: URL | null = null;
+    server.use(
+      http.get(`${BASE_URL}/athlete/${ATHLETE}/sport-settings/Ride`, ({ request }) => {
+        methods.push(request.method);
+        return HttpResponse.json({
+          id: 42,
+          type: "Ride",
+          ftp: 250,
+          max_hr: 190,
+          power_zones: [100, 150, 200, 250, 300],
+          warmup_time: 600 // an untouched field the client never models
+        });
+      }),
+      http.put(`${BASE_URL}/athlete/${ATHLETE}/sport-settings/Ride`, async ({ request }) => {
+        methods.push(request.method);
+        putUrl = new URL(request.url);
+        putBody = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(putBody);
+      })
+    );
+
+    const updated = await makeClient().updateSportSettings("Ride", { ftp: 265 });
+
+    // GET before PUT, in order.
+    expect(methods).toEqual(["GET", "PUT"]);
+    // Required query flag defaults to false.
+    expect(putUrl!.searchParams.get("recalcHrZones")).toBe("false");
+    // Only ftp changed; everything else (including the unmodelled field) is preserved.
+    expect(putBody).toEqual({
+      id: 42,
+      type: "Ride",
+      ftp: 265,
+      max_hr: 190,
+      power_zones: [100, 150, 200, 250, 300],
+      warmup_time: 600
+    });
+    expect(updated.ftp).toBe(265);
+  });
+
+  it("forwards recalcHrZones=true when requested", async () => {
+    let putUrl: URL | null = null;
+    server.use(
+      http.get(`${BASE_URL}/athlete/${ATHLETE}/sport-settings/Run`, () =>
+        HttpResponse.json({ id: 7, type: "Run", lthr: 165 })
+      ),
+      http.put(`${BASE_URL}/athlete/${ATHLETE}/sport-settings/Run`, async ({ request }) => {
+        putUrl = new URL(request.url);
+        return HttpResponse.json(await request.json());
+      })
+    );
+
+    await makeClient().updateSportSettings("Run", { lthr: 170 }, true);
+
+    expect(putUrl!.searchParams.get("recalcHrZones")).toBe("true");
+  });
+
   it("requests the plural power-curves endpoint with type and repeated curve params", async () => {
     let url: URL | null = null;
     server.use(
