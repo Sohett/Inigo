@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { IntervalsIcuClient, SportSettingsPatch } from "../../client";
+import type { IntervalsIcuClient } from "../../client";
 import { runTool } from "../result";
 
 export function registerAthleteTools(server: McpServer, client: IntervalsIcuClient): void {
@@ -22,10 +22,10 @@ export function registerAthleteWriteTools(server: McpServer, client: IntervalsIc
     {
       title: "Update sport thresholds and zones",
       description:
-        "Update the athlete's per-sport training thresholds and zones on Intervals.icu — the " +
+        "Update the athlete's per-sport training thresholds and zones on Intervals.icu, the " +
         "source of truth used to compute activity metrics. Pass only the fields you want to " +
-        "change; the rest of the athlete's settings are preserved (read-merge-write). Use this " +
-        "when re-estimating physiology from a session (e.g. a new FTP).",
+        "change (partial update); the other settings are left untouched. Use this when " +
+        "re-estimating physiology from a session (e.g. a new FTP).",
       inputSchema: {
         sport: z
           .enum(["Ride", "Run", "Swim"])
@@ -50,21 +50,9 @@ export function registerAthleteWriteTools(server: McpServer, client: IntervalsIc
         pace_zones: z
           .array(z.number())
           .optional()
-          .describe("Pace zone bounds (replaces the current set)."),
-        recalc_hr_zones: z
-          .boolean()
-          .optional()
-          .describe(
-            "When true, Intervals.icu recomputes HR zones from lthr/max_hr (overriding any hr_zones sent). Defaults to false."
-          )
+          .describe("Pace zone bounds (replaces the current set).")
       }
     },
-    ({ sport, recalc_hr_zones, ...patch }) =>
-      runTool(() => {
-        // `patch` is exactly the coach-controlled field set; the client overlays only the
-        // provided (non-undefined) ones onto the athlete's current settings.
-        const fields: SportSettingsPatch = patch;
-        return client.updateSportSettings(sport, fields, recalc_hr_zones ?? false);
-      })
+    ({ sport, ...patch }) => runTool(() => client.updateSportSettings(sport, patch))
   );
 }

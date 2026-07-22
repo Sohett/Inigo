@@ -9,10 +9,8 @@ export const dynamic = "force-dynamic";
 
 const handler = createMcpHandler(
   (server) => {
-    const { client, config } = getDeps();
-    registerIntervalsIcuTools(server, client, {
-      enableWriteTools: config.ENABLE_WRITE_TOOLS
-    });
+    const { client } = getDeps();
+    registerIntervalsIcuTools(server, client);
   },
   {
     serverInfo: { name: "intervals-icu-mcp", version: "0.1.0" },

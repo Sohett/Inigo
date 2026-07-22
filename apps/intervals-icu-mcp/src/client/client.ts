@@ -116,30 +116,18 @@ export class IntervalsIcuClient {
   }
 
   /**
-   * Update the athlete's per-sport thresholds/zones with a read-merge-write: fetch the
-   * current settings for `sport`, overlay only the provided fields, and PUT the merged
-   * object back. This avoids clobbering the ~50 fields Intervals.icu holds that the coach
-   * never touches. `sport` is an Intervals.icu activity type (e.g. "Ride", "Run", "Swim") —
-   * the endpoint keys sport settings by id *or* type. `recalcHrZones` is required by the
-   * API: when true the server recomputes HR zones from `lthr`/`max_hr` (which would override
-   * any `hr_zones` sent), so it defaults to false to keep the write predictable.
+   * Update the athlete's per-sport thresholds/zones. The PUT is a partial update: only
+   * the fields in `patch` change, the rest are left untouched. `sport` is an Intervals.icu
+   * activity type (e.g. "Ride", "Run", "Swim") — the endpoint keys sport settings by id or
+   * type. `recalcHrZones` is required by the API; we send false so provided values are
+   * never silently overridden by a server-side HR-zone recompute.
    */
-  async updateSportSettings(
-    sport: string,
-    patch: SportSettingsPatch,
-    recalcHrZones = false
-  ): Promise<SportSettings> {
-    const path = `/athlete/${this.athleteId}/sport-settings/${encodeURIComponent(sport)}`;
-    const current = await this.requestJson(path, sportSettingsSchema);
-    const merged: Record<string, unknown> = { ...current };
-    for (const [key, value] of Object.entries(patch)) {
-      if (value !== undefined) merged[key] = value;
-    }
-    return this.requestJson(path, sportSettingsSchema, {
-      method: "PUT",
-      query: { recalcHrZones },
-      body: merged
-    });
+  updateSportSettings(sport: string, patch: SportSettingsPatch): Promise<SportSettings> {
+    return this.requestJson(
+      `/athlete/${this.athleteId}/sport-settings/${encodeURIComponent(sport)}`,
+      sportSettingsSchema,
+      { method: "PUT", query: { recalcHrZones: false }, body: patch }
+    );
   }
 
   // ----- Activities -----

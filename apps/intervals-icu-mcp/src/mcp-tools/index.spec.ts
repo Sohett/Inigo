@@ -3,25 +3,21 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { IntervalsIcuClient } from "../client";
-import { registerIntervalsIcuTools, type RegisterToolsOptions } from "./index";
+import { registerIntervalsIcuTools } from "./index";
 
 function createMockClient(): IntervalsIcuClient {
   const mock: Partial<Record<keyof IntervalsIcuClient, unknown>> = {
     getActivities: async () => [{ id: "i1", name: "Easy Run", type: "Run" }],
     getAthleteProfile: async () => ({ id: "i123", name: "Thomas" }),
     upsertEvent: async (event: Record<string, unknown>) => ({ id: 99, ...event }),
-    updateSportSettings: async (
-      sport: string,
-      patch: Record<string, unknown>,
-      recalcHrZones: boolean
-    ) => ({ sport, patch, recalcHrZones })
+    updateSportSettings: async (sport: string, patch: Record<string, unknown>) => ({ sport, patch })
   };
   return mock as unknown as IntervalsIcuClient;
 }
 
-async function connect(options: RegisterToolsOptions) {
+async function connect() {
   const server = new McpServer({ name: "test", version: "0.0.0" });
-  registerIntervalsIcuTools(server, createMockClient(), options);
+  registerIntervalsIcuTools(server, createMockClient());
 
   const client = new Client({ name: "test-client", version: "0.0.0" });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
@@ -30,14 +26,14 @@ async function connect(options: RegisterToolsOptions) {
 }
 
 describe("registerIntervalsIcuTools", () => {
-  let readOnlyClient: Awaited<ReturnType<typeof connect>>;
+  let mcpClient: Awaited<ReturnType<typeof connect>>;
 
   beforeEach(async () => {
-    readOnlyClient = await connect({ enableWriteTools: false });
+    mcpClient = await connect();
   });
 
   it("registers the read tools", async () => {
-    const { tools } = await readOnlyClient.listTools();
+    const { tools } = await mcpClient.listTools();
     const names = tools.map((tool) => tool.name);
     expect(names).toEqual(
       expect.arrayContaining([
@@ -55,17 +51,8 @@ describe("registerIntervalsIcuTools", () => {
     );
   });
 
-  it("does not register write tools when disabled", async () => {
-    const { tools } = await readOnlyClient.listTools();
-    const names = tools.map((tool) => tool.name);
-    expect(names).not.toContain("create_or_update_event");
-    expect(names).not.toContain("delete_event");
-    expect(names).not.toContain("update_sport_settings");
-  });
-
-  it("registers write tools when enabled", async () => {
-    const client = await connect({ enableWriteTools: true });
-    const { tools } = await client.listTools();
+  it("registers the write tools", async () => {
+    const { tools } = await mcpClient.listTools();
     const names = tools.map((tool) => tool.name);
     expect(names).toEqual(
       expect.arrayContaining([
@@ -77,9 +64,8 @@ describe("registerIntervalsIcuTools", () => {
     );
   });
 
-  it("maps update_sport_settings args to a patch and defaults recalc off", async () => {
-    const client = await connect({ enableWriteTools: true });
-    const result = await client.callTool({
+  it("maps update_sport_settings args to a sport + partial patch", async () => {
+    const result = await mcpClient.callTool({
       name: "update_sport_settings",
       arguments: { sport: "Ride", ftp: 265 }
     });
@@ -87,15 +73,13 @@ describe("registerIntervalsIcuTools", () => {
     const parsed = JSON.parse(content[0]!.text) as {
       sport: string;
       patch: Record<string, unknown>;
-      recalcHrZones: boolean;
     };
     expect(parsed.sport).toBe("Ride");
     expect(parsed.patch).toEqual({ ftp: 265 });
-    expect(parsed.recalcHrZones).toBe(false);
   });
 
   it("calls a tool and returns JSON content from the client", async () => {
-    const result = await readOnlyClient.callTool({ name: "get_activities", arguments: {} });
+    const result = await mcpClient.callTool({ name: "get_activities", arguments: {} });
     const content = result.content as { type: string; text: string }[];
     expect(content[0]?.type).toBe("text");
     const parsed = JSON.parse(content[0]!.text) as { name: string }[];
@@ -103,8 +87,7 @@ describe("registerIntervalsIcuTools", () => {
   });
 
   it("maps camelCase event input to the Intervals.icu snake_case payload", async () => {
-    const client = await connect({ enableWriteTools: true });
-    const result = await client.callTool({
+    const result = await mcpClient.callTool({
       name: "create_or_update_event",
       arguments: { startDateLocal: "2026-07-01", category: "WORKOUT", name: "Intervals" }
     });
@@ -116,8 +99,7 @@ describe("registerIntervalsIcuTools", () => {
   });
 
   it("passes a full datetime start through unchanged", async () => {
-    const client = await connect({ enableWriteTools: true });
-    const result = await client.callTool({
+    const result = await mcpClient.callTool({
       name: "create_or_update_event",
       arguments: { startDateLocal: "2026-07-01T09:30:00", category: "WORKOUT", name: "Intervals" }
     });
