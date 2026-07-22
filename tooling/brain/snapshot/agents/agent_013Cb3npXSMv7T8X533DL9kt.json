@@ -35,17 +35,17 @@
       {
         "id": "agent_01CTK33Z2CLPwtDyq9vKDsVG",
         "type": "agent",
-        "version": 7
+        "version": 8
       },
       {
         "id": "agent_01Dbg6WeAF41xSs8bTfiE8XD",
         "type": "agent",
-        "version": 3
+        "version": 4
       },
       {
         "id": "agent_012ethnUdHzvRW9iPxdzzbTx",
         "type": "agent",
-        "version": 7
+        "version": 8
       }
     ],
     "type": "coordinator"
@@ -160,6 +160,6 @@
     }
   ],
   "type": "agent",
-  "updated_at": "2026-07-10T12:06:29.549205Z",
-  "version": 13
+  "updated_at": "2026-07-22T16:23:43.634873Z",
+  "version": 14
 }

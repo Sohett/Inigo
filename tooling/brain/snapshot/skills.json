@@ -21,36 +21,36 @@
     "type": "skill",
     "id": "xlsx",
     "created_at": "2025-10-14T08:41:11.530827Z",
-    "updated_at": "2026-06-22T20:18:02.461831Z",
+    "updated_at": "2026-07-22T14:00:36.934172Z",
     "display_title": "xlsx",
     "source": "anthropic",
-    "latest_version": "20260203"
+    "latest_version": "20260722"
   },
   {
     "type": "skill",
     "id": "pptx",
     "created_at": "2025-10-14T08:41:11.530747Z",
-    "updated_at": "2026-06-22T20:18:02.449350Z",
+    "updated_at": "2026-07-16T03:00:49.254431Z",
     "display_title": "pptx",
     "source": "anthropic",
-    "latest_version": "20260622"
+    "latest_version": "20260716"
   },
   {
     "type": "skill",
     "id": "pdf",
     "created_at": "2025-10-14T08:41:11.530650Z",
-    "updated_at": "2026-06-22T20:18:02.437378Z",
+    "updated_at": "2026-07-10T19:23:15.432550Z",
     "display_title": "pdf",
     "source": "anthropic",
-    "latest_version": "20260203"
+    "latest_version": "20260709"
   },
   {
     "type": "skill",
     "id": "docx",
     "created_at": "2025-10-14T08:41:11.530393Z",
-    "updated_at": "2026-06-22T20:18:02.423823Z",
+    "updated_at": "2026-07-16T16:01:10.458608Z",
     "display_title": "docx",
     "source": "anthropic",
-    "latest_version": "20260618"
+    "latest_version": "20260716"
   }
 ]
