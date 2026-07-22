@@ -9,10 +9,12 @@ import {
   eventSchema,
   gearListSchema,
   intervalsSchema,
+  sportSettingsSchema,
   streamListSchema,
   wellnessListSchema,
   type FitnessPoint,
-  type IntervalsEvent
+  type IntervalsEvent,
+  type SportSettings
 } from "./schemas";
 
 export interface IntervalsIcuClientOptions {
@@ -46,6 +48,30 @@ export interface CurveQuery {
   newest?: string;
   /** Durations to return, e.g. ["5s", "1m", "5m", "20m"]. Defaults to last year. */
   curves?: string[];
+}
+
+/**
+ * The coach-controlled subset of sport settings. Every field is optional: only the ones
+ * provided are overlaid onto the athlete's existing settings (a read-merge-write), so the
+ * other ~50 fields Intervals.icu holds are left untouched.
+ */
+export interface SportSettingsPatch {
+  /** Functional Threshold Power, watts. */
+  ftp?: number;
+  /** Indoor FTP, watts. */
+  indoor_ftp?: number;
+  /** Lactate threshold heart rate, bpm. */
+  lthr?: number;
+  /** Max heart rate, bpm. */
+  max_hr?: number;
+  /** Threshold pace, seconds per metre (Intervals.icu unit). */
+  threshold_pace?: number;
+  /** Power zone upper bounds. */
+  power_zones?: number[];
+  /** HR zone upper bounds. */
+  hr_zones?: number[];
+  /** Pace zone bounds. */
+  pace_zones?: number[];
 }
 
 type QueryPrimitive = string | number | boolean;
@@ -87,6 +113,21 @@ export class IntervalsIcuClient {
 
   getGear(): Promise<z.infer<typeof gearListSchema>> {
     return this.requestJson(`/athlete/${this.athleteId}/gear`, gearListSchema);
+  }
+
+  /**
+   * Update the athlete's per-sport thresholds/zones. The PUT is a partial update: only
+   * the fields in `patch` change, the rest are left untouched. `sport` is an Intervals.icu
+   * activity type (e.g. "Ride", "Run", "Swim") — the endpoint keys sport settings by id or
+   * type. `recalcHrZones` is required by the API; we send false so provided values are
+   * never silently overridden by a server-side HR-zone recompute.
+   */
+  updateSportSettings(sport: string, patch: SportSettingsPatch): Promise<SportSettings> {
+    return this.requestJson(
+      `/athlete/${this.athleteId}/sport-settings/${encodeURIComponent(sport)}`,
+      sportSettingsSchema,
+      { method: "PUT", query: { recalcHrZones: false }, body: patch }
+    );
   }
 
   // ----- Activities -----

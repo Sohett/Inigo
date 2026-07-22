@@ -129,6 +129,31 @@ describe("IntervalsIcuClient", () => {
     expect(methods).toEqual(["POST", "PUT"]);
   });
 
+  it("updates sport settings with a partial PUT of only the provided fields", async () => {
+    let method = "";
+    let putUrl: URL | null = null;
+    let putBody: Record<string, unknown> | null = null;
+    // Only a PUT handler is registered: onUnhandledRequest "error" makes the test fail if
+    // the client also issues a GET, so this proves the write is a single partial PUT.
+    server.use(
+      http.put(`${BASE_URL}/athlete/${ATHLETE}/sport-settings/Ride`, async ({ request }) => {
+        method = request.method;
+        putUrl = new URL(request.url);
+        putBody = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ id: 42, type: "Ride", ftp: 265 });
+      })
+    );
+
+    const updated = await makeClient().updateSportSettings("Ride", { ftp: 265 });
+
+    expect(method).toBe("PUT");
+    // Required query flag is always false so provided values are never overridden.
+    expect(putUrl!.searchParams.get("recalcHrZones")).toBe("false");
+    // Only the provided field is sent (partial update, no clobbering of other settings).
+    expect(putBody).toEqual({ ftp: 265 });
+    expect(updated.ftp).toBe(265);
+  });
+
   it("requests the plural power-curves endpoint with type and repeated curve params", async () => {
     let url: URL | null = null;
     server.use(

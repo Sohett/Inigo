@@ -11,14 +11,7 @@ describe("loadConfig", () => {
   it("parses a valid environment and applies defaults", () => {
     const config = loadConfig(validEnv);
     expect(config.INTERVALS_API_KEY).toBe("test-api-key");
-    expect(config.ENABLE_WRITE_TOOLS).toBe(false);
     expect(config.INTERVALS_BASE_URL).toBe("https://intervals.icu/api/v1");
-  });
-
-  it("coerces ENABLE_WRITE_TOOLS truthy strings to boolean", () => {
-    expect(loadConfig({ ...validEnv, ENABLE_WRITE_TOOLS: "true" }).ENABLE_WRITE_TOOLS).toBe(true);
-    expect(loadConfig({ ...validEnv, ENABLE_WRITE_TOOLS: "1" }).ENABLE_WRITE_TOOLS).toBe(true);
-    expect(loadConfig({ ...validEnv, ENABLE_WRITE_TOOLS: "0" }).ENABLE_WRITE_TOOLS).toBe(false);
   });
 
   it("throws when a required variable is missing", () => {

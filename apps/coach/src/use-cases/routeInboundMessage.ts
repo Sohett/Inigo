@@ -1,4 +1,5 @@
 import type { ManagedAgentBrain } from "../brain/managedAgents";
+import { formatTurn } from "../brain/taskEnvelope";
 import type { Athlete } from "../domain/athlete";
 import type { AthleteRepository } from "../repositories/athleteRepository";
 import {
@@ -102,16 +103,4 @@ export function createRouteInboundMessage(deps: RouteInboundMessageDeps): RouteI
 
 function ignored(reason: IgnoreReason): RouteOutcome {
   return { status: "ignored", reason };
-}
-
-/**
- * Format a turn the agent can act on. The envelope carries:
- *  - `inigo_athlete_id`: our internal athlete UUID (`athlete.id` in Neon). This is the
- *    key the agent uses to reach the athlete-data MCP (`/athlete/{id}/api/mcp`). It is
- *    deliberately NOT the Intervals.icu athlete id — that one lives in the Intervals MCP.
- *  - `chat_id`: the WhatsApp chat to reply to (via the OpenWA send tool).
- * The agent's system prompt (configured on the control plane) explains this envelope.
- */
-export function formatTurn(inigoAthleteId: string, chatId: string, text: string): string {
-  return `inigo_athlete_id: ${inigoAthleteId}\nchat_id: ${chatId}\nmessage: ${text}`;
 }

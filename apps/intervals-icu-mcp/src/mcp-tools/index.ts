@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { IntervalsIcuClient } from "../client";
-import { registerAthleteTools } from "./tools/athlete";
+import { registerAthleteTools, registerAthleteWriteTools } from "./tools/athlete";
 import { registerActivityTools } from "./tools/activities";
 import { registerWellnessTools } from "./tools/wellness";
 import { registerFitnessTools } from "./tools/fitness";
@@ -8,20 +8,12 @@ import { registerCurveTools } from "./tools/curves";
 import { registerGearTools } from "./tools/gear";
 import { registerEventReadTools, registerEventWriteTools } from "./tools/events";
 
-export interface RegisterToolsOptions {
-  /** When true, register the event write tools (create/update/delete). */
-  enableWriteTools: boolean;
-}
-
 /**
- * Register all Intervals.icu tools on the given MCP server. Read tools are
- * always registered; write tools only when explicitly enabled.
+ * Register all Intervals.icu tools on the given MCP server. Access is bounded by the
+ * MCP bearer and, per agent, by the Managed Agent toolset allowlists — so reads and
+ * writes are both always registered here.
  */
-export function registerIntervalsIcuTools(
-  server: McpServer,
-  client: IntervalsIcuClient,
-  options: RegisterToolsOptions
-): void {
+export function registerIntervalsIcuTools(server: McpServer, client: IntervalsIcuClient): void {
   registerAthleteTools(server, client);
   registerActivityTools(server, client);
   registerWellnessTools(server, client);
@@ -30,9 +22,8 @@ export function registerIntervalsIcuTools(
   registerGearTools(server, client);
   registerEventReadTools(server, client);
 
-  if (options.enableWriteTools) {
-    registerEventWriteTools(server, client);
-  }
+  registerAthleteWriteTools(server, client);
+  registerEventWriteTools(server, client);
 }
 
 export { jsonResult, errorResult, runTool, type ToolResult } from "./result";

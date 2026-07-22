@@ -76,6 +76,28 @@ export const athleteSchema = z
   .catchall(z.unknown());
 export type Athlete = z.infer<typeof athleteSchema>;
 
+/**
+ * Per-sport thresholds and zones (FTP, LTHR, max HR, threshold pace, power/HR/pace
+ * zones). The full object carries ~60 fields; we validate the coach-controlled ones and
+ * keep the rest with `.catchall` so a read-merge-write PUT never drops fields it didn't
+ * touch. FTP/HR fields are integers, threshold pace and pace zones are floats.
+ */
+export const sportSettingsSchema = z
+  .object({
+    id: id.nullish(),
+    type: z.string().nullish(),
+    ftp: z.number().nullish(),
+    indoor_ftp: z.number().nullish(),
+    lthr: z.number().nullish(),
+    max_hr: z.number().nullish(),
+    threshold_pace: z.number().nullish(),
+    power_zones: z.array(z.number()).nullish(),
+    hr_zones: z.array(z.number()).nullish(),
+    pace_zones: z.array(z.number()).nullish()
+  })
+  .catchall(z.unknown());
+export type SportSettings = z.infer<typeof sportSettingsSchema>;
+
 export const gearSchema = z
   .object({
     id: id.nullish(),

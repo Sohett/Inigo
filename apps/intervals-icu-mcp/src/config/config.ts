@@ -15,11 +15,6 @@ export const configSchema = z.object({
   MCP_BEARER_TOKEN: z
     .string()
     .min(16, "MCP_BEARER_TOKEN must be at least 16 characters"),
-  /** When false, write tools (event create/update/delete) are not registered. */
-  ENABLE_WRITE_TOOLS: z
-    .enum(["true", "false", "1", "0"])
-    .default("false")
-    .transform((value) => value === "true" || value === "1"),
   /** Base URL of the Intervals.icu API. */
   INTERVALS_BASE_URL: z.url().default("https://intervals.icu/api/v1")
 });

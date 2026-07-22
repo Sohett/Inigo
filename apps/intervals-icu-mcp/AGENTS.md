@@ -30,8 +30,8 @@ les **tools** sont de fines couches `input zod → client → sortie MCP`.
 - Enregistrer un tool via `server.registerTool(name, { title, description, inputSchema }, handler)`.
 - Encapsuler l'appel client dans `runTool(() => client.xxx())` pour la gestion uniforme
   succès/erreur.
-- Les **tools d'écriture** (events) ne sont enregistrés que si `options.enableWriteTools`
-  (mappé sur `ENABLE_WRITE_TOOLS`, défaut off — least privilege).
+- Tous les tools (lecture et écriture) sont enregistrés ; l'accès est borné par le bearer
+  MCP et, côté agent, par les allowlists de toolset (least privilege au niveau agent).
 
 ## Ajouter un nouveau tool MCP
 
@@ -39,8 +39,7 @@ les **tools** sont de fines couches `input zod → client → sortie MCP`.
    test msw dans `client.spec.ts`.
 2. Crée/édite le fichier de domaine sous `src/mcp-tools/tools/` et enregistre le tool
    (`registerTool` + `runTool`, cf. conventions ci-dessus).
-3. Branche le `register*` dans `src/mcp-tools/index.ts`. Si c'est une **écriture**,
-   ajoute-le dans le bloc gardé par `options.enableWriteTools`.
+3. Branche le `register*` dans `src/mcp-tools/index.ts`.
 4. Ajoute le nom du tool à l'assertion de `src/mcp-tools/index.spec.ts`.
 5. `pnpm verify`.
 
@@ -73,4 +72,8 @@ que de deviner. Endpoints ci-dessous vérifiés contre cette spec.
   30 derniers jours si non fourni.
 - **`delete_events_by_range`** : `category` (array) est requis par l'API (garde-fou
   contre la suppression de tout le calendrier).
+- **`update_sport_settings`** (écriture) : `PUT /athlete/{id}/sport-settings/{sport}` où
+  `{sport}` est un type d'activité (`Ride`/`Run`/`Swim`). Mise à jour **partielle** : on
+  n'envoie que les champs à changer. Le param query `recalcHrZones` est **requis** par l'API,
+  fixé à `false` (pas de recalcul auto des zones HR).
 - **Arrays en query** (`curves`, `category`, `types`) : encodés en paramètres répétés.

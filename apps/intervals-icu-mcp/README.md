@@ -23,7 +23,6 @@ Validées au boot par `@inigo/shared-config` (échec explicite si invalide). Cop
 | `INTERVALS_API_KEY` | Clé API du compte Intervals.icu (Settings → Developer) |
 | `INTERVALS_ATHLETE_ID` | Id de l'athlète (ex. `i123456`) |
 | `MCP_BEARER_TOKEN` | Secret que le client MCP doit présenter (`openssl rand -hex 32`) |
-| `ENABLE_WRITE_TOOLS` | `true` pour exposer les tools d'écriture (events). Défaut : `false` |
 | `INTERVALS_BASE_URL` | Optionnel — défaut `https://intervals.icu/api/v1` |
 
 > Les secrets sont **server-side uniquement**, jamais commités, jamais exposés au client.

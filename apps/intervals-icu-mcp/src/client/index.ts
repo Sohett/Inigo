@@ -1,5 +1,10 @@
 export { IntervalsIcuClient } from "./client";
-export type { IntervalsIcuClientOptions, DateRange, CurveQuery } from "./client";
+export type {
+  IntervalsIcuClientOptions,
+  DateRange,
+  CurveQuery,
+  SportSettingsPatch
+} from "./client";
 export { IntervalsIcuApiError } from "./errors";
 export type {
   Activity,
@@ -9,5 +14,6 @@ export type {
   FitnessPoint,
   Gear,
   IntervalsEvent,
+  SportSettings,
   Wellness
 } from "./schemas";
