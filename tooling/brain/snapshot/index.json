@@ -1,5 +1,5 @@
 {
-  "fetchedAt": "2026-07-22T16:24:18.999Z",
+  "fetchedAt": "2026-07-23T15:17:12.059Z",
   "counts": {
     "agents": 5,
     "environments": 1,
@@ -11,7 +11,7 @@
     {
       "id": "agent_013Cb3npXSMv7T8X533DL9kt",
       "name": "inigo-coordinateur",
-      "version": 14
+      "version": 15
     },
     {
       "id": "agent_01Sp4ghn8GHc5Lbd9JJptEzR",

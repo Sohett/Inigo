@@ -17,6 +17,9 @@
   ],
   "metadata": {},
   "model": {
+    "effort": {
+      "type": "xhigh"
+    },
     "id": "claude-opus-4-8",
     "speed": "standard"
   },

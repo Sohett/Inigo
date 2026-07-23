@@ -22,6 +22,9 @@
   ],
   "metadata": {},
   "model": {
+    "effort": {
+      "type": "high"
+    },
     "id": "claude-sonnet-4-6",
     "speed": "standard"
   },
@@ -160,6 +163,6 @@
     }
   ],
   "type": "agent",
-  "updated_at": "2026-07-22T16:23:43.634873Z",
-  "version": 14
+  "updated_at": "2026-07-23T15:16:29.475527Z",
+  "version": 15
 }
