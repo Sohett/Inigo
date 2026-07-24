@@ -11,14 +11,27 @@ import type { CredentialProvider } from "./schema";
 
 const DEFAULT_PROVIDER: CredentialProvider = "intervals_icu";
 
-/** Fetch and decrypt an athlete's Intervals.icu API key, or null if none is stored. */
+/** An athlete's decrypted Intervals.icu credential, as needed to call their API. */
+export interface IntervalsCredential {
+  /** The decrypted API key (HTTP Basic password). */
+  apiKey: string;
+  /** Intervals.icu athlete id (e.g. "i123456"), null if it was never recorded. */
+  externalAthleteId: string | null;
+}
+
+/**
+ * Fetch and decrypt an athlete's Intervals.icu credential, or null if none is stored.
+ * Returns both the API key and the external athlete id — a caller needs both to build
+ * a client (the id keys every `/athlete/{id}/…` path).
+ */
 export async function getIntervalsKey(
   db: Db,
   athleteId: string,
   masterKeyBase64: string
-): Promise<string | null> {
+): Promise<IntervalsCredential | null> {
   const rows = await db
     .select({
+      externalAthleteId: athleteCredential.externalAthleteId,
       ciphertext: athleteCredential.secretCiphertext,
       iv: athleteCredential.secretIv,
       authTag: athleteCredential.secretAuthTag
@@ -34,7 +47,11 @@ export async function getIntervalsKey(
 
   const row = rows[0];
   if (!row) return null;
-  return openSecret({ ciphertext: row.ciphertext, iv: row.iv, authTag: row.authTag }, masterKeyBase64);
+  const apiKey = openSecret(
+    { ciphertext: row.ciphertext, iv: row.iv, authTag: row.authTag },
+    masterKeyBase64
+  );
+  return { apiKey, externalAthleteId: row.externalAthleteId };
 }
 
 /** Encrypt and upsert an athlete's Intervals.icu API key. */

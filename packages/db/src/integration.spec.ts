@@ -54,7 +54,8 @@ describe.skipIf(!databaseUrl || !encryptionKey)("coach <-> Neon round-trip (inte
     await setIntervalsKey(db, { athleteId, apiKey, externalAthleteId: "i123456" }, encryptionKey as string);
 
     const recovered = await getIntervalsKey(db, athleteId, encryptionKey as string);
-    expect(recovered).toBe(apiKey);
+    expect(recovered?.apiKey).toBe(apiKey);
+    expect(recovered?.externalAthleteId).toBe("i123456");
 
     const creds = await db
       .select({ ciphertext: athleteCredential.secretCiphertext })
@@ -67,7 +68,10 @@ describe.skipIf(!databaseUrl || !encryptionKey)("coach <-> Neon round-trip (inte
 
   it("rotates the key in place (single row per athlete/provider)", async () => {
     await setIntervalsKey(db, { athleteId, apiKey: "rotated-key-2" }, encryptionKey as string);
-    expect(await getIntervalsKey(db, athleteId, encryptionKey as string)).toBe("rotated-key-2");
+    const rotated = await getIntervalsKey(db, athleteId, encryptionKey as string);
+    expect(rotated?.apiKey).toBe("rotated-key-2");
+    // externalAthleteId is left untouched when a rotation omits it.
+    expect(rotated?.externalAthleteId).toBe("i123456");
 
     const creds = await db
       .select()
