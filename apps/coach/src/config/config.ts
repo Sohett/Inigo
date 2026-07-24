@@ -37,10 +37,15 @@ export const configSchema = z.object({
       { message: "DB_ENCRYPTION_KEY must be a base64-encoded 32-byte key" }
     ),
   /**
-   * Bearer token the brain (Managed Agent) must present to reach the athlete-data
-   * MCP endpoint (`/api/mcp`). Server-side only, min 16 chars.
+   * Bearer token the brain (Managed Agent) must present to reach coach's MCP endpoints
+   * (`/api/mcp` athlete-data and `/api/intervals/mcp`). Server-side only, min 16 chars.
    */
-  MCP_BEARER_TOKEN: z.string().min(16, "MCP_BEARER_TOKEN must be at least 16 characters")
+  MCP_BEARER_TOKEN: z.string().min(16, "MCP_BEARER_TOKEN must be at least 16 characters"),
+  /**
+   * Base URL of the Intervals.icu API. The intervals MCP (`/api/intervals/mcp`) calls it
+   * per athlete, with each athlete's own key resolved from Neon at request time.
+   */
+  INTERVALS_BASE_URL: z.url().default("https://intervals.icu/api/v1")
 });
 
 export type Config = z.infer<typeof configSchema>;
