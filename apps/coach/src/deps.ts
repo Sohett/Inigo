@@ -10,6 +10,8 @@ import {
   createAthleteDataRepository,
   type AthleteDataRepository
 } from "./mcp/repository/athleteDataRepository";
+import { createIntervalsResolver } from "./intervals/resolveClient";
+import type { ResolveClient } from "./intervals/mcp-tools/result";
 
 export interface Deps {
   config: Config;
@@ -17,6 +19,8 @@ export interface Deps {
   db: Db;
   repo: AthleteRepository;
   athleteData: AthleteDataRepository;
+  /** Resolves a per-athlete Intervals.icu client (key fetched + decrypted from Neon). */
+  intervalsResolver: ResolveClient;
 }
 
 let cached: Deps | null = null;
@@ -38,7 +42,12 @@ export function getDeps(): Deps {
       brain: createManagedAgentBrain(anthropic),
       db,
       repo: createDrizzleAthleteRepository(db),
-      athleteData: createAthleteDataRepository(db)
+      athleteData: createAthleteDataRepository(db),
+      intervalsResolver: createIntervalsResolver(
+        db,
+        config.DB_ENCRYPTION_KEY,
+        config.INTERVALS_BASE_URL
+      )
     };
   }
   return cached;
