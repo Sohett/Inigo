@@ -26,9 +26,10 @@ aura besoin de compute persistant (queue, batch long) — pas avant.
 app/
   api/webhooks/whatsapp/route.ts        # entrée HTTP fine : (verif HMAC optionnelle) → parse → use-case → 200
   api/[transport]/route.ts              # endpoint MCP athlete-data statique (/api/mcp), bearer requis
+  api/intervals/[transport]/route.ts    # endpoint MCP Intervals.icu statique (/api/intervals/mcp), bearer requis
   layout.tsx, page.tsx                  # minimal
 src/
-  config/config.ts                 # env zod (ANTHROPIC_API_KEY, DATABASE_URL, DB_ENCRYPTION_KEY, WHATSAPP_WEBHOOK_SECRET?, MCP_BEARER_TOKEN)
+  config/config.ts                 # env zod (ANTHROPIC_API_KEY, DATABASE_URL, DB_ENCRYPTION_KEY, WHATSAPP_WEBHOOK_SECRET?, MCP_BEARER_TOKEN, INTERVALS_BASE_URL?)
   auth.ts                          # verifyWebhookSignature (webhook) + verifyBearerToken (MCP), constant-time
   domain/
     athlete.ts                     # modèle métier Athlete + enum AthleteStatus (routing ; indépendants de @inigo/db)
@@ -44,7 +45,11 @@ src/
   mcp/
     repository/athleteDataRepository.ts  # accès Neon scopé par athlete (createDb → forAthlete(id)), mappe rows→modèles (domain/coaching) ; seul autre layer @inigo/db-aware
     tools/{index,result,profile,thresholds,goals,plan,adaptationLog}.ts  # tools MCP fins (reads + writes gated)
-  deps.ts                          # singleton lazy { config, brain, db, repo, athleteData }
+  intervals/
+    client/                        # client REST Intervals.icu typé (repris de intervals-icu-mcp, inchangé)
+    mcp-tools/{index,result,tools/*}.ts  # tools MCP Intervals fins ; chaque tool prend athleteId + résout un client par requête
+    resolveClient.ts               # createIntervalsResolver(db, encKey, baseUrl) : getIntervalsKey → déchiffre → IntervalsIcuClient
+  deps.ts                          # singleton lazy { config, brain, db, repo, athleteData, intervalsResolver }
 # futur : app/(admin)/… , app/api/admin/… , src/services/…
 ```
 
@@ -113,6 +118,28 @@ Un serveur MCP hébergé **dans coach** (choix assumé : pas d'app séparée) do
   `get_fitness`), courbes puissance/FC/allure, **calendrier des séances planifiées**, FTP/zones
   *calculées* par Intervals. Règle FTP : décision coaching = `athlete_threshold` (ce MCP) ;
   Intervals reste le calcul live.
+
+## MCP Intervals.icu (le brain lit/écrit Intervals via coach) — INI-7
+
+Un **second** serveur MCP hébergé dans coach (`POST/GET /api/intervals/mcp`, `basePath:
+"/api/intervals"`), **distinct** de l'athlete-data (`/api/mcp`). Rapatrié depuis l'ex-app
+standalone `intervals-icu-mcp` pour passer en **multi-athlète** : la clé Intervals.icu n'est
+plus une seule clé en env, mais **une par athlète** stockée chiffrée dans Neon
+(`athlete_credential`, cf. `@inigo/db`).
+
+- **Clé par athlète, résolue au moment de l'usage** : chaque tool prend un `athleteId` (le même
+  `inigo_athlete_id` que coach-data — l'id Inigo, **pas** l'id Intervals). Le handler résout un
+  client **par requête** via `createIntervalsResolver` : `getIntervalsKey(db, athleteId, DB_ENCRYPTION_KEY)`
+  → déchiffre la clé + lit l'id Intervals externe → `new IntervalsIcuClient(...)`. Le secret est
+  déchiffré **dans coach**, jamais renvoyé au brain ni au LLM.
+- **Absence de clé** : le resolver `throw` (message clair, sans secret) → `errorResult` du tool.
+- **Deux endpoints, pas un** : choix assumé pour garder le **nom de serveur brain `intervals-icu`**
+  et les **allowlists de toolset par agent** (coordinateur = read-only, constructeur/réadaptateur =
+  full) inchangées. Seule l'URL du serveur `intervals-icu` bascule (ops, post-deploy) vers
+  `https://app.inigo-coach.com/api/intervals/mcp`.
+- **Auth** : même bearer global `MCP_BEARER_TOKEN` que coach-data (`withMcpAuth({ required: true })`).
+- **Écriture d'une clé** : `setIntervalsKey` (`@inigo/db`) — écriture chiffrée + rotation
+  (`rotatedAt`). La **capture par onboarding WhatsApp est hors périmètre** (ticket dédié).
 
 ## Conventions (en plus de la racine)
 
