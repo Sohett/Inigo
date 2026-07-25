@@ -7,7 +7,7 @@
     {
       "name": "intervals-icu",
       "type": "url",
-      "url": "https://intervals-icu-mcp.inigo-coach.com/api/mcp"
+      "url": "https://app.inigo-coach.com/api/intervals/mcp"
     },
     {
       "name": "inigo-coach-data",
