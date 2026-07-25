@@ -13,7 +13,6 @@
     "typecheck": "pnpm -r run typecheck",
     "lint": "pnpm -r run lint",
     "verify": "pnpm -r run lint && pnpm -r run typecheck && pnpm -r run test",
-    "dev:mcp": "pnpm --filter @inigo/intervals-icu-mcp run dev",
     "dev:landing": "pnpm --filter @inigo/landing-page run dev",
     "dev:coach": "pnpm --filter @inigo/coach run dev"
   },

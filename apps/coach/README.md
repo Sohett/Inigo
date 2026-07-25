@@ -6,10 +6,10 @@ vers la **bonne session de Managed Agent Anthropic**, résolue par le **`phone_n
 l'athlète en base (Neon). L'agent répond ensuite **lui-même** sur WhatsApp via son outil
 MCP OpenWA (`MessageSendText`).
 
-Il expose aussi un **serveur MCP `athlete-data`** (`/api/mcp`) : c'est par là
-que le brain **lit et écrit la donnée coaching structurée** de l'athlète en base (profil,
-seuils, objectifs, plan, journal d'adaptation), en complément d'`intervals-icu-mcp` qui porte
-la donnée d'entraînement live.
+Il expose aussi **deux serveurs MCP** pour le brain : **`athlete-data`** (`/api/mcp`) pour la
+donnée coaching structurée en base (profil, seuils, objectifs, plan, journal d'adaptation), et
+**Intervals.icu** (`/api/intervals/mcp`) pour la donnée d'entraînement live, avec la clé résolue
+par athlète depuis Neon (rapatrié de l'ex-app `intervals-icu-mcp`, INI-7).
 
 À terme, cette même app hébergera l'**admin** (dashboards, actions, triggers sur le brain).
 
@@ -28,7 +28,7 @@ coach (Vercel)
    POST /api/webhooks/whatsapp → routeInboundMessage.execute
      → résout l'athlète + sa session via phone_num (Neon) → append user.message à SA session
    ⇅
-Managed Agent (Anthropic) — session de l'athlète = mémoire ; MCP: intervals-icu-mcp + OpenWA ; répond via MessageSendText
+Managed Agent (Anthropic) — session de l'athlète = mémoire ; MCP: coach (athlete-data + Intervals) + OpenWA ; répond via MessageSendText
 ```
 
 Le use-case dérive le numéro de l'expéditeur depuis le JID WhatsApp, résout l'athlète en base,
@@ -47,7 +47,8 @@ Validées au boot par `src/config/config.ts`. Copie `.env.example` → `.env` **
 | `DATABASE_URL` | Connexion Neon (base coaching partagée via `@inigo/db`), server-side |
 | `DB_ENCRYPTION_KEY` | Clé base64 32 octets (AES-256-GCM) pour sceller les secrets par athlète |
 | `WHATSAPP_WEBHOOK_SECRET` | Optionnel : vérif HMAC `X-OpenWA-Signature` si renseigné |
-| `MCP_BEARER_TOKEN` | Bearer que le brain présente au MCP athlete-data (min 16 car., server-side) |
+| `MCP_BEARER_TOKEN` | Bearer que le brain présente aux MCP athlete-data et Intervals.icu (min 16 car., server-side) |
+| `INTERVALS_BASE_URL` | Optionnel : override de l'URL de l'API Intervals.icu (défaut `https://intervals.icu/api/v1`) |
 
 ## Setup (résumé)
 
@@ -80,10 +81,10 @@ Tools : lecture `get_profile`, `get_thresholds`, `get_goals`, `get_training_plan
 `save_training_plan` (crée/met à jour le macro-plan + ses blocs, en une écriture atomique).
 `get_profile` n'expose **aucun** secret ni donnée de routing (ni `phone_num`, ni ids de session).
 
-**Frontière avec `intervals-icu-mcp`** : ce MCP porte la *couche coaching* (profil, seuils
-historisés, objectifs, plan, journal). `intervals-icu-mcp` porte la *vérité live* (activités,
-CTL/ATL/TSB, courbes, calendrier planifié). La FTP de décision vient d'ici (`get_thresholds`) ;
-Intervals reste le calcul live.
+**Frontière athlete-data ⟂ Intervals.icu** (deux endpoints de coach) : `athlete-data` porte la
+*couche coaching* (profil, seuils historisés, objectifs, plan, journal). Le MCP Intervals.icu
+(`/api/intervals/mcp`) porte la *vérité live* (activités, CTL/ATL/TSB, courbes, calendrier
+planifié). La FTP de décision vient d'ici (`get_thresholds`) ; Intervals reste le calcul live.
 
 **Côté Managed Agent** : ajouter à la session un vault `static_bearer`
 (`url=https://<coach>/api/mcp`, `token=MCP_BEARER_TOKEN`) et déclarer le serveur dans les
@@ -119,7 +120,7 @@ curl -X POST "http://localhost:3000/api/mcp" \
 ## Déploiement
 
 Vercel (Next.js). Variables via le dashboard Vercel (dont `MCP_BEARER_TOKEN`, requis, à poser
-**avant** deploy). Endpoints : `/api/webhooks/whatsapp` et `/api/mcp`.
+**avant** deploy). Endpoints : `/api/webhooks/whatsapp`, `/api/mcp` et `/api/intervals/mcp`.
 
 ## Contribuer
 

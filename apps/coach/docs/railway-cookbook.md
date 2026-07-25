@@ -187,8 +187,9 @@ variable OpenWA côté app. Plus de session fixe en env : la session est résolu
 
 ### Côté Managed Agent (contrôle Anthropic, une fois)
 - **Vault `static_bearer`** pour le MCP OpenWA : **URL = `$OWA_URL/mcp`**, **token = `$OWA_API_KEY`**.
-- **Session par athlète** créée avec l'agent coach + ce vault (+ celui d'intervals-icu-mcp) →
-  son id stocké en base dans `athlete.anthropic_session_id` (avec le `phone_num`).
+- **Session par athlète** créée avec l'agent coach + le vault (static_bearer OpenWA + les bearers
+  des MCP coach `athlete-data` et Intervals.icu) → son id stocké en base dans
+  `athlete.anthropic_session_id` (avec le `phone_num`).
 - **Prompt système** : reçoit `chat_id: …\nmessage: …` → répond via
   `MessageSendText(sessionId="<UUID session OpenWA>", chatId=<fourni>, text=…)`.
 
