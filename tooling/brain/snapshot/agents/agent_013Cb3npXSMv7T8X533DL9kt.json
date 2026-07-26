@@ -12,7 +12,7 @@
     {
       "name": "intervals-icu",
       "type": "url",
-      "url": "https://intervals-icu-mcp.inigo-coach.com/api/mcp"
+      "url": "https://app.inigo-coach.com/api/intervals/mcp"
     },
     {
       "name": "inigo-coach-data",
@@ -33,22 +33,22 @@
       {
         "id": "agent_01Sp4ghn8GHc5Lbd9JJptEzR",
         "type": "agent",
-        "version": 4
+        "version": 5
       },
       {
         "id": "agent_01CTK33Z2CLPwtDyq9vKDsVG",
         "type": "agent",
-        "version": 8
+        "version": 9
       },
       {
         "id": "agent_01Dbg6WeAF41xSs8bTfiE8XD",
         "type": "agent",
-        "version": 4
+        "version": 5
       },
       {
         "id": "agent_012ethnUdHzvRW9iPxdzzbTx",
         "type": "agent",
-        "version": 8
+        "version": 9
       }
     ],
     "type": "coordinator"
@@ -163,6 +163,6 @@
     }
   ],
   "type": "agent",
-  "updated_at": "2026-07-23T15:16:29.475527Z",
-  "version": 15
+  "updated_at": "2026-07-25T13:38:41.182344Z",
+  "version": 16
 }
