@@ -1,16 +1,15 @@
 # Inigo
 
 **Inigo est un coach sportif.** Ce dépôt est le monorepo TypeScript qui regroupe ses
-services : un serveur MCP qui expose les données [Intervals.icu](https://intervals.icu) aux
-agents IA, une landing page, et le backend qui relie WhatsApp au coach (Managed Agent).
+services : une landing page, et le backend qui relie WhatsApp au coach (Managed Agent) et
+expose aux agents IA les serveurs MCP (donnée coaching + [Intervals.icu](https://intervals.icu)).
 
 ## Aperçu du monorepo
 
 ```
 apps/    # services déployables
-  intervals-icu-mcp/   # serveur MCP exposant Intervals.icu aux agents
   landing-page/        # landing page one-page (Astro) qui capte des leads WhatsApp
-  coach/         # backend (Next.js) reliant WhatsApp (OpenWA) au coach Managed Agent
+  coach/         # backend (Next.js) : WhatsApp (OpenWA) → coach Managed Agent + serveurs MCP
 ```
 
 Outillage : **pnpm** workspaces, **TypeScript 5.9** strict, **Vitest 4**.
@@ -25,15 +24,14 @@ pnpm install                                    # installer les dépendances
 pnpm verify                                     # lint + typecheck + test sur tout le monorepo
 ```
 
-Pour lancer un service en développement, voir son README (ex. `pnpm dev:mcp`).
+Pour lancer un service en développement, voir son README (ex. `pnpm dev:coach`).
 
 ## Services
 
 | Service | Description | Doc |
 |---|---|---|
-| `intervals-icu-mcp` | Serveur MCP distant exposant Intervals.icu aux agents — <https://intervals-icu-mcp.inigo-coach.com> | [`apps/intervals-icu-mcp/README.md`](apps/intervals-icu-mcp/README.md) |
 | `landing-page` | Landing page one-page (Astro) — présente le coach et capte un numéro WhatsApp | [`apps/landing-page/README.md`](apps/landing-page/README.md) |
-| `coach` | Backend (Next.js) reliant WhatsApp (gateway OpenWA) au coach Managed Agent | [`apps/coach/README.md`](apps/coach/README.md) |
+| `coach` | Backend (Next.js) reliant WhatsApp (gateway OpenWA) au coach Managed Agent ; héberge les serveurs MCP athlete-data (`/api/mcp`) et Intervals.icu (`/api/intervals/mcp`) | [`apps/coach/README.md`](apps/coach/README.md) |
 
 ## Contribuer
 

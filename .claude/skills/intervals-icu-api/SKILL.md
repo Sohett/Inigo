@@ -1,6 +1,6 @@
 ---
 name: intervals-icu-api
-description: Reference for the Intervals.icu REST API (OpenAPI spec bundled). Use whenever adding, modifying, or verifying an Intervals.icu endpoint in the intervals-icu-client / intervals-icu-mcp-tools packages — to confirm exact paths, HTTP methods, required query params, request/response schemas, or auth. Always check the spec instead of guessing endpoint shapes.
+description: Reference for the Intervals.icu REST API (OpenAPI spec bundled). Use whenever adding, modifying, or verifying an Intervals.icu endpoint in apps/coach's Intervals client / MCP tools (`apps/coach/src/intervals/`) — to confirm exact paths, HTTP methods, required query params, request/response schemas, or auth. Always check the spec instead of guessing endpoint shapes.
 ---
 
 # Intervals.icu API reference
@@ -79,7 +79,6 @@ console.log(JSON.stringify(s.components.schemas[process.argv[1]],null,2))' Activ
 
 ## When you change the client
 
-After confirming an endpoint here, update `libs/intervals-icu-client/src/client.ts`
+After confirming an endpoint here, update `apps/coach/src/intervals/client/client.ts`
 (+ schema in `schemas.ts`, + msw test in `client.spec.ts`), then the matching tool in
-`libs/intervals-icu-mcp-tools/`. See `apps/intervals-icu-mcp/AGENTS.md` → "Ajouter un
-nouveau tool MCP".
+`apps/coach/src/intervals/mcp-tools/tools/`. See `apps/coach/AGENTS.md` → "MCP Intervals.icu".
