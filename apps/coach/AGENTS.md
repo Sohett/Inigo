@@ -31,7 +31,6 @@ app/
   api/[transport]/route.ts              # endpoint MCP athlete-data statique (/api/mcp), bearer requis
   api/intervals/[transport]/route.ts    # endpoint MCP Intervals.icu statique (/api/intervals/mcp), bearer requis
   api/admin/athletes/[athleteId]/session/route.ts  # POST : ouvre une session et repointe l'athlète
-  api/admin/brain-config/route.ts       # PUT : édite le template de session
   (admin)/admin/page.tsx                # la page admin (server component) + _components/ (client)
   layout.tsx, page.tsx, globals.css     # minimal + Tailwind
 src/
@@ -42,20 +41,18 @@ src/
   components/ui/*                  # composants shadcn (button, card, table, badge, input, label)
   domain/
     athlete.ts                     # modèle métier Athlete + enum AthleteStatus (routing ; indépendants de @inigo/db)
-    brain.ts                       # BrainSessionTemplate : agent coordinateur, environment, vaults, memory store
+    brain.ts                       # SessionElements / RunningSession / BrainInventory (indépendants du SDK)
     coaching.ts                    # modèles métier de la donnée coaching (contrat de sortie des tools MCP) + inputs
   repositories/
     athleteRepository.ts           # PORT AthleteRepository (findByPhone, findByLid, setChatId, findById, listAll, setSession)
     drizzleAthleteRepository.ts     # ADAPTER Drizzle (requête inline) + toAthlete(row→modèle)
-    brainConfigRepository.ts       # PORT BrainConfigRepository (get, save) — le template de session
-    drizzleBrainConfigRepository.ts # ADAPTER Drizzle : upsert sur la ligne unique `brain_config`
   use-cases/
     routeInboundMessage.ts         # use-case de routing : une seule fonction publique execute()
-    startAthleteSession.ts         # use-case admin : crée une session et repointe l'athlète dessus
-    updateBrainConfig.ts           # use-case admin : valide (zod) et enregistre le template
+    startAthleteSession.ts         # use-case admin : clone la session courante, repointe l'athlète
+    loadAdminOverview.ts           # use-case admin (lecture) : athlètes + sessions live + inventaire
   mappers/
     whatsappPayload.ts             # schémas zod + normalisation du payload OpenWA + senderPhone
-  brain/managedAgents.ts           # FRONTIÈRE cerveau : appendUserMessage(sessionId,text) + createSession(input) + adaptateur SDK
+  brain/managedAgents.ts           # FRONTIÈRE cerveau : appendUserMessage + readSession + createSession + listInventory
   mcp/
     repository/athleteDataRepository.ts  # accès Neon scopé par athlete (createDb → forAthlete(id)), mappe rows→modèles (domain/coaching) ; seul autre layer @inigo/db-aware
     tools/{index,result,profile,thresholds,goals,plan,adaptationLog}.ts  # tools MCP fins (reads + writes gated)
@@ -164,10 +161,21 @@ coordinateur et écrit son id dans `athlete.anthropic_session_id`.
   version à la création, et une session **fige** cette config pour sa vie entière (seuls
   `tools`/`mcp_servers` changent après). Une nouvelle version d'agent n'a donc d'effet runtime
   qu'en (re)créant une session. Même raison que l'étape 3 de `brain:deploy`.
-- **Le template vit en base** (`brain_config`, ligne unique, id `'default'`), pas en env :
-  il doit s'updater par le code, et la page l'édite. Seedé par la migration `0003` depuis
-  `tooling/brain/deploy.manifest.json`. Les deux sources doivent rester d'accord ; faire lire
-  la base à `tooling/brain` est un suivi possible.
+- **Rien n'est stocké de la config de session.** `readSession` lit la session courante de
+  l'athlète (`agent.id`, `environment_id`, `vault_ids`, `resources`) et `createSession` la
+  recrée. La session qui tourne **est** la source de vérité : une copie en base ou en env peut
+  diverger du plan de contrôle, elle non. Ne réintroduis pas de table de config ici.
+- **Mapping lecture → création obligatoire.** Les `resources` renvoyées portent des champs
+  output-only (`id`, `created_at`, `updated_at`, `mount_path`, `name`, `description`) que la
+  création refuse : `toSessionResource` ne garde que ce qui est réinjectable. Un
+  `github_repository` **ne peut pas** être cloné (son `authorization_token` n'est jamais
+  renvoyé) : on throw plutôt que d'ouvrir une session amputée. Vérifié contre l'API réelle.
+- **Seule la première session demande un choix**, fait dans des listes alimentées par
+  `listInventory` (live). L'agent proposé par défaut est celui qui porte un roster
+  `multiagent`. Les vaults s'appellent `display_name` là où tout le reste utilise `name`.
+- **Lectures résilientes** : `loadAdminOverview` capture les erreurs **par athlète**
+  (`sessionError`) au lieu d'avorter — un pointeur vers une session supprimée est justement
+  la dérive que cette page doit rendre visible. Même règle que les lectures de `@inigo/brain`.
 - **Ordre des effets** : la session est créée **avant** l'écriture du pointeur, donc un échec
   Anthropic laisse l'athlète sur sa session précédente plutôt que orphelin. `setSession` écrit
   aussi `managed_agent_id`, pour que la ligne dise toujours quel agent tourne vraiment.
@@ -219,11 +227,14 @@ le skill Claude Code `managed-agents-api`.
   dans le mot de passe),
   parsing/normalisation du payload + `senderPhone`, mapping `toAthlete`, **use-case
   `routeInboundMessage`** (4 cas de routing + filtres + throws infra, repo & brain fakes),
-  brain (fake SDK : append **et** createSession), **use-case `startAthleteSession`**
-  (nominal, athlète inconnu, brain non configuré, échec Anthropic qui n'écrit rien) et
-  `updateBrainConfig` (défauts, préfixes d'ids refusés). Route admin : 401 sans/avec mauvais
-  identifiants, 400 UUID invalide, 200 nominal, 404/409/502. Côté MCP : intégration
-  `InMemoryTransport` (reads + writes présents dont
+  brain (fake SDK : append, readSession qui retire les champs output-only, createSession,
+  listInventory), **`startAthleteSession`** (clone nominal, éléments ignorés quand il y a une
+  session, ressources reportées telles quelles, première session depuis des éléments choisis,
+  préfixes d'ids refusés, athlète inconnu, échec de lecture ou de création qui n'écrit rien) et
+  **`loadAdminOverview`** (session cassée isolée sur sa ligne, inventaire injoignable qui
+  dégrade au lieu de casser). Route admin : 401 sans/avec mauvais identifiants, 400 UUID
+  invalide, 200 clone, 200 première session, 409 sans rien à cloner, 404, 502. Côté MCP :
+  intégration `InMemoryTransport` (reads + writes présents dont
   `save_training_plan`, un call renvoie du JSON, validation de date rejetée), route (401 sans
   bearer, 400 UUID invalide). Pas de réseau. Le store `saveTrainingPlan` (create, update
   replace-all, archivage de l'actif, scoping cross-athlète) est couvert par la spec d'intégration

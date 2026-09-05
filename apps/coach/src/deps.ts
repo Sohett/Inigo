@@ -6,8 +6,6 @@ import {
   createDrizzleAthleteRepository
 } from "./repositories/drizzleAthleteRepository";
 import type { AthleteRepository } from "./repositories/athleteRepository";
-import { createDrizzleBrainConfigRepository } from "./repositories/drizzleBrainConfigRepository";
-import type { BrainConfigRepository } from "./repositories/brainConfigRepository";
 import {
   createAthleteDataRepository,
   type AthleteDataRepository
@@ -20,8 +18,6 @@ export interface Deps {
   brain: ManagedAgentBrain;
   db: Db;
   repo: AthleteRepository;
-  /** The brain session template new sessions are created from. */
-  brainConfig: BrainConfigRepository;
   athleteData: AthleteDataRepository;
   /** Resolves a per-athlete Intervals.icu client (key fetched + decrypted from Neon). */
   intervalsResolver: ResolveClient;
@@ -46,7 +42,6 @@ export function getDeps(): Deps {
       brain: createManagedAgentBrain(anthropic),
       db,
       repo: createDrizzleAthleteRepository(db),
-      brainConfig: createDrizzleBrainConfigRepository(db),
       athleteData: createAthleteDataRepository(db),
       intervalsResolver: createIntervalsResolver(
         db,

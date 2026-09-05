@@ -33,9 +33,6 @@ export type AdaptationTrigger =
 
 export type CredentialProvider = "intervals_icu";
 
-/** How a session may use the memory store attached to it as a resource. */
-export type MemoryStoreAccess = "read_only" | "read_write";
-
 /** A single training zone bound (Coggan-style). */
 export interface Zone {
   name?: string;

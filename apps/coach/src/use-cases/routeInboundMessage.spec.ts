@@ -32,7 +32,9 @@ const unusedRepoMethods = () => ({
   setSession: vi.fn(() => Promise.resolve())
 });
 const unusedBrainMethods = () => ({
-  createSession: vi.fn(() => Promise.resolve({ sessionId: "sesn_unused", agentVersion: 1 }))
+  createSession: vi.fn(() => Promise.resolve({ sessionId: "sesn_unused", agentVersion: 1 })),
+  readSession: vi.fn(),
+  listInventory: vi.fn()
 });
 
 function makeDeps(athlete: Athlete | null) {

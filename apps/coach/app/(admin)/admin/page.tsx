@@ -1,19 +1,13 @@
 import type { Athlete } from "@/domain/athlete";
+import type { BrainElement, BrainInventory, RunningSession } from "@/domain/brain";
 import { getDeps } from "@/deps";
+import { createLoadAdminOverview } from "@/use-cases/loadAdminOverview";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow
-} from "@/components/ui/table";
-import { BrainConfigForm } from "./_components/brain-config-form";
+import { FirstSessionForm } from "./_components/first-session-form";
 import { NewSessionButton } from "./_components/new-session-button";
 
-// Reads live DB state and secrets, so it must never be prerendered at build time.
+// Reads live DB and control-plane state, so it must never be prerendered or cached.
 export const dynamic = "force-dynamic";
 
 export const metadata = { title: "Admin · Inigo coach" };
@@ -24,100 +18,120 @@ const STATUS_VARIANT: Record<Athlete["status"], "default" | "secondary" | "outli
   ended: "outline"
 };
 
+/** Show a control-plane id by its name when we know it, else the raw id. */
+function label(elements: BrainElement[] | undefined, id: string): string {
+  return elements?.find((element) => element.id === id)?.name ?? id;
+}
+
+function SessionSummary({
+  session,
+  inventory
+}: {
+  session: RunningSession;
+  inventory: BrainInventory | null;
+}) {
+  const memoryStores = session.resources.filter((resource) => resource.kind === "memory_store");
+  return (
+    <dl className="grid gap-1 text-xs sm:grid-cols-[7rem_1fr]">
+      <dt className="text-muted-foreground">Session</dt>
+      <dd className="font-mono break-all">{session.sessionId}</dd>
+
+      <dt className="text-muted-foreground">Tourne sur</dt>
+      <dd>
+        {session.agentName} · v{session.agentVersion}
+      </dd>
+
+      <dt className="text-muted-foreground">Environment</dt>
+      <dd>{label(inventory?.environments, session.environmentId)}</dd>
+
+      <dt className="text-muted-foreground">Vaults</dt>
+      <dd>
+        {session.vaultIds.length === 0
+          ? "aucun"
+          : session.vaultIds.map((id) => label(inventory?.vaults, id)).join(", ")}
+      </dd>
+
+      <dt className="text-muted-foreground">Memory</dt>
+      <dd>
+        {memoryStores.length === 0
+          ? "aucun"
+          : memoryStores
+              .map(
+                (resource) =>
+                  `${label(inventory?.memoryStores, resource.memoryStoreId)} (${resource.access})`
+              )
+              .join(", ")}
+      </dd>
+    </dl>
+  );
+}
+
 export default async function AdminPage() {
   const deps = getDeps();
-  const [athletes, template] = await Promise.all([
-    deps.repo.listAll(),
-    deps.brainConfig.get()
-  ]);
+  const overview = await createLoadAdminOverview({ repo: deps.repo, brain: deps.brain }).execute();
 
   return (
-    <main className="mx-auto grid max-w-5xl gap-6 px-4 py-10">
+    <main className="mx-auto grid max-w-4xl gap-6 px-4 py-10">
       <header className="grid gap-1">
         <h1 className="text-2xl font-semibold tracking-tight">Admin Inigo</h1>
         <p className="text-sm text-muted-foreground">
-          Ouvre une session brain et pointe l'athlète dessus. Une session fige la config de
-          l'agent à sa création : après un déploiement d'agent, c'est ce bouton qui fait
-          basculer le runtime sur la nouvelle version.
+          Une session fige la config de l'agent à sa création. Après un déploiement qui bump
+          une version d'agent, c'est l'ouverture d'une session fraîche qui fait basculer le
+          runtime. Le bouton recrée la session de l'athlète à l'identique, en repointant
+          l'agent sur sa dernière version. Tout ce qui est affiché ici est lu en direct chez
+          Anthropic, rien n'est stocké de ce côté.
         </p>
       </header>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Brain</CardTitle>
-          <CardDescription>
-            Le template dont chaque nouvelle session est construite. Ce sont des identifiants
-            du plan de contrôle Anthropic, jamais des secrets : les credentials vivent dans les
-            vaults pointés ici.
-            {template && (
-              <>
-                {" "}
-                Dernière modification :{" "}
-                {template.updatedAt.toISOString().replace("T", " ").slice(0, 16)} UTC.
-              </>
-            )}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <BrainConfigForm template={template} />
-        </CardContent>
-      </Card>
+      {overview.athletes.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Aucun athlète en base.</p>
+      ) : (
+        overview.athletes.map(({ athlete, session, sessionError }) => (
+          <Card key={athlete.id}>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                {athlete.displayName ?? "Sans nom"}
+                <Badge variant={STATUS_VARIANT[athlete.status]}>{athlete.status}</Badge>
+              </CardTitle>
+              <CardDescription className="font-mono text-xs">{athlete.phoneNum}</CardDescription>
+            </CardHeader>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Athlètes</CardTitle>
-          <CardDescription>
-            {athletes.length} athlète{athletes.length > 1 ? "s" : ""} en base. La session
-            affichée est celle vers laquelle les messages WhatsApp sont routés.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {athletes.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Aucun athlète en base.</p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Athlète</TableHead>
-                  <TableHead>Statut</TableHead>
-                  <TableHead>Session courante</TableHead>
-                  <TableHead className="text-right">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {athletes.map((athlete) => (
-                  <TableRow key={athlete.id}>
-                    <TableCell>
-                      <div className="font-medium">{athlete.displayName ?? "Sans nom"}</div>
-                      <div className="font-mono text-xs text-muted-foreground">
-                        {athlete.phoneNum}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={STATUS_VARIANT[athlete.status]}>{athlete.status}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      {athlete.anthropicSessionId ? (
-                        <span className="font-mono text-xs break-all">
-                          {athlete.anthropicSessionId}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">Aucune session</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <NewSessionButton
-                        athleteId={athlete.id}
-                        hasSession={athlete.anthropicSessionId !== null}
-                      />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+            <CardContent className="grid gap-4">
+              {session && <SessionSummary session={session} inventory={overview.inventory} />}
+
+              {sessionError && (
+                <div className="grid gap-1 text-xs">
+                  <p className="text-destructive">
+                    La session <span className="font-mono">{athlete.anthropicSessionId}</span> est
+                    illisible chez Anthropic.
+                  </p>
+                  <p className="text-muted-foreground">{sessionError}</p>
+                </div>
+              )}
+
+              {!session && !sessionError && (
+                <div className="grid gap-3">
+                  <p className="text-xs text-muted-foreground">
+                    Aucune session. Choisis de quoi ouvrir la première, listé en direct depuis
+                    Anthropic.
+                  </p>
+                  <FirstSessionForm
+                    athleteId={athlete.id}
+                    inventory={overview.inventory}
+                    inventoryError={overview.inventoryError}
+                  />
+                </div>
+              )}
+
+              {(session ?? sessionError) && (
+                <div className="flex justify-end">
+                  <NewSessionButton athleteId={athlete.id} canClone={session !== null} />
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ))
+      )}
     </main>
   );
 }

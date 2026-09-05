@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import type { Athlete } from "../domain/athlete";
-import type { BrainSessionTemplate } from "../domain/brain";
+import type { RunningSession } from "../domain/brain";
 import type { ManagedAgentBrain } from "../brain/managedAgents";
 import {
   createStartAthleteSession,
@@ -17,29 +17,35 @@ const athlete: Athlete = {
   chatId: "32470000000@c.us",
   status: "active",
   anthropicSessionId: "sesn_old",
-  managedAgentId: "agent_old"
+  managedAgentId: "agent_coord"
 };
 
-const template: BrainSessionTemplate = {
-  coordinatorAgentId: "agent_coord",
+const running: RunningSession = {
+  sessionId: "sesn_old",
+  agentId: "agent_coord",
+  agentName: "inigo-coordinateur",
+  agentVersion: 16,
+  status: "idle",
   environmentId: "env_1",
   vaultIds: ["vlt_1"],
-  memoryStoreId: "memstore_1",
-  memoryStoreAccess: "read_only",
-  updatedAt: new Date("2026-09-01T00:00:00Z")
+  resources: [
+    { kind: "memory_store", memoryStoreId: "memstore_1", access: "read_only", instructions: null }
+  ]
 };
 
 type CreateSession = ManagedAgentBrain["createSession"];
+type ReadSession = ManagedAgentBrain["readSession"];
 
 function makeDeps(
   overrides: {
     athlete?: Athlete | null;
-    template?: BrainSessionTemplate | null;
+    readSession?: ReadSession;
     createSession?: CreateSession;
   } = {}
 ) {
+  const readSession = vi.fn<ReadSession>(overrides.readSession ?? (() => Promise.resolve(running)));
   const createSession = vi.fn<CreateSession>(
-    overrides.createSession ?? (() => Promise.resolve({ sessionId: "sesn_new", agentVersion: 16 }))
+    overrides.createSession ?? (() => Promise.resolve({ sessionId: "sesn_new", agentVersion: 17 }))
   );
   const setSession = vi.fn(() => Promise.resolve());
 
@@ -54,18 +60,25 @@ function makeDeps(
       listAll: vi.fn(() => Promise.resolve([athlete])),
       setSession
     },
-    brainConfig: {
-      get: vi.fn(() =>
-        Promise.resolve(overrides.template === undefined ? template : overrides.template)
-      ),
-      save: vi.fn()
+    brain: {
+      appendUserMessage: vi.fn(),
+      readSession,
+      createSession,
+      listInventory: vi.fn()
     },
-    brain: { appendUserMessage: vi.fn(), createSession },
     now: () => new Date("2026-09-05T12:00:00Z")
   };
 
-  return { deps, createSession, setSession };
+  return { deps, readSession, createSession, setSession };
 }
+
+const firstSessionElements = {
+  agentId: "agent_coord",
+  environmentId: "env_1",
+  vaultIds: ["vlt_1"],
+  memoryStoreId: "memstore_1",
+  memoryStoreAccess: "read_only"
+};
 
 describe("sessionTitle", () => {
   it("uses the display name and the day", () => {
@@ -81,17 +94,18 @@ describe("sessionTitle", () => {
   });
 });
 
-describe("startAthleteSession", () => {
-  it("creates the session from the template and repoints the athlete at it", async () => {
-    const { deps, createSession, setSession } = makeDeps();
+describe("startAthleteSession — cloning a live session", () => {
+  it("recreates the running session's elements and repoints the athlete", async () => {
+    const { deps, readSession, createSession, setSession } = makeDeps();
 
     const outcome = await createStartAthleteSession(deps).execute(athlete.id);
 
+    expect(readSession).toHaveBeenCalledWith("sesn_old");
     expect(createSession).toHaveBeenCalledWith({
       agentId: "agent_coord",
       environmentId: "env_1",
       vaultIds: ["vlt_1"],
-      resources: [{ type: "memory_store", memory_store_id: "memstore_1", access: "read_only" }],
+      resources: running.resources,
       title: "Inigo · Thomas · 2026-09-05"
     });
     expect(setSession).toHaveBeenCalledWith(athlete.id, "sesn_new", "agent_coord");
@@ -99,45 +113,55 @@ describe("startAthleteSession", () => {
       status: "started",
       athleteId: athlete.id,
       sessionId: "sesn_new",
-      agentVersion: 16,
-      previousSessionId: "sesn_old"
+      agentVersion: 17,
+      previousSessionId: "sesn_old",
+      source: "cloned"
     });
   });
 
-  it("omits the memory-store resource when the template has none", async () => {
-    const { deps, createSession } = makeDeps({ template: { ...template, memoryStoreId: null } });
+  it("ignores supplied elements when there is a session to clone", async () => {
+    const { deps, createSession } = makeDeps();
+
+    await createStartAthleteSession(deps).execute(athlete.id, {
+      agentId: "agent_someone_else",
+      environmentId: "env_other"
+    });
+
+    expect(createSession).toHaveBeenCalledWith(
+      expect.objectContaining({ agentId: "agent_coord", environmentId: "env_1" })
+    );
+  });
+
+  it("carries the elements over verbatim, whatever they are", async () => {
+    const { deps, createSession } = makeDeps({
+      readSession: () =>
+        Promise.resolve({
+          ...running,
+          vaultIds: ["vlt_1", "vlt_2"],
+          resources: [{ kind: "file", fileId: "file_1", mountPath: "/mnt/x" }]
+        })
+    });
 
     await createStartAthleteSession(deps).execute(athlete.id);
 
     expect(createSession).toHaveBeenCalledWith(
-      expect.not.objectContaining({ resources: expect.anything() })
+      expect.objectContaining({
+        vaultIds: ["vlt_1", "vlt_2"],
+        resources: [{ kind: "file", fileId: "file_1", mountPath: "/mnt/x" }]
+      })
     );
   });
 
-  it("reports a null previous session for an athlete who had none", async () => {
-    const { deps } = makeDeps({ athlete: { ...athlete, anthropicSessionId: null } });
+  it("leaves the athlete on their previous session when the read fails", async () => {
+    const { deps, createSession, setSession } = makeDeps({
+      readSession: () => Promise.reject(new Error("session gone"))
+    });
 
-    const outcome = await createStartAthleteSession(deps).execute(athlete.id);
-
-    expect(outcome).toMatchObject({ status: "started", previousSessionId: null });
-  });
-
-  it("fails without touching the brain when the athlete is unknown", async () => {
-    const { deps, createSession } = makeDeps({ athlete: null });
-
-    const outcome = await createStartAthleteSession(deps).execute(athlete.id);
-
-    expect(outcome).toEqual({ status: "failed", reason: StartSessionFailure.AthleteNotFound });
+    await expect(createStartAthleteSession(deps).execute(athlete.id)).rejects.toThrow(
+      "session gone"
+    );
     expect(createSession).not.toHaveBeenCalled();
-  });
-
-  it("fails without touching the brain when the brain is not configured", async () => {
-    const { deps, createSession } = makeDeps({ template: null });
-
-    const outcome = await createStartAthleteSession(deps).execute(athlete.id);
-
-    expect(outcome).toEqual({ status: "failed", reason: StartSessionFailure.BrainNotConfigured });
-    expect(createSession).not.toHaveBeenCalled();
+    expect(setSession).not.toHaveBeenCalled();
   });
 
   it("leaves the athlete on their previous session when the create fails", async () => {
@@ -149,5 +173,85 @@ describe("startAthleteSession", () => {
       "anthropic down"
     );
     expect(setSession).not.toHaveBeenCalled();
+  });
+});
+
+describe("startAthleteSession — first session", () => {
+  const newcomer = { ...athlete, anthropicSessionId: null, managedAgentId: null };
+
+  it("builds the session from the supplied elements, without reading anything", async () => {
+    const { deps, readSession, createSession, setSession } = makeDeps({ athlete: newcomer });
+
+    const outcome = await createStartAthleteSession(deps).execute(
+      newcomer.id,
+      firstSessionElements
+    );
+
+    expect(readSession).not.toHaveBeenCalled();
+    expect(createSession).toHaveBeenCalledWith({
+      agentId: "agent_coord",
+      environmentId: "env_1",
+      vaultIds: ["vlt_1"],
+      resources: [
+        {
+          kind: "memory_store",
+          memoryStoreId: "memstore_1",
+          access: "read_only",
+          instructions: null
+        }
+      ],
+      title: "Inigo · Thomas · 2026-09-05"
+    });
+    expect(setSession).toHaveBeenCalledWith(newcomer.id, "sesn_new", "agent_coord");
+    expect(outcome).toMatchObject({ status: "started", previousSessionId: null, source: "chosen" });
+  });
+
+  it("omits the memory-store resource when none is chosen", async () => {
+    const { deps, createSession } = makeDeps({ athlete: newcomer });
+
+    await createStartAthleteSession(deps).execute(newcomer.id, {
+      ...firstSessionElements,
+      memoryStoreId: null
+    });
+
+    expect(createSession).toHaveBeenCalledWith(expect.objectContaining({ resources: [] }));
+  });
+
+  it("fails when no elements are supplied and there is nothing to clone", async () => {
+    const { deps, createSession } = makeDeps({ athlete: newcomer });
+
+    const outcome = await createStartAthleteSession(deps).execute(newcomer.id);
+
+    expect(outcome).toEqual({ status: "failed", reason: StartSessionFailure.NoSessionToClone });
+    expect(createSession).not.toHaveBeenCalled();
+  });
+
+  it("rejects ids with the wrong prefix, naming every offending field", async () => {
+    const { deps, createSession } = makeDeps({ athlete: newcomer });
+
+    const outcome = await createStartAthleteSession(deps).execute(newcomer.id, {
+      ...firstSessionElements,
+      agentId: "env_oops",
+      environmentId: "agent_oops"
+    });
+
+    expect(outcome.status).toBe("failed");
+    if (outcome.status !== "failed") throw new Error("expected failure");
+    expect(outcome.reason).toBe(StartSessionFailure.InvalidElements);
+    expect(outcome.issues?.join(" ")).toContain("agentId");
+    expect(outcome.issues?.join(" ")).toContain("environmentId");
+    expect(createSession).not.toHaveBeenCalled();
+  });
+});
+
+describe("startAthleteSession — unknown athlete", () => {
+  it("fails without touching the brain", async () => {
+    const { deps, readSession, createSession } = makeDeps({ athlete: null });
+
+    const outcome = await createStartAthleteSession(deps).execute(athlete.id);
+
+    expect(outcome).toEqual({ status: "failed", reason: StartSessionFailure.AthleteNotFound });
+    expect(readSession).not.toHaveBeenCalled();
+    expect(createSession).not.toHaveBeenCalled();
   });
 });

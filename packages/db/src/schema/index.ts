@@ -1,7 +1,7 @@
 /**
- * V0 schema barrel. Ten tables owned by Neon: the athlete core (identity/routing,
- * secret, profile, historised thresholds, goals), the coaching output (macro-plan,
- * blocks, weekly propositions, adaptation journal), and the brain session template.
+ * V0 schema barrel. Nine tables owned by Neon: the athlete core (identity/routing,
+ * secret, profile, historised thresholds, goals) and the coaching output
+ * (macro-plan, blocks, weekly propositions, adaptation journal).
  *
  * Deliberately NOT here (owned by Intervals.icu, never duplicated): activities,
  * daily PMC (CTL/ATL/TSB), power/HR/pace curves, and the planned-session calendar.
@@ -15,6 +15,5 @@ export { goal } from "./goal";
 export { trainingPlan, planBlock } from "./plan";
 export { weeklyProposition } from "./proposition";
 export { adaptationLog } from "./adaptationLog";
-export { brainConfig } from "./brainConfig";
 
 export * from "./types";

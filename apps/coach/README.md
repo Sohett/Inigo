@@ -56,10 +56,10 @@ Validées au boot par `src/config/config.ts`. Copie `.env.example` → `.env` **
 
 1. **Gateway OpenWA sur Railway** — voir [`docs/railway-cookbook.md`](docs/railway-cookbook.md).
 2. **Session Managed par athlète** : ouverte depuis l'**admin** (`/admin`, bouton
-   « Nouvelle session »), qui la crée sur l'agent coordinateur et écrit son id dans
-   `athlete.anthropic_session_id` — c'est ce que le routing résout. Le template
-   (agent, environment, vaults, memory store) vit en base dans `brain_config`, éditable
-   depuis cette même page. L'onboarding automatique d'un nouvel athlète reste hors périmètre.
+   « Nouvelle session »), qui la crée et écrit son id dans `athlete.anthropic_session_id` —
+   c'est ce que le routing résout. Rien n'est stocké de la config de session : l'admin lit la
+   session que l'athlète fait déjà tourner et la recrée à l'identique. L'onboarding
+   automatique d'un nouvel athlète reste hors périmètre.
    > Les *deployments* Managed servent uniquement aux runs planifiés (cron) ; ici on n'en utilise pas : le coach pousse les messages à une session existante via l'API (`POST /v1/sessions/:id/events`).
 3. **Prompt système de l'agent** : « tu reçois des messages WhatsApp au format
    `inigo_athlete_id: …\nchat_id: …\nmessage: …`. `inigo_athlete_id` est l'id athlète Inigo
@@ -79,10 +79,19 @@ Pourquoi ça compte : une session **fige la config de l'agent à sa création** 
 c'est la création d'une session fraîche qui fait basculer le runtime sur cette version. Ce
 bouton remplace la manœuvre d'avant (commande locale, puis `UPDATE` SQL à la main).
 
-- **Template de session** : `brain_config` en base (ligne unique) porte l'agent coordinateur,
-  l'environment, les vaults et le memory store. En base et pas en env, pour que ça s'update par
-  le code : la carte « Brain » de `/admin` l'édite (`PUT /api/admin/brain-config`). La migration
-  `0003` seed la ligne depuis `tooling/brain/deploy.manifest.json`.
+- **Aucune config stockée.** Le bouton lit la session courante de l'athlète
+  (`GET /v1/sessions/{id}`, qui renvoie `agent.id`, `environment_id`, `vault_ids` et
+  `resources`) et la recrée à l'identique, en repointant l'agent sur sa dernière version.
+  La session qui tourne **est** la source de vérité : contrairement à une copie en base ou en
+  env, elle ne peut pas diverger du plan de contrôle. Seule la **première** session d'un
+  athlète demande un choix, fait dans des listes déroulantes alimentées en direct
+  (agents, environments, vaults, memory stores) — donc pas d'id tapé à la main.
+- **Ce que la page affiche est lu en direct** chez Anthropic : l'agent et sa version,
+  l'environment, les vaults, la mémoire. Une session devenue illisible (supprimée côté
+  console) s'affiche en erreur sur sa ligne, sans casser le reste de la page.
+- **Une limite assumée** : une session montant un `github_repository` ne peut pas être clonée,
+  parce que la création exige un `authorization_token` que l'API ne renvoie jamais. Le cas est
+  refusé bruyamment plutôt que d'ouvrir une session amputée de son credential.
 - **Auth** : HTTP Basic (`ADMIN_USER` / `ADMIN_PASSWORD`), posée par `proxy.ts` sur
   `/admin` et `/api/admin/*` **seulement** — le webhook OpenWA et les deux MCP gardent
   leurs propres credentials et ne voient jamais de challenge Basic. Chaque route admin

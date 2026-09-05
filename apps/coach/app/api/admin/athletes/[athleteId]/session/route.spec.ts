@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import type { Athlete } from "../../../../../../src/domain/athlete";
-import type { BrainSessionTemplate } from "../../../../../../src/domain/brain";
+import type { RunningSession } from "../../../../../../src/domain/brain";
 
 const ADMIN_USER = "inigo";
 const ADMIN_PASSWORD = "a-very-long-admin-password";
@@ -16,20 +16,22 @@ const athlete: Athlete = {
   managedAgentId: "agent_old"
 };
 
-const template: BrainSessionTemplate = {
-  coordinatorAgentId: "agent_coord",
+const running: RunningSession = {
+  sessionId: "sesn_old",
+  agentId: "agent_coord",
+  agentName: "inigo-coordinateur",
+  agentVersion: 16,
+  status: "idle",
   environmentId: "env_1",
   vaultIds: ["vlt_1"],
-  memoryStoreId: null,
-  memoryStoreAccess: "read_only",
-  updatedAt: new Date("2026-09-01T00:00:00Z")
+  resources: []
 };
 
 // The fakes the route sees instead of the real Neon/Anthropic clients. Reassigned per test.
 const fake = {
   findById: vi.fn(),
   setSession: vi.fn(),
-  getTemplate: vi.fn(),
+  readSession: vi.fn(),
   createSession: vi.fn()
 };
 
@@ -37,18 +39,18 @@ vi.mock("../../../../../../src/deps", () => ({
   getDeps: () => ({
     config: { ADMIN_USER, ADMIN_PASSWORD },
     repo: { findById: fake.findById, setSession: fake.setSession },
-    brainConfig: { get: fake.getTemplate },
-    brain: { createSession: fake.createSession }
+    brain: { readSession: fake.readSession, createSession: fake.createSession }
   })
 }));
 
 const basic = (user = ADMIN_USER, password = ADMIN_PASSWORD) =>
   `Basic ${Buffer.from(`${user}:${password}`).toString("base64")}`;
 
-function post(athleteId: string, headers: Record<string, string> = {}) {
+function post(athleteId: string, headers: Record<string, string> = {}, body?: string) {
   return new Request(`http://localhost/api/admin/athletes/${athleteId}/session`, {
     method: "POST",
-    headers
+    headers,
+    ...(body === undefined ? {} : { body })
   });
 }
 
@@ -62,8 +64,8 @@ beforeAll(() => {
 beforeEach(() => {
   fake.findById.mockReset().mockResolvedValue(athlete);
   fake.setSession.mockReset().mockResolvedValue(undefined);
-  fake.getTemplate.mockReset().mockResolvedValue(template);
-  fake.createSession.mockReset().mockResolvedValue({ sessionId: "sesn_new", agentVersion: 16 });
+  fake.readSession.mockReset().mockResolvedValue(running);
+  fake.createSession.mockReset().mockResolvedValue({ sessionId: "sesn_new", agentVersion: 17 });
 });
 
 describe("POST /api/admin/athletes/[athleteId]/session", () => {
@@ -99,7 +101,7 @@ describe("POST /api/admin/athletes/[athleteId]/session", () => {
     expect(fake.createSession).not.toHaveBeenCalled();
   });
 
-  it("creates the session and returns its id (200)", async () => {
+  it("clones the running session and returns the new id (200)", async () => {
     const { POST } = await import("./route");
     const response = await POST(
       post(athlete.id, { authorization: basic() }),
@@ -110,9 +112,11 @@ describe("POST /api/admin/athletes/[athleteId]/session", () => {
     await expect(response.json()).resolves.toEqual({
       ok: true,
       sessionId: "sesn_new",
-      agentVersion: 16,
-      previousSessionId: "sesn_old"
+      agentVersion: 17,
+      previousSessionId: "sesn_old",
+      source: "cloned"
     });
+    expect(fake.readSession).toHaveBeenCalledWith("sesn_old");
     expect(fake.setSession).toHaveBeenCalledWith(athlete.id, "sesn_new", "agent_coord");
   });
 
@@ -128,8 +132,8 @@ describe("POST /api/admin/athletes/[athleteId]/session", () => {
     await expect(response.json()).resolves.toMatchObject({ error: "athlete_not_found" });
   });
 
-  it("answers 409 when the brain has no template", async () => {
-    fake.getTemplate.mockResolvedValue(null);
+  it("answers 409 for an athlete with no session and no elements supplied", async () => {
+    fake.findById.mockResolvedValue({ ...athlete, anthropicSessionId: null });
     const { POST } = await import("./route");
     const response = await POST(
       post(athlete.id, { authorization: basic() }),
@@ -137,7 +141,42 @@ describe("POST /api/admin/athletes/[athleteId]/session", () => {
     );
 
     expect(response.status).toBe(409);
-    await expect(response.json()).resolves.toMatchObject({ error: "brain_not_configured" });
+    await expect(response.json()).resolves.toMatchObject({ error: "no_session_to_clone" });
+  });
+
+  it("opens a first session from the supplied elements (200)", async () => {
+    fake.findById.mockResolvedValue({ ...athlete, anthropicSessionId: null });
+    const { POST } = await import("./route");
+    const response = await POST(
+      post(
+        athlete.id,
+        { authorization: basic(), "content-type": "application/json" },
+        JSON.stringify({ agentId: "agent_coord", environmentId: "env_1", vaultIds: ["vlt_1"] })
+      ),
+      params(athlete.id)
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ ok: true, source: "chosen" });
+    expect(fake.readSession).not.toHaveBeenCalled();
+  });
+
+  it("answers 400 with the offending fields when the elements are malformed", async () => {
+    fake.findById.mockResolvedValue({ ...athlete, anthropicSessionId: null });
+    const { POST } = await import("./route");
+    const response = await POST(
+      post(
+        athlete.id,
+        { authorization: basic(), "content-type": "application/json" },
+        JSON.stringify({ agentId: "nope", environmentId: "env_1" })
+      ),
+      params(athlete.id)
+    );
+
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { error: string; issues: string[] };
+    expect(body.error).toBe("invalid_elements");
+    expect(body.issues.join(" ")).toContain("agentId");
   });
 
   it("answers 502 when Anthropic fails", async () => {
