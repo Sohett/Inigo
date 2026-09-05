@@ -46,14 +46,16 @@
           "name": "web_search",
           "permission_policy": {
             "type": "always_allow"
-          }
+          },
+          "type": "web_search"
         },
         {
           "enabled": false,
           "name": "web_fetch",
           "permission_policy": {
             "type": "always_allow"
-          }
+          },
+          "type": "web_fetch"
         }
       ],
       "default_config": {
