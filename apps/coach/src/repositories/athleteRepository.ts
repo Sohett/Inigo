@@ -12,4 +12,13 @@ export interface AthleteRepository {
   findByLid(whatsappLid: string): Promise<Athlete | null>;
   /** Persist the WhatsApp chat id learned on an inbound message. Idempotent. */
   setChatId(athleteId: string, chatId: string): Promise<void>;
+  /** Resolve one athlete by internal id, or null if there is none. */
+  findById(athleteId: string): Promise<Athlete | null>;
+  /** Every athlete, oldest first — the admin roster. */
+  listAll(): Promise<Athlete[]>;
+  /**
+   * Point an athlete at a freshly created Managed Agent session. Writes the agent id
+   * alongside so the row always says which agent the live session actually runs.
+   */
+  setSession(athleteId: string, sessionId: string, agentId: string): Promise<void>;
 }

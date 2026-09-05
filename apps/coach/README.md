@@ -49,15 +49,17 @@ Validées au boot par `src/config/config.ts`. Copie `.env.example` → `.env` **
 | `WHATSAPP_WEBHOOK_SECRET` | Optionnel : vérif HMAC `X-OpenWA-Signature` si renseigné |
 | `MCP_BEARER_TOKEN` | Bearer que le brain présente aux MCP athlete-data et Intervals.icu (min 16 car., server-side) |
 | `INTERVALS_BASE_URL` | Optionnel : override de l'URL de l'API Intervals.icu (défaut `https://intervals.icu/api/v1`) |
+| `ADMIN_USER` | Identifiant HTTP Basic de l'admin (`/admin`, `/api/admin/*`), min 3 car. |
+| `ADMIN_PASSWORD` | Mot de passe HTTP Basic de l'admin, min 16 car., server-side |
 
 ## Setup (résumé)
 
 1. **Gateway OpenWA sur Railway** — voir [`docs/railway-cookbook.md`](docs/railway-cookbook.md).
-2. **Session Managed par athlète** (contrôle Anthropic, `ant` CLI / console), créée avec
-   l'agent coach + un **vault `static_bearer`** pour le MCP OpenWA (`url=<gateway>/mcp`,
-   `token=` clé OPERATOR). Son id est stocké en base dans `athlete.anthropic_session_id`
-   (avec le `phone_num` de l'athlète) : c'est ce que le routing résout. La création de session
-   par athlète (onboarding) est hors périmètre pour l'instant.
+2. **Session Managed par athlète** : ouverte depuis l'**admin** (`/admin`, bouton
+   « Nouvelle session »), qui la crée sur l'agent coordinateur et écrit son id dans
+   `athlete.anthropic_session_id` — c'est ce que le routing résout. Le template
+   (agent, environment, vaults, memory store) vit en base dans `brain_config`, éditable
+   depuis cette même page. L'onboarding automatique d'un nouvel athlète reste hors périmètre.
    > Les *deployments* Managed servent uniquement aux runs planifiés (cron) ; ici on n'en utilise pas : le coach pousse les messages à une session existante via l'API (`POST /v1/sessions/:id/events`).
 3. **Prompt système de l'agent** : « tu reçois des messages WhatsApp au format
    `inigo_athlete_id: …\nchat_id: …\nmessage: …`. `inigo_athlete_id` est l'id athlète Inigo
@@ -66,6 +68,31 @@ Validées au boot par `src/config/config.ts`. Copie `.env.example` → `.env` **
    concis, adapté à WhatsApp ».
 4. **Webhook OpenWA** → URL `https://<coach>/api/webhooks/whatsapp`, event
    `message.received`.
+
+## Admin (`/admin`)
+
+Page d'admin servie par cette même app. Aujourd'hui une capacité : **ouvrir une nouvelle
+session brain pour un athlète** et pointer sa ligne dessus.
+
+Pourquoi ça compte : une session **fige la config de l'agent à sa création** (seuls
+`tools`/`mcp_servers` bougent ensuite). Après un `brain:deploy` qui bump une version d'agent,
+c'est la création d'une session fraîche qui fait basculer le runtime sur cette version. Ce
+bouton remplace la manœuvre d'avant (commande locale, puis `UPDATE` SQL à la main).
+
+- **Template de session** : `brain_config` en base (ligne unique) porte l'agent coordinateur,
+  l'environment, les vaults et le memory store. En base et pas en env, pour que ça s'update par
+  le code : la carte « Brain » de `/admin` l'édite (`PUT /api/admin/brain-config`). La migration
+  `0003` seed la ligne depuis `tooling/brain/deploy.manifest.json`.
+- **Auth** : HTTP Basic (`ADMIN_USER` / `ADMIN_PASSWORD`), posée par `proxy.ts` sur
+  `/admin` et `/api/admin/*` **seulement** — le webhook OpenWA et les deux MCP gardent
+  leurs propres credentials et ne voient jamais de challenge Basic. Chaque route admin
+  revérifie l'en-tête elle-même (l'autorisation ne repose pas sur le seul proxy).
+- **Ce que l'admin ne fait pas** : appliquer les configs d'agents depuis le snapshot et
+  re-pinner le roster du coordinateur. Ça reste `@inigo/brain` en local (`brain:deploy`),
+  qui a besoin du snapshot git. L'admin ouvre la session, c'est tout.
+- **L'ancienne session n'est pas supprimée** : elle reste lisible dans la console Anthropic,
+  simplement plus rien n'y est routé. Le bouton demande donc confirmation quand l'athlète a
+  déjà une session.
 
 ## MCP athlete-data (accès du brain à la donnée coaching)
 
@@ -95,6 +122,8 @@ l'isolation repose sur l'`athleteId` passé par l'agent (durcissement futur : be
 
 ```bash
 pnpm dev:coach     # next dev (depuis la racine)
+
+# Admin : http://localhost:3000/admin — le navigateur demande ADMIN_USER / ADMIN_PASSWORD.
 
 # Tester le webhook (sans secret) :
 curl -X POST http://localhost:3000/api/webhooks/whatsapp \

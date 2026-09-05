@@ -4,6 +4,7 @@ import { athleteProfile } from "./schema/profile";
 import { athleteThreshold } from "./schema/threshold";
 import { goal } from "./schema/goal";
 import { planBlock, trainingPlan } from "./schema/plan";
+import { brainConfig } from "./schema/brainConfig";
 
 /**
  * Zod schemas mirroring the tables, for validating inputs at the app boundary
@@ -21,3 +22,4 @@ export const insertAthleteThresholdSchema = createInsertSchema(athleteThreshold)
 export const insertGoalSchema = createInsertSchema(goal);
 export const insertTrainingPlanSchema = createInsertSchema(trainingPlan);
 export const insertPlanBlockSchema = createInsertSchema(planBlock);
+export const insertBrainConfigSchema = createInsertSchema(brainConfig);

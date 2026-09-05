@@ -15,6 +15,10 @@ It never duplicates what **Intervals.icu** owns: activities, daily PMC (CTL/ATL/
 power/HR/pace curves, and the planned-session calendar. Those are read live via the
 Intervals.icu MCP.
 
+One table sits outside the coaching layer: `brain_config`, a single row holding the
+Managed Agent session template (coordinator agent, environment, vaults, memory store).
+It lives here rather than in env so the coach admin can read and update it at runtime.
+
 ## Usage
 
 ```ts

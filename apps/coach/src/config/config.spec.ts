@@ -5,7 +5,9 @@ const base: Record<string, string> = {
   ANTHROPIC_API_KEY: "sk-ant-xxx",
   DATABASE_URL: "postgresql://user:pass@host/db?sslmode=require",
   DB_ENCRYPTION_KEY: Buffer.alloc(32).toString("base64"),
-  MCP_BEARER_TOKEN: "a-very-long-mcp-bearer-token"
+  MCP_BEARER_TOKEN: "a-very-long-mcp-bearer-token",
+  ADMIN_USER: "inigo",
+  ADMIN_PASSWORD: "a-very-long-admin-password"
 };
 
 describe("loadConfig", () => {
@@ -53,5 +55,17 @@ describe("loadConfig", () => {
 
   it("throws when MCP_BEARER_TOKEN is too short", () => {
     expect(() => loadConfig({ ...base, MCP_BEARER_TOKEN: "short" })).toThrow(/MCP_BEARER_TOKEN/);
+  });
+
+  it("throws when the admin credentials are missing", () => {
+    const { ADMIN_USER, ADMIN_PASSWORD, ...rest } = base;
+    void ADMIN_USER;
+    void ADMIN_PASSWORD;
+    expect(() => loadConfig(rest)).toThrow(/ADMIN_USER/);
+    expect(() => loadConfig({ ...rest, ADMIN_USER: "inigo" })).toThrow(/ADMIN_PASSWORD/);
+  });
+
+  it("throws when ADMIN_PASSWORD is too short", () => {
+    expect(() => loadConfig({ ...base, ADMIN_PASSWORD: "short" })).toThrow(/ADMIN_PASSWORD/);
   });
 });

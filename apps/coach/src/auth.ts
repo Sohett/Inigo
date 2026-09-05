@@ -38,3 +38,41 @@ export function verifyBearerToken(provided: string, expected: string): boolean {
   if (presented.length !== secret.length) return false;
   return timingSafeEqual(presented, secret);
 }
+
+/** Challenge sent with a 401 so the browser prompts for the admin credentials. */
+export const BASIC_AUTH_CHALLENGE = 'Basic realm="Inigo admin", charset="UTF-8"';
+
+/**
+ * Verify an HTTP Basic `Authorization` header against the expected admin credentials.
+ *
+ * Guards the admin surface (the `/admin` pages and `/api/admin/*`). Both halves are
+ * compared in constant time, and the user is compared even when the password already
+ * failed, so neither field leaks through timing. Never throws: a missing, malformed,
+ * or non-Basic header is simply false.
+ */
+export function verifyBasicAuth(
+  header: string | null | undefined,
+  expectedUser: string,
+  expectedPassword: string
+): boolean {
+  if (!header) return false;
+  const [scheme, encoded] = header.split(" ");
+  if (scheme?.toLowerCase() !== "basic" || !encoded) return false;
+
+  let decoded: string;
+  try {
+    decoded = Buffer.from(encoded, "base64").toString("utf8");
+  } catch {
+    return false;
+  }
+
+  // Only the first colon separates the two: a password may legitimately contain one.
+  const separator = decoded.indexOf(":");
+  if (separator === -1) return false;
+  const user = decoded.slice(0, separator);
+  const password = decoded.slice(separator + 1);
+
+  const userOk = verifyBearerToken(user, expectedUser);
+  const passwordOk = verifyBearerToken(password, expectedPassword);
+  return userOk && passwordOk;
+}

@@ -6,6 +6,8 @@ beforeAll(() => {
   process.env["DATABASE_URL"] = "postgresql://user:pass@host/db?sslmode=require";
   process.env["DB_ENCRYPTION_KEY"] = Buffer.alloc(32).toString("base64");
   process.env["MCP_BEARER_TOKEN"] = "a-very-long-mcp-bearer-token";
+  process.env["ADMIN_USER"] = "inigo";
+  process.env["ADMIN_PASSWORD"] = "a-very-long-admin-password";
 });
 
 describe("intervals MCP route", () => {
