@@ -54,4 +54,32 @@ describe("loadConfig", () => {
   it("throws when MCP_BEARER_TOKEN is too short", () => {
     expect(() => loadConfig({ ...base, MCP_BEARER_TOKEN: "short" })).toThrow(/MCP_BEARER_TOKEN/);
   });
+
+  // This monorepo has several `.env` files and Next only reads the app's own, so a
+  // variable put in packages/db/.env is silently absent here. The error must say so.
+  it("names where the variables belong when one is missing", () => {
+    const { DATABASE_URL, ...rest } = base;
+    void DATABASE_URL;
+    try {
+      loadConfig(rest);
+      throw new Error("expected loadConfig to throw");
+    } catch (error) {
+      const message = (error as Error).message;
+      expect(message).toContain("DATABASE_URL");
+      expect(message).toContain("apps/coach/.env");
+      expect(message).toContain("packages/db/.env is NOT read by this app");
+    }
+  });
+
+  // Regression: the admin credentials once lived in this schema, which is parsed on every
+  // request path — so an admin credential that was missing, or merely too short, took the
+  // WhatsApp webhook and both MCP endpoints down with it. The admin must never be able to
+  // break the coach, so this schema ignores it entirely (see `adminCredentials`).
+  it("ignores the admin credentials, absent or malformed", () => {
+    expect(() => loadConfig(base)).not.toThrow();
+    expect(() =>
+      loadConfig({ ...base, ADMIN_USER: "a", ADMIN_PASSWORD: "short" })
+    ).not.toThrow();
+    expect(loadConfig(base).MCP_BEARER_TOKEN).toBe("a-very-long-mcp-bearer-token");
+  });
 });

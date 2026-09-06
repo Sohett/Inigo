@@ -62,3 +62,10 @@ Never `push` in production: migrations are versioned and applied via `migrate`.
 - `DATABASE_URL` — Neon connection string.
 - `DB_ENCRYPTION_KEY` — base64-encoded 32-byte key for secret sealing. Generate with
   `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`.
+
+`packages/db/.env` is read **only** by this package's own commands (the `db:migrate:*`
+scripts and the integration spec). Consuming apps do not read it: each app carries its own
+copy, the same way each Vercel project carries its own environment variables. So
+`apps/coach/.env` repeats these two, and the copies must agree — a `DB_ENCRYPTION_KEY`
+that differs from the one used to seal a secret cannot decrypt it, and a `DATABASE_URL`
+pointing at another Neon branch than the migrated one fails in confusing ways.

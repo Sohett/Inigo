@@ -48,7 +48,29 @@ export const configSchema = z.object({
   INTERVALS_BASE_URL: z.url().default("https://intervals.icu/api/v1")
 });
 
+/**
+ * `ADMIN_USER` / `ADMIN_PASSWORD` are deliberately NOT in this schema.
+ *
+ * This schema is validated on every request path, so any rule about the admin — missing,
+ * or merely too short — would take the WhatsApp webhook and both MCP endpoints down with
+ * it. The admin must never be able to break the coach. They are read and validated where
+ * they are used instead: `adminCredentials()` in `src/auth.ts`, which fails closed.
+ */
+
 export type Config = z.infer<typeof configSchema>;
+
+/**
+ * Where the missing variables are supposed to live. Spelled out because this is a
+ * monorepo with several `.env` files: `packages/db/.env` feeds drizzle-kit migrations
+ * only, and Next reads nothing but the `.env` of the app it runs from — so a variable
+ * put in the wrong one is silently absent here.
+ */
+const ENV_LOCATION_HINT = [
+  "Where to set them:",
+  "  - local dev: apps/coach/.env (see apps/coach/.env.example)",
+  "  - deployed: the coach project's environment variables on Vercel",
+  "packages/db/.env is NOT read by this app; it only feeds drizzle-kit migrations."
+].join("\n");
 
 /**
  * Parse and validate the given environment (defaults to `process.env`).
@@ -61,7 +83,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     const issues = parsed.error.issues
       .map((issue) => `  - ${issue.path.join(".") || "(root)"}: ${issue.message}`)
       .join("\n");
-    throw new Error(`Invalid environment configuration:\n${issues}`);
+    throw new Error(`Invalid environment configuration:\n${issues}\n\n${ENV_LOCATION_HINT}`);
   }
   return parsed.data;
 }

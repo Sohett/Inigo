@@ -5,10 +5,10 @@ humain / déploiement / setup : `README.md`.
 
 ## Rôle & principe
 
-App **full-stack unique** : le **backend** (route handlers `app/api/*` + logique `src/`) et,
-plus tard, l'**admin** (pages sous `app/(admin)/…`) vivent ensemble. Aujourd'hui, une seule
-capacité : **router** un message WhatsApp entrant vers la bonne session Managed Agent, résolue
-par le `phone_num` de l'athlète en base (Neon).
+App **full-stack unique** : le **backend** (route handlers `app/api/*` + logique `src/`) et
+l'**admin** (pages sous `app/(admin)/…`) vivent ensemble. Deux capacités : **router** un message
+WhatsApp entrant vers la bonne session Managed Agent, résolue par le `phone_num` de l'athlète en
+base (Neon) ; et **ouvrir une nouvelle session** pour un athlète depuis l'admin.
 
 Séparation nette du système : le **cerveau** tourne chez Anthropic (Managed Agents),
 **WhatsApp** chez OpenWA/Railway. Cette app ne fait qu'**orchestrer** (stateless) → Vercel
@@ -19,29 +19,40 @@ aura besoin de compute persistant (queue, batch long) — pas avant.
 
 - **Next.js 16** (App Router). **@anthropic-ai/sdk** (Managed Agents beta,
   `managed-agents-2026-04-01`, posé auto par le SDK). **zod 4**, **Vitest 4**.
+- **UI admin** : **Tailwind 4** (via `@tailwindcss/postcss`) + **shadcn/ui** (style `base-nova`,
+  base-ui, lucide) — mêmes choix que `landing-page`, alias `@/*` → `src/*`.
 
 ## Layout (couches, prêt à grandir)
 
 ```
+proxy.ts                                # HTTP Basic sur /admin + /api/admin/* (Next 16 ; runtime Node imposé)
 app/
   api/webhooks/whatsapp/route.ts        # entrée HTTP fine : (verif HMAC optionnelle) → parse → use-case → 200
   api/[transport]/route.ts              # endpoint MCP athlete-data statique (/api/mcp), bearer requis
   api/intervals/[transport]/route.ts    # endpoint MCP Intervals.icu statique (/api/intervals/mcp), bearer requis
-  layout.tsx, page.tsx                  # minimal
+  api/admin/athletes/[athleteId]/session/route.ts  # POST : ouvre une session et repointe l'athlète
+  (admin)/admin/page.tsx                # la page admin (server component) + _components/ (client)
+  layout.tsx, page.tsx, globals.css     # minimal + Tailwind
 src/
-  config/config.ts                 # env zod (ANTHROPIC_API_KEY, DATABASE_URL, DB_ENCRYPTION_KEY, WHATSAPP_WEBHOOK_SECRET?, MCP_BEARER_TOKEN, INTERVALS_BASE_URL?)
-  auth.ts                          # verifyWebhookSignature (webhook) + verifyBearerToken (MCP), constant-time
+  config/config.ts                 # env zod (ANTHROPIC_API_KEY, DATABASE_URL, DB_ENCRYPTION_KEY, WHATSAPP_WEBHOOK_SECRET?, MCP_BEARER_TOKEN, INTERVALS_BASE_URL?) — PAS les vars d'admin
+  auth.ts                          # verifyWebhookSignature + verifyBearerToken + verifyBasicAuth (constant-time) + adminCredentials (lit/valide ADMIN_*)
+  admin/guard.ts                   # requireAdmin(request) : re-vérif de l'en-tête dans chaque route admin
+  lib/utils.ts                     # cn() (clsx + tailwind-merge)
+  components/ui/*                  # composants shadcn (button, card, table, badge, input, label)
   domain/
     athlete.ts                     # modèle métier Athlete + enum AthleteStatus (routing ; indépendants de @inigo/db)
+    brain.ts                       # SessionElements / RunningSession / BrainInventory (indépendants du SDK)
     coaching.ts                    # modèles métier de la donnée coaching (contrat de sortie des tools MCP) + inputs
   repositories/
-    athleteRepository.ts           # PORT AthleteRepository (findByPhone, setChatId)
+    athleteRepository.ts           # PORT AthleteRepository (findByPhone, findByLid, setChatId, findById, listAll, setSession)
     drizzleAthleteRepository.ts     # ADAPTER Drizzle (requête inline) + toAthlete(row→modèle)
   use-cases/
-    routeInboundMessage.ts         # LE use-case : une seule fonction publique execute()
+    routeInboundMessage.ts         # use-case de routing : une seule fonction publique execute()
+    startAthleteSession.ts         # use-case admin : clone la session courante, repointe l'athlète
+    loadAdminOverview.ts           # use-case admin (lecture) : athlètes + sessions live + inventaire
   mappers/
     whatsappPayload.ts             # schémas zod + normalisation du payload OpenWA + senderPhone
-  brain/managedAgents.ts           # FRONTIÈRE cerveau : appendUserMessage(sessionId,text) + adaptateur SDK
+  brain/managedAgents.ts           # FRONTIÈRE cerveau : appendUserMessage + readSession + createSession + listInventory
   mcp/
     repository/athleteDataRepository.ts  # accès Neon scopé par athlete (createDb → forAthlete(id)), mappe rows→modèles (domain/coaching) ; seul autre layer @inigo/db-aware
     tools/{index,result,profile,thresholds,goals,plan,adaptationLog}.ts  # tools MCP fins (reads + writes gated)
@@ -50,7 +61,7 @@ src/
     mcp-tools/{index,result,tools/*}.ts  # tools MCP Intervals fins ; chaque tool prend athleteId + résout un client par requête
     resolveClient.ts               # createIntervalsResolver(db, encKey, baseUrl) : getIntervalsKey → déchiffre → IntervalsIcuClient
   deps.ts                          # singleton lazy { config, brain, db, repo, athleteData, intervalsResolver }
-# futur : app/(admin)/… , app/api/admin/… , src/services/…
+# futur : src/services/…
 ```
 
 ## Contrat de routing (le flux)
@@ -141,6 +152,48 @@ plus une seule clé en env, mais **une par athlète** stockée chiffrée dans Ne
 - **Écriture d'une clé** : `setIntervalsKey` (`@inigo/db`) — écriture chiffrée + rotation
   (`rotatedAt`). La **capture par onboarding WhatsApp est hors périmètre** (ticket dédié).
 
+## Admin (`/admin`) — ouvrir une session
+
+Deuxième capacité de l'app. Un bouton par athlète crée une session Managed Agent sur l'agent
+coordinateur et écrit son id dans `athlete.anthropic_session_id`.
+
+- **Pourquoi une nouvelle session** : référencer l'agent **par id** épingle sa *dernière*
+  version à la création, et une session **fige** cette config pour sa vie entière (seuls
+  `tools`/`mcp_servers` changent après). Une nouvelle version d'agent n'a donc d'effet runtime
+  qu'en (re)créant une session. Même raison que l'étape 3 de `brain:deploy`.
+- **Rien n'est stocké de la config de session.** `readSession` lit la session courante de
+  l'athlète (`agent.id`, `environment_id`, `vault_ids`, `resources`) et `createSession` la
+  recrée. La session qui tourne **est** la source de vérité : une copie en base ou en env peut
+  diverger du plan de contrôle, elle non. Ne réintroduis pas de table de config ici.
+- **Mapping lecture → création obligatoire.** Les `resources` renvoyées portent des champs
+  output-only (`id`, `created_at`, `updated_at`, `mount_path`, `name`, `description`) que la
+  création refuse : `toSessionResource` ne garde que ce qui est réinjectable. Un
+  `github_repository` **ne peut pas** être cloné (son `authorization_token` n'est jamais
+  renvoyé) : on throw plutôt que d'ouvrir une session amputée. Vérifié contre l'API réelle.
+- **Seule la première session demande un choix**, fait dans des listes alimentées par
+  `listInventory` (live). L'agent proposé par défaut est celui qui porte un roster
+  `multiagent`. Les vaults s'appellent `display_name` là où tout le reste utilise `name`.
+- **Lectures résilientes** : `loadAdminOverview` capture les erreurs **par athlète**
+  (`sessionError`) au lieu d'avorter — un pointeur vers une session supprimée est justement
+  la dérive que cette page doit rendre visible. Même règle que les lectures de `@inigo/brain`.
+- **Ordre des effets** : la session est créée **avant** l'écriture du pointeur, donc un échec
+  Anthropic laisse l'athlète sur sa session précédente plutôt que orphelin. `setSession` écrit
+  aussi `managed_agent_id`, pour que la ligne dise toujours quel agent tourne vraiment.
+- **Ce qui reste dans `tooling/brain`** : appliquer les configs d'agents depuis le snapshot et
+  re-pinner le roster (Vercel n'a pas le snapshot git). L'admin ouvre la session, rien de plus.
+- **Auth** : HTTP Basic (`ADMIN_USER`/`ADMIN_PASSWORD`) posée par `proxy.ts`, matcher limité à
+  `/admin` et `/api/admin/*` — le webhook et les MCP ne doivent **jamais** voir de challenge
+  Basic. Chaque route admin re-vérifie l'en-tête via `requireAdmin`, pour ne pas faire reposer
+  l'autorisation sur le seul proxy.
+- **L'ADMIN NE DOIT JAMAIS POUVOIR CASSER LE COACH.** Ses identifiants ne sont **pas** dans le
+  schéma de `config.ts` : ce schéma est parsé sur *chaque* chemin de requête, donc n'importe
+  quelle règle sur l'admin (absent, ou juste trop court) fait tomber le webhook WhatsApp et les
+  deux MCP avec elle. C'est arrivé : `ADMIN_PASSWORD` trop court → webhook 500 et MCP 401 malgré
+  un bearer valide. Ils sont lus et validés là où ils servent (`adminCredentials()`), qui échoue
+  fermé → 503 côté admin, rien ailleurs. **N'ajoute jamais de variable propre à l'admin dans
+  `configSchema`.** Gardé par les specs des routes webhook et MCP, qui tournent avec un
+  `ADMIN_PASSWORD` volontairement inutilisable.
+
 ## Conventions (en plus de la racine)
 
 - **Frontière cerveau** : tout passe par `ManagedAgentBrain` (`src/brain/managedAgents.ts`).
@@ -175,10 +228,20 @@ le skill Claude Code `managed-agents-api`.
 ## Tests
 
 - Vitest co-localisés (`*.spec.ts`). `pnpm --filter @inigo/coach run test`.
-- Couvre : config (dont `MCP_BEARER_TOKEN`), auth (HMAC + bearer),
+- Couvre : config (dont `MCP_BEARER_TOKEN` ; et le fait qu'elle **ignore** les vars d'admin),
+  auth (HMAC + bearer + Basic : en-tête absent/malformé, mauvais user, mauvais mot de passe,
+  deux-points dans le mot de passe ; `adminCredentials` qui échoue fermé sur absent/trop court),
+  **routes webhook et MCP bootées avec un admin inutilisable** (la régression de prod),
   parsing/normalisation du payload + `senderPhone`, mapping `toAthlete`, **use-case
   `routeInboundMessage`** (4 cas de routing + filtres + throws infra, repo & brain fakes),
-  brain (fake SDK). Côté MCP : intégration `InMemoryTransport` (reads + writes présents dont
+  brain (fake SDK : append, readSession qui retire les champs output-only, createSession,
+  listInventory), **`startAthleteSession`** (clone nominal, éléments ignorés quand il y a une
+  session, ressources reportées telles quelles, première session depuis des éléments choisis,
+  préfixes d'ids refusés, athlète inconnu, échec de lecture ou de création qui n'écrit rien) et
+  **`loadAdminOverview`** (session cassée isolée sur sa ligne, inventaire injoignable qui
+  dégrade au lieu de casser). Route admin : 401 sans/avec mauvais identifiants, 400 UUID
+  invalide, 200 clone, 200 première session, 409 sans rien à cloner, 404, 502. Côté MCP :
+  intégration `InMemoryTransport` (reads + writes présents dont
   `save_training_plan`, un call renvoie du JSON, validation de date rejetée), route (401 sans
   bearer, 400 UUID invalide). Pas de réseau. Le store `saveTrainingPlan` (create, update
   replace-all, archivage de l'actif, scoping cross-athlète) est couvert par la spec d'intégration

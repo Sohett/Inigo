@@ -22,13 +22,34 @@ function makeAthlete(overrides: Partial<Athlete> = {}): Athlete {
   };
 }
 
+/**
+ * Port members this use-case never touches, filled in so the fakes still satisfy the
+ * interfaces. They exist for the admin path (see `startAthleteSession`).
+ */
+const unusedRepoMethods = () => ({
+  findById: vi.fn(() => Promise.resolve(null)),
+  listAll: vi.fn(() => Promise.resolve([])),
+  setSession: vi.fn(() => Promise.resolve())
+});
+const unusedBrainMethods = () => ({
+  createSession: vi.fn(() => Promise.resolve({ sessionId: "sesn_unused", agentVersion: 1 })),
+  readSession: vi.fn(),
+  listInventory: vi.fn()
+});
+
 function makeDeps(athlete: Athlete | null) {
   const appendUserMessage = vi.fn(() => Promise.resolve());
   const findByPhone = vi.fn((_phone: string) => Promise.resolve(athlete));
   const findByLid = vi.fn((_lid: string) => Promise.resolve(athlete));
   const setChatId = vi.fn(() => Promise.resolve());
-  const repo: AthleteRepository = { findByPhone, findByLid, setChatId };
-  return { deps: { repo, brain: { appendUserMessage } }, appendUserMessage, findByPhone, findByLid, setChatId };
+  const repo: AthleteRepository = { findByPhone, findByLid, setChatId, ...unusedRepoMethods() };
+  return {
+    deps: { repo, brain: { appendUserMessage, ...unusedBrainMethods() } },
+    appendUserMessage,
+    findByPhone,
+    findByLid,
+    setChatId
+  };
 }
 
 // A plausible inbound text from an athlete whose stored phone is +32475123456.
@@ -195,8 +216,8 @@ describe("routeInboundMessage", () => {
     const findByLid = vi.fn(() => Promise.resolve(null));
     const appendUserMessage = vi.fn(() => Promise.resolve());
     const deps = {
-      repo: { findByPhone, findByLid, setChatId: vi.fn(() => Promise.resolve()) },
-      brain: { appendUserMessage }
+      repo: { findByPhone, findByLid, setChatId: vi.fn(() => Promise.resolve()), ...unusedRepoMethods() },
+      brain: { appendUserMessage, ...unusedBrainMethods() }
     };
     await expect(createRouteInboundMessage(deps).execute(inbound)).rejects.toThrow("neon down");
     expect(appendUserMessage).not.toHaveBeenCalled();
@@ -209,9 +230,10 @@ describe("routeInboundMessage", () => {
       repo: {
         findByPhone: vi.fn(() => Promise.resolve(makeAthlete({ chatId: null }))),
         findByLid: vi.fn(() => Promise.resolve(null)),
-        setChatId
+        setChatId,
+        ...unusedRepoMethods()
       },
-      brain: { appendUserMessage }
+      brain: { appendUserMessage, ...unusedBrainMethods() }
     };
     await expect(createRouteInboundMessage(deps).execute(inbound)).rejects.toThrow("neon down");
     expect(appendUserMessage).not.toHaveBeenCalled();
@@ -223,9 +245,10 @@ describe("routeInboundMessage", () => {
       repo: {
         findByPhone: vi.fn(() => Promise.resolve(makeAthlete())),
         findByLid: vi.fn(() => Promise.resolve(null)),
-        setChatId: vi.fn(() => Promise.resolve())
+        setChatId: vi.fn(() => Promise.resolve()),
+        ...unusedRepoMethods()
       },
-      brain: { appendUserMessage }
+      brain: { appendUserMessage, ...unusedBrainMethods() }
     };
     await expect(createRouteInboundMessage(deps).execute(inbound)).rejects.toThrow("anthropic 500");
   });

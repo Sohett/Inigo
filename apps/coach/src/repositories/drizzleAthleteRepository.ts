@@ -42,6 +42,21 @@ export function createDrizzleAthleteRepository(db: Db): AthleteRepository {
     async setChatId(athleteId: string, chatId: string): Promise<void> {
       // `updated_at` auto-bumps via the column's `$onUpdate`, so no manual set is needed.
       await db.update(athlete).set({ chatId }).where(eq(athlete.id, athleteId));
+    },
+    async findById(athleteId: string): Promise<Athlete | null> {
+      const rows = await db.select().from(athlete).where(eq(athlete.id, athleteId)).limit(1);
+      const row = rows[0];
+      return row ? toAthlete(row) : null;
+    },
+    async listAll(): Promise<Athlete[]> {
+      const rows = await db.select().from(athlete).orderBy(athlete.createdAt);
+      return rows.map(toAthlete);
+    },
+    async setSession(athleteId: string, sessionId: string, agentId: string): Promise<void> {
+      await db
+        .update(athlete)
+        .set({ anthropicSessionId: sessionId, managedAgentId: agentId })
+        .where(eq(athlete.id, athleteId));
     }
   };
 }

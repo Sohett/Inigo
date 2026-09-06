@@ -41,6 +41,12 @@ ici n'a besoin d'écouter la réponse** ni d'envoyer le message.
 
 Validées au boot par `src/config/config.ts`. Copie `.env.example` → `.env` **dans ce dossier**.
 
+> **Toutes** ces variables doivent vivre dans `apps/coach/.env` : Next ne lit que le `.env`
+> de l'app qu'il fait tourner. `packages/db/.env` est un autre fichier, utilisé uniquement
+> par drizzle-kit pour les commandes de migration — le coach ne le lit jamais. Même chose en
+> prod : le projet Vercel `coach` porte ses propres variables. Une variable rangée dans le
+> mauvais `.env` est simplement absente ici (l'erreur de boot le rappelle).
+
 | Variable | Rôle |
 |---|---|
 | `ANTHROPIC_API_KEY` | Clé API Anthropic (server-side) |
@@ -49,15 +55,22 @@ Validées au boot par `src/config/config.ts`. Copie `.env.example` → `.env` **
 | `WHATSAPP_WEBHOOK_SECRET` | Optionnel : vérif HMAC `X-OpenWA-Signature` si renseigné |
 | `MCP_BEARER_TOKEN` | Bearer que le brain présente aux MCP athlete-data et Intervals.icu (min 16 car., server-side) |
 | `INTERVALS_BASE_URL` | Optionnel : override de l'URL de l'API Intervals.icu (défaut `https://intervals.icu/api/v1`) |
+| `ADMIN_USER` | Identifiant HTTP Basic de l'admin (`/admin`, `/api/admin/*`), min 3 car. |
+| `ADMIN_PASSWORD` | Mot de passe HTTP Basic de l'admin, min 16 car., server-side |
+
+Les deux variables d'admin ne sont **pas** dans le schéma zod de `config.ts` : ce schéma est
+validé à chaque requête, donc une valeur d'admin absente **ou trop courte** ferait tomber le
+webhook WhatsApp et les deux MCP avec elle. Elles sont lues et validées là où elles servent
+(`adminCredentials()`), et l'admin refuse de servir (503) si elles sont inutilisables.
 
 ## Setup (résumé)
 
 1. **Gateway OpenWA sur Railway** — voir [`docs/railway-cookbook.md`](docs/railway-cookbook.md).
-2. **Session Managed par athlète** (contrôle Anthropic, `ant` CLI / console), créée avec
-   l'agent coach + un **vault `static_bearer`** pour le MCP OpenWA (`url=<gateway>/mcp`,
-   `token=` clé OPERATOR). Son id est stocké en base dans `athlete.anthropic_session_id`
-   (avec le `phone_num` de l'athlète) : c'est ce que le routing résout. La création de session
-   par athlète (onboarding) est hors périmètre pour l'instant.
+2. **Session Managed par athlète** : ouverte depuis l'**admin** (`/admin`, bouton
+   « Nouvelle session »), qui la crée et écrit son id dans `athlete.anthropic_session_id` —
+   c'est ce que le routing résout. Rien n'est stocké de la config de session : l'admin lit la
+   session que l'athlète fait déjà tourner et la recrée à l'identique. L'onboarding
+   automatique d'un nouvel athlète reste hors périmètre.
    > Les *deployments* Managed servent uniquement aux runs planifiés (cron) ; ici on n'en utilise pas : le coach pousse les messages à une session existante via l'API (`POST /v1/sessions/:id/events`).
 3. **Prompt système de l'agent** : « tu reçois des messages WhatsApp au format
    `inigo_athlete_id: …\nchat_id: …\nmessage: …`. `inigo_athlete_id` est l'id athlète Inigo
@@ -66,6 +79,43 @@ Validées au boot par `src/config/config.ts`. Copie `.env.example` → `.env` **
    concis, adapté à WhatsApp ».
 4. **Webhook OpenWA** → URL `https://<coach>/api/webhooks/whatsapp`, event
    `message.received`.
+
+## Admin (`/admin`)
+
+Page d'admin servie par cette même app. Aujourd'hui une capacité : **ouvrir une nouvelle
+session brain pour un athlète** et pointer sa ligne dessus.
+
+Pourquoi ça compte : une session **fige la config de l'agent à sa création** (seuls
+`tools`/`mcp_servers` bougent ensuite). Après un `brain:deploy` qui bump une version d'agent,
+c'est la création d'une session fraîche qui fait basculer le runtime sur cette version. Ce
+bouton remplace la manœuvre d'avant (commande locale, puis `UPDATE` SQL à la main).
+
+- **Aucune config stockée.** Le bouton lit la session courante de l'athlète
+  (`GET /v1/sessions/{id}`, qui renvoie `agent.id`, `environment_id`, `vault_ids` et
+  `resources`) et la recrée à l'identique, en repointant l'agent sur sa dernière version.
+  La session qui tourne **est** la source de vérité : contrairement à une copie en base ou en
+  env, elle ne peut pas diverger du plan de contrôle. Seule la **première** session d'un
+  athlète demande un choix, fait dans des listes déroulantes alimentées en direct
+  (agents, environments, vaults, memory stores) — donc pas d'id tapé à la main.
+- **Ce que la page affiche est lu en direct** chez Anthropic : l'agent et sa version,
+  l'environment, les vaults, la mémoire. Une session devenue illisible (supprimée côté
+  console) s'affiche en erreur sur sa ligne, sans casser le reste de la page.
+- **Une limite assumée** : une session montant un `github_repository` ne peut pas être clonée,
+  parce que la création exige un `authorization_token` que l'API ne renvoie jamais. Le cas est
+  refusé bruyamment plutôt que d'ouvrir une session amputée de son credential.
+- **Auth** : HTTP Basic (`ADMIN_USER` / `ADMIN_PASSWORD`), posée par `proxy.ts` sur
+  `/admin` et `/api/admin/*` **seulement** — le webhook OpenWA et les deux MCP gardent
+  leurs propres credentials et ne voient jamais de challenge Basic. Chaque route admin
+  revérifie l'en-tête elle-même (l'autorisation ne repose pas sur le seul proxy).
+- **L'admin ne peut pas casser le coach** : ses identifiants ne sont pas dans le schéma d'env
+  partagé. Mal réglés, l'admin répond 503 et le log dit quoi corriger ; le webhook et les MCP
+  continuent de tourner.
+- **Ce que l'admin ne fait pas** : appliquer les configs d'agents depuis le snapshot et
+  re-pinner le roster du coordinateur. Ça reste `@inigo/brain` en local (`brain:deploy`),
+  qui a besoin du snapshot git. L'admin ouvre la session, c'est tout.
+- **L'ancienne session n'est pas supprimée** : elle reste lisible dans la console Anthropic,
+  simplement plus rien n'y est routé. Le bouton demande donc confirmation quand l'athlète a
+  déjà une session.
 
 ## MCP athlete-data (accès du brain à la donnée coaching)
 
@@ -96,6 +146,8 @@ l'isolation repose sur l'`athleteId` passé par l'agent (durcissement futur : be
 ```bash
 pnpm dev:coach     # next dev (depuis la racine)
 
+# Admin : http://localhost:3000/admin — le navigateur demande ADMIN_USER / ADMIN_PASSWORD.
+
 # Tester le webhook (sans secret) :
 curl -X POST http://localhost:3000/api/webhooks/whatsapp \
   -H "content-type: application/json" \
@@ -120,7 +172,12 @@ curl -X POST "http://localhost:3000/api/mcp" \
 ## Déploiement
 
 Vercel (Next.js). Variables via le dashboard Vercel (dont `MCP_BEARER_TOKEN`, requis, à poser
-**avant** deploy). Endpoints : `/api/webhooks/whatsapp`, `/api/mcp` et `/api/intervals/mcp`.
+**avant** deploy). Endpoints : `/api/webhooks/whatsapp`, `/api/mcp`, `/api/intervals/mcp` et
+`/admin`.
+
+Pour utiliser l'admin, poser `ADMIN_USER` (min 3 car.) et `ADMIN_PASSWORD` (min 16 car.).
+Absentes ou trop courtes, seul l'admin est indisponible (503, avec un log qui dit quoi
+corriger) : le webhook et les MCP continuent de tourner.
 
 ## Contribuer
 
