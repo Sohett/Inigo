@@ -35,9 +35,9 @@ const fake = {
   createSession: vi.fn()
 };
 
+// `requireAdmin` reads the credentials from the environment, not from here.
 vi.mock("../../../../../../src/deps", () => ({
   getDeps: () => ({
-    config: { ADMIN_USER, ADMIN_PASSWORD },
     repo: { findById: fake.findById, setSession: fake.setSession },
     brain: { readSession: fake.readSession, createSession: fake.createSession }
   })
@@ -62,6 +62,8 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
+  process.env["ADMIN_USER"] = ADMIN_USER;
+  process.env["ADMIN_PASSWORD"] = ADMIN_PASSWORD;
   fake.findById.mockReset().mockResolvedValue(athlete);
   fake.setSession.mockReset().mockResolvedValue(undefined);
   fake.readSession.mockReset().mockResolvedValue(running);
@@ -75,6 +77,21 @@ describe("POST /api/admin/athletes/[athleteId]/session", () => {
 
     expect(response.status).toBe(401);
     expect(response.headers.get("WWW-Authenticate")).toContain("Basic");
+    expect(fake.createSession).not.toHaveBeenCalled();
+  });
+
+  it("fails closed with 503 when the admin is not configured", async () => {
+    delete process.env["ADMIN_USER"];
+    delete process.env["ADMIN_PASSWORD"];
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const { POST } = await import("./route");
+    const response = await POST(
+      post(athlete.id, { authorization: basic() }),
+      params(athlete.id)
+    );
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toMatchObject({ error: "admin_not_configured" });
     expect(fake.createSession).not.toHaveBeenCalled();
   });
 

@@ -42,6 +42,31 @@ export function verifyBearerToken(provided: string, expected: string): boolean {
 /** Challenge sent with a 401 so the browser prompts for the admin credentials. */
 export const BASIC_AUTH_CHALLENGE = 'Basic realm="Inigo admin", charset="UTF-8"';
 
+/** Minimum admin password length. Short enough to guess is not an admin credential. */
+export const ADMIN_PASSWORD_MIN_LENGTH = 16;
+/** Minimum admin user length. */
+export const ADMIN_USER_MIN_LENGTH = 3;
+
+/**
+ * The admin credentials, read and validated where they are used.
+ *
+ * Deliberately **not** part of `loadConfig`'s schema: that schema is parsed on every
+ * request path, so an admin credential that is missing — or merely too short — would take
+ * the WhatsApp webhook and both MCP endpoints down with it. The admin must never be able
+ * to break the coach.
+ *
+ * Returns null when unusable, so every caller fails closed: the admin refuses to serve,
+ * and nothing else notices. Static `process.env.X` access, so bundlers that inline env
+ * still work. Never logs the values.
+ */
+export function adminCredentials(): { user: string; password: string } | null {
+  const user = process.env.ADMIN_USER;
+  const password = process.env.ADMIN_PASSWORD;
+  if (!user || user.length < ADMIN_USER_MIN_LENGTH) return null;
+  if (!password || password.length < ADMIN_PASSWORD_MIN_LENGTH) return null;
+  return { user, password };
+}
+
 /**
  * Verify an HTTP Basic `Authorization` header against the expected admin credentials.
  *

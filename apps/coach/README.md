@@ -52,6 +52,11 @@ Validées au boot par `src/config/config.ts`. Copie `.env.example` → `.env` **
 | `ADMIN_USER` | Identifiant HTTP Basic de l'admin (`/admin`, `/api/admin/*`), min 3 car. |
 | `ADMIN_PASSWORD` | Mot de passe HTTP Basic de l'admin, min 16 car., server-side |
 
+Les deux variables d'admin ne sont **pas** dans le schéma zod de `config.ts` : ce schéma est
+validé à chaque requête, donc une valeur d'admin absente **ou trop courte** ferait tomber le
+webhook WhatsApp et les deux MCP avec elle. Elles sont lues et validées là où elles servent
+(`adminCredentials()`), et l'admin refuse de servir (503) si elles sont inutilisables.
+
 ## Setup (résumé)
 
 1. **Gateway OpenWA sur Railway** — voir [`docs/railway-cookbook.md`](docs/railway-cookbook.md).
@@ -96,6 +101,9 @@ bouton remplace la manœuvre d'avant (commande locale, puis `UPDATE` SQL à la m
   `/admin` et `/api/admin/*` **seulement** — le webhook OpenWA et les deux MCP gardent
   leurs propres credentials et ne voient jamais de challenge Basic. Chaque route admin
   revérifie l'en-tête elle-même (l'autorisation ne repose pas sur le seul proxy).
+- **L'admin ne peut pas casser le coach** : ses identifiants ne sont pas dans le schéma d'env
+  partagé. Mal réglés, l'admin répond 503 et le log dit quoi corriger ; le webhook et les MCP
+  continuent de tourner.
 - **Ce que l'admin ne fait pas** : appliquer les configs d'agents depuis le snapshot et
   re-pinner le roster du coordinateur. Ça reste `@inigo/brain` en local (`brain:deploy`),
   qui a besoin du snapshot git. L'admin ouvre la session, c'est tout.
@@ -158,7 +166,12 @@ curl -X POST "http://localhost:3000/api/mcp" \
 ## Déploiement
 
 Vercel (Next.js). Variables via le dashboard Vercel (dont `MCP_BEARER_TOKEN`, requis, à poser
-**avant** deploy). Endpoints : `/api/webhooks/whatsapp`, `/api/mcp` et `/api/intervals/mcp`.
+**avant** deploy). Endpoints : `/api/webhooks/whatsapp`, `/api/mcp`, `/api/intervals/mcp` et
+`/admin`.
+
+Pour utiliser l'admin, poser `ADMIN_USER` (min 3 car.) et `ADMIN_PASSWORD` (min 16 car.).
+Absentes ou trop courtes, seul l'admin est indisponible (503, avec un log qui dit quoi
+corriger) : le webhook et les MCP continuent de tourner.
 
 ## Contribuer
 

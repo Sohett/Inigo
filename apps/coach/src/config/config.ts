@@ -45,15 +45,17 @@ export const configSchema = z.object({
    * Base URL of the Intervals.icu API. The intervals MCP (`/api/intervals/mcp`) calls it
    * per athlete, with each athlete's own key resolved from Neon at request time.
    */
-  INTERVALS_BASE_URL: z.url().default("https://intervals.icu/api/v1"),
-  /**
-   * HTTP Basic credentials guarding the admin (the `/admin` pages and `/api/admin/*`).
-   * Required: an admin that can open brain sessions and rewrite session pointers must
-   * never be reachable without them. Server-side only, never logged.
-   */
-  ADMIN_USER: z.string().min(3, "ADMIN_USER must be at least 3 characters"),
-  ADMIN_PASSWORD: z.string().min(16, "ADMIN_PASSWORD must be at least 16 characters")
+  INTERVALS_BASE_URL: z.url().default("https://intervals.icu/api/v1")
 });
+
+/**
+ * `ADMIN_USER` / `ADMIN_PASSWORD` are deliberately NOT in this schema.
+ *
+ * This schema is validated on every request path, so any rule about the admin — missing,
+ * or merely too short — would take the WhatsApp webhook and both MCP endpoints down with
+ * it. The admin must never be able to break the coach. They are read and validated where
+ * they are used instead: `adminCredentials()` in `src/auth.ts`, which fails closed.
+ */
 
 export type Config = z.infer<typeof configSchema>;
 

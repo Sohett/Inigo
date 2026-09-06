@@ -6,8 +6,11 @@ beforeAll(() => {
   process.env["DATABASE_URL"] = "postgresql://user:pass@host/db?sslmode=require";
   process.env["DB_ENCRYPTION_KEY"] = Buffer.alloc(32).toString("base64");
   process.env["MCP_BEARER_TOKEN"] = "a-very-long-mcp-bearer-token";
-  process.env["ADMIN_USER"] = "inigo";
-  process.env["ADMIN_PASSWORD"] = "a-very-long-admin-password";
+  // Deliberately UNUSABLE admin credentials (a too-short password, the state that broke
+  // production): the MCP endpoints must not depend on the admin. When these lived in the
+  // shared config schema, this value turned a valid bearer into a 401.
+  process.env["ADMIN_USER"] = "x";
+  process.env["ADMIN_PASSWORD"] = "short";
 });
 
 describe("intervals MCP route", () => {

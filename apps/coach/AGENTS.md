@@ -34,8 +34,8 @@ app/
   (admin)/admin/page.tsx                # la page admin (server component) + _components/ (client)
   layout.tsx, page.tsx, globals.css     # minimal + Tailwind
 src/
-  config/config.ts                 # env zod (ANTHROPIC_API_KEY, DATABASE_URL, DB_ENCRYPTION_KEY, WHATSAPP_WEBHOOK_SECRET?, MCP_BEARER_TOKEN, INTERVALS_BASE_URL?, ADMIN_USER, ADMIN_PASSWORD)
-  auth.ts                          # verifyWebhookSignature (webhook) + verifyBearerToken (MCP) + verifyBasicAuth (admin), constant-time
+  config/config.ts                 # env zod (ANTHROPIC_API_KEY, DATABASE_URL, DB_ENCRYPTION_KEY, WHATSAPP_WEBHOOK_SECRET?, MCP_BEARER_TOKEN, INTERVALS_BASE_URL?) — PAS les vars d'admin
+  auth.ts                          # verifyWebhookSignature + verifyBearerToken + verifyBasicAuth (constant-time) + adminCredentials (lit/valide ADMIN_*)
   admin/guard.ts                   # requireAdmin(request) : re-vérif de l'en-tête dans chaque route admin
   lib/utils.ts                     # cn() (clsx + tailwind-merge)
   components/ui/*                  # composants shadcn (button, card, table, badge, input, label)
@@ -183,10 +183,16 @@ coordinateur et écrit son id dans `athlete.anthropic_session_id`.
   re-pinner le roster (Vercel n'a pas le snapshot git). L'admin ouvre la session, rien de plus.
 - **Auth** : HTTP Basic (`ADMIN_USER`/`ADMIN_PASSWORD`) posée par `proxy.ts`, matcher limité à
   `/admin` et `/api/admin/*` — le webhook et les MCP ne doivent **jamais** voir de challenge
-  Basic. `proxy.ts` lit les deux variables **directement** dans l'env, pas via `loadConfig` :
-  le garde ne doit pas répondre 500 (ni cracher un dump de config dans les logs) parce qu'une
-  variable sans rapport manque. Chaque route admin re-vérifie l'en-tête via `requireAdmin`,
-  pour ne pas faire reposer l'autorisation sur le seul proxy.
+  Basic. Chaque route admin re-vérifie l'en-tête via `requireAdmin`, pour ne pas faire reposer
+  l'autorisation sur le seul proxy.
+- **L'ADMIN NE DOIT JAMAIS POUVOIR CASSER LE COACH.** Ses identifiants ne sont **pas** dans le
+  schéma de `config.ts` : ce schéma est parsé sur *chaque* chemin de requête, donc n'importe
+  quelle règle sur l'admin (absent, ou juste trop court) fait tomber le webhook WhatsApp et les
+  deux MCP avec elle. C'est arrivé : `ADMIN_PASSWORD` trop court → webhook 500 et MCP 401 malgré
+  un bearer valide. Ils sont lus et validés là où ils servent (`adminCredentials()`), qui échoue
+  fermé → 503 côté admin, rien ailleurs. **N'ajoute jamais de variable propre à l'admin dans
+  `configSchema`.** Gardé par les specs des routes webhook et MCP, qui tournent avec un
+  `ADMIN_PASSWORD` volontairement inutilisable.
 
 ## Conventions (en plus de la racine)
 
@@ -222,9 +228,10 @@ le skill Claude Code `managed-agents-api`.
 ## Tests
 
 - Vitest co-localisés (`*.spec.ts`). `pnpm --filter @inigo/coach run test`.
-- Couvre : config (dont `MCP_BEARER_TOKEN`, `ADMIN_USER`/`ADMIN_PASSWORD`), auth (HMAC +
-  bearer + Basic : en-tête absent/malformé, mauvais user, mauvais mot de passe, deux-points
-  dans le mot de passe),
+- Couvre : config (dont `MCP_BEARER_TOKEN` ; et le fait qu'elle **ignore** les vars d'admin),
+  auth (HMAC + bearer + Basic : en-tête absent/malformé, mauvais user, mauvais mot de passe,
+  deux-points dans le mot de passe ; `adminCredentials` qui échoue fermé sur absent/trop court),
+  **routes webhook et MCP bootées avec un admin inutilisable** (la régression de prod),
   parsing/normalisation du payload + `senderPhone`, mapping `toAthlete`, **use-case
   `routeInboundMessage`** (4 cas de routing + filtres + throws infra, repo & brain fakes),
   brain (fake SDK : append, readSession qui retire les champs output-only, createSession,
