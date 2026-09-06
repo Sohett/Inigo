@@ -60,6 +60,19 @@ export const configSchema = z.object({
 export type Config = z.infer<typeof configSchema>;
 
 /**
+ * Where the missing variables are supposed to live. Spelled out because this is a
+ * monorepo with several `.env` files: `packages/db/.env` feeds drizzle-kit migrations
+ * only, and Next reads nothing but the `.env` of the app it runs from — so a variable
+ * put in the wrong one is silently absent here.
+ */
+const ENV_LOCATION_HINT = [
+  "Where to set them:",
+  "  - local dev: apps/coach/.env (see apps/coach/.env.example)",
+  "  - deployed: the coach project's environment variables on Vercel",
+  "packages/db/.env is NOT read by this app; it only feeds drizzle-kit migrations."
+].join("\n");
+
+/**
  * Parse and validate the given environment (defaults to `process.env`).
  * Throws an aggregated, human-readable error if anything is missing/invalid.
  * Never logs secret values.
@@ -70,7 +83,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     const issues = parsed.error.issues
       .map((issue) => `  - ${issue.path.join(".") || "(root)"}: ${issue.message}`)
       .join("\n");
-    throw new Error(`Invalid environment configuration:\n${issues}`);
+    throw new Error(`Invalid environment configuration:\n${issues}\n\n${ENV_LOCATION_HINT}`);
   }
   return parsed.data;
 }

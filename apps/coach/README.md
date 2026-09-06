@@ -41,6 +41,12 @@ ici n'a besoin d'écouter la réponse** ni d'envoyer le message.
 
 Validées au boot par `src/config/config.ts`. Copie `.env.example` → `.env` **dans ce dossier**.
 
+> **Toutes** ces variables doivent vivre dans `apps/coach/.env` : Next ne lit que le `.env`
+> de l'app qu'il fait tourner. `packages/db/.env` est un autre fichier, utilisé uniquement
+> par drizzle-kit pour les commandes de migration — le coach ne le lit jamais. Même chose en
+> prod : le projet Vercel `coach` porte ses propres variables. Une variable rangée dans le
+> mauvais `.env` est simplement absente ici (l'erreur de boot le rappelle).
+
 | Variable | Rôle |
 |---|---|
 | `ANTHROPIC_API_KEY` | Clé API Anthropic (server-side) |
