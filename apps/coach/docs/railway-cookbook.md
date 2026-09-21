@@ -63,9 +63,13 @@ Service → **Variables** → ajoute (ou `railway variables --set 'KEY=value'`) 
 | `API_MASTER_KEY` | `$OWA_MASTER_KEY` | Credential admin de bootstrap (sert à créer les clés API scoped). |
 | `DATABASE_TYPE` | `sqlite` | Défaut. Pas de Postgres pour démarrer (SQLite vit dans le volume). |
 | `STORAGE_TYPE` | `local` | Défaut. Médias dans le volume. |
+| `MCP_READONLY` | `false` | **CRITIQUE depuis OpenWA 0.8.1.** Sans ça le MCP ne monte que les 25 outils de lecture : `MessageSendText` disparaît et le coach ne peut plus répondre. |
 
-Laisse `MCP_READONLY` **non défini** (le coach doit pouvoir envoyer). `WEBHOOK_SSRF_PROTECT`
-reste `true` (ta glue Vercel est publique, donc OK).
+`MCP_READONLY` est lu en comparaison stricte (`process.env.MCP_READONLY !== 'false'`) et n'est
+**pas** validé au boot : toute autre valeur (`False`, `"false"`, un espace en trop, variable
+absente) retombe silencieusement en lecture seule, sans erreur ni log. Vérifie la valeur exacte
+après chaque redeploy (cf. §5). `WEBHOOK_SSRF_PROTECT` reste `true` (ta glue Vercel est
+publique, donc OK).
 
 ### 2b. Volume persistant
 - [ ] Service → **Volumes → New Volume**, **Mount path = `/app/data`**.
@@ -141,10 +145,21 @@ curl -X POST "$OWA_URL/mcp" \
   -H "Authorization: Bearer $OWA_API_KEY" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
 ```
-- [ ] La réponse liste ~39 tools (Session*/Message*/Contact*/Group*/Webhook*).
+- [ ] La réponse liste **51 tools** (Session*/Message*/Contact*/Group*/Webhook*/Label*/Automation*).
+      **25 = lecture seule** : `MCP_READONLY` n'est pas à `false` sur le déploiement qui tourne.
 - [ ] L'outil d'envoi de texte est **`MessageSendText`** (confirmé). Il exige `sessionId`
       (UUID de session OpenWA) + `chatId` + `text` → tu l'utiliseras dans le **prompt système
       de l'agent** (c'est l'agent qui envoie la réponse via ce tool).
+
+`tools/list` répond **sans clé API** (l'auth n'est vérifiée qu'au `tools/call`), donc le compte
+d'outils se vérifie en une commande, même sans avoir la clé sous la main :
+
+```bash
+curl -s -X POST "$OWA_URL/mcp" \
+  -H "content-type: application/json" -H "accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' \
+  | grep -o '"name":"[A-Za-z]*"' | wc -l
+```
 
 ---
 
@@ -221,18 +236,19 @@ variable OpenWA côté app. Plus de session fixe en env : la session est résolu
 | Webhook ne part pas | mauvais `events`, `secret` divergent, ou URL injoignable | `events:["message.received"]`, même secret des 2 côtés, URL glue publique |
 | Glue répond 401 | `OPENWA_WEBHOOK_SECRET` ≠ `secret` du webhook | aligner les deux |
 | `tools/list` 401 | mauvais header d'auth | `Authorization: Bearer $OWA_API_KEY` (ou `X-API-Key`) |
+| `mcp__open-whatsapp__MessageSendText is not an available tool` | MCP monté en lecture seule (25 tools au lieu de 51) : `MCP_READONLY` absent ou ≠ `false` sur le service/environnement qui tourne | mettre `MCP_READONLY` à exactement `false`, redeploy, revérifier le compte de tools (§5) |
 | Numéro banni | volume/pattern trop agressif | numéro dédié, volume bas, pas d'envoi en masse |
 
 ---
 
 ## Checklist finale
 - [ ] `BIND_HOST=0.0.0.0`, `API_PORT=2785`, target port 2785, domaine généré
-- [ ] `MCP_ENABLED=true`, `AUTO_START_SESSIONS=true`, `ENGINE_TYPE` choisi
+- [ ] `MCP_ENABLED=true`, `MCP_READONLY=false`, `AUTO_START_SESSIONS=true`, `ENGINE_TYPE` choisi
 - [ ] Volume monté sur `/app/data`
 - [ ] Serverless **OFF**, Replicas **= 1**
 - [ ] Clé API OPERATOR créée
 - [ ] Session WhatsApp authentifiée + **persistance vérifiée après redeploy**
-- [ ] `tools/list` OK + nom de l'outil d'envoi noté
+- [ ] `tools/list` OK : **51 tools**, `MessageSendText` présent
 - [ ] Webhook enregistré vers la glue (même secret)
 - [ ] Variables câblées (Vercel + vault OpenWA)
 - [ ] Test bout-en-bout réussi
