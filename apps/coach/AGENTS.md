@@ -215,6 +215,9 @@ coordinateur et écrit son id dans `athlete.anthropic_session_id`.
   (webhook.site) et resserrer si besoin.
 - **Outil d'envoi MCP** = `MessageSendText` (confirmé via `tools/list`), exige `sessionId`
   (UUID de session OpenWA) + `chatId` + `text` → géré dans le **prompt système de l'agent**.
+  Depuis OpenWA 0.8.1 il n'est monté que si `MCP_READONLY=false` (comparaison stricte, non
+  validée au boot) : sans ça `tools/list` ne rend que les 25 outils de lecture et l'agent se
+  prend « is not an available tool ». Détails et vérif → `docs/railway-cookbook.md` §5.
 
 ## Skills du Managed Agent
 
