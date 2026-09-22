@@ -1,6 +1,7 @@
 import { createMcpHandler, withMcpAuth } from "mcp-handler";
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 import { registerWhatsappTools } from "../../../../src/whatsapp/mcp-tools";
+import { createSendAthleteMessage } from "../../../../src/use-cases/sendAthleteMessage";
 import { getDeps } from "../../../../src/deps";
 import { verifyBearerToken } from "../../../../src/auth";
 
@@ -8,12 +9,17 @@ import { verifyBearerToken } from "../../../../src/auth";
 export const dynamic = "force-dynamic";
 
 // The third static MCP endpoint (/api/whatsapp/mcp), same shape as the other two. It exposes a
-// single tool so the agent never carries the gateway session id nor a WhatsApp chat id: both are
-// resolved here, from the environment and from Neon.
+// single tool so the agent never carries the gateway session id nor a WhatsApp chat id: the
+// `sendAthleteMessage` use-case resolves both, from Neon and from the environment.
 const handler = createMcpHandler(
   (server) => {
     const { whatsapp, repo, whatsappGateway } = getDeps();
-    registerWhatsappTools(server, { resolve: whatsapp, repo, gateway: whatsappGateway });
+    const sendMessage = createSendAthleteMessage({
+      repo,
+      gateway: whatsappGateway,
+      resolveClient: whatsapp
+    });
+    registerWhatsappTools(server, { sendMessage });
   },
   {
     serverInfo: { name: "whatsapp-mcp", version: "0.1.0" },

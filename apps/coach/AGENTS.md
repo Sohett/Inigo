@@ -51,6 +51,7 @@ src/
     routeInboundMessage.ts         # use-case de routing : une seule fonction publique execute()
     startAthleteSession.ts         # use-case admin : clone la session courante, repointe l'athlète
     loadAdminOverview.ts           # use-case admin (lecture) : athlètes + sessions live + inventaire
+    sendAthleteMessage.ts          # use-case : la seule façon de parler à l'athlète (chat + session de passerelle)
   repositories/whatsappGatewayRepository.ts  # PORT : la session de passerelle (en base, pas en env)
   mappers/
     whatsappPayload.ts             # schémas zod + normalisation du payload OpenWA + senderPhone
@@ -62,7 +63,7 @@ src/
     client/                        # client REST OpenWA typé (POST send-text ; zéro retry, un envoi n'est pas idempotent)
     credentials.ts                 # lit OPENWA_BASE_URL/API_KEY dans l'env — JAMAIS dans configSchema (cf. §Admin)
     resolveClient.ts               # createOpenWaResolver() : résout le client à l'appel, pas au boot
-    mcp-tools/{index,result}.ts    # un seul tool : send_whatsapp_message(athleteId, text)
+    mcp-tools/{index,result}.ts    # un seul tool : send_whatsapp_message(athleteId, text) — mapping pur, zéro décision
   intervals/
     client/                        # client REST Intervals.icu typé (repris de intervals-icu-mcp, inchangé)
     mcp-tools/{index,result,tools/*}.ts  # tools MCP Intervals fins ; chaque tool prend athleteId + résout un client par requête
@@ -166,6 +167,12 @@ plus une seule clé en env, mais **une par athlète** stockée chiffrée dans Ne
 Le **troisième** serveur MCP (`POST/GET /api/whatsapp/mcp`, `basePath: "/api/whatsapp"`), qui
 remplace l'accès direct de l'agent au serveur MCP de la passerelle OpenWA.
 
+- **La décision vit dans un use-case**, `sendAthleteMessage` : c'est lui qui assemble ce qu'un
+  envoi demande (quel athlète, quel chat, quelle session de passerelle) et qui rend un
+  `SendMessageOutcome`. Le tool MCP ne fait que traduire cet outcome en résultat MCP, comme une
+  route le traduirait en HTTP. Les échecs métier sont **retournés**, la panne de passerelle
+  **throw** : ce n'est pas une décision, c'est une rupture, et le message du client dit déjà si
+  une nouvelle tentative est sûre.
 - **Un seul tool** : `send_whatsapp_message(athleteId, text)`. Le serveur OpenWA en publie 51
   pour celui-là seul, soit ≈ 8 600 tokens de définitions rechargés à chaque requête modèle du
   coordinateur. Et il exigeait de l'agent le `sessionId` de la passerelle, un identifiant
