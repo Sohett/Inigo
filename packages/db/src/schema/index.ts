@@ -15,5 +15,6 @@ export { goal } from "./goal";
 export { trainingPlan, planBlock } from "./plan";
 export { weeklyProposition } from "./proposition";
 export { adaptationLog } from "./adaptationLog";
+export { whatsappGateway } from "./whatsappGateway";
 
 export * from "./types";

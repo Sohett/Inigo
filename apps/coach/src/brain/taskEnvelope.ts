@@ -24,10 +24,13 @@ export function formatDateDuJour(now: Date, timeZone: string = DEFAULT_TIMEZONE)
  * Format a turn the coordinator agent can act on. The envelope carries:
  *  - `date_du_jour`: the athlete's local day (`YYYY-MM-DD (jour)`) — the coordinator's
  *    temporal anchor so it never guesses today's date, and which it relays to specialists.
- *  - `inigo_athlete_id`: our internal athlete UUID (`athlete.id` in Neon). This is the
- *    key the agent uses to reach the athlete-data MCP (`/athlete/{id}/api/mcp`). It is
- *    deliberately NOT the Intervals.icu athlete id — that one lives in the Intervals MCP.
- *  - `chat_id`: the WhatsApp chat to reply to (via the OpenWA send tool).
+ *  - `inigo_athlete_id`: our internal athlete UUID (`athlete.id` in Neon). This is the key
+ *    the agent passes to every MCP server (`/api/coaching-data/mcp`, `/api/intervals/mcp`,
+ *    `/api/whatsapp/mcp`). It is deliberately NOT the Intervals.icu athlete id — that one
+ *    lives behind the Intervals MCP.
+ *
+ * The WhatsApp chat id is deliberately NOT carried here: `send_whatsapp_message` resolves it
+ * from the athlete, so the agent never handles a chat id or a gateway session id.
  * The agent's system prompt (configured on the control plane) explains this envelope.
  *
  * `now`/`timeZone` are parameters (defaulting to now in `Europe/Brussels`) so the date is
@@ -36,10 +39,9 @@ export function formatDateDuJour(now: Date, timeZone: string = DEFAULT_TIMEZONE)
  */
 export function formatTurn(
   inigoAthleteId: string,
-  chatId: string,
   text: string,
   now: Date = new Date(),
   timeZone: string = DEFAULT_TIMEZONE
 ): string {
-  return `date_du_jour: ${formatDateDuJour(now, timeZone)}\ninigo_athlete_id: ${inigoAthleteId}\nchat_id: ${chatId}\nmessage: ${text}`;
+  return `date_du_jour: ${formatDateDuJour(now, timeZone)}\ninigo_athlete_id: ${inigoAthleteId}\nmessage: ${text}`;
 }

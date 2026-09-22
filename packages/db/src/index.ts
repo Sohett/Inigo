@@ -8,6 +8,7 @@ export * from "./schema";
 export { createDb, type Db } from "./client";
 export { sealSecret, openSecret, generateMasterKey, type SealedSecret } from "./crypto";
 export { getIntervalsKey, setIntervalsKey, type IntervalsCredential } from "./credentials";
+export { getWhatsappSessionId, setWhatsappSessionId } from "./whatsappGateway";
 export {
   insertAthleteSchema,
   selectAthleteSchema,

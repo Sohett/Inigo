@@ -73,7 +73,7 @@ describe("routeInboundMessage", () => {
     expect(findByPhone).toHaveBeenCalledWith("+32475123456");
     expect(appendUserMessage).toHaveBeenCalledWith(
       "sesn_abc",
-      `${DATE_LINE}\ninigo_athlete_id: a-1\nchat_id: 32475123456@c.us\nmessage: salut`
+      `${DATE_LINE}\ninigo_athlete_id: a-1\nmessage: salut`
     );
     expect(outcome).toEqual({
       status: "forwarded",
@@ -112,7 +112,7 @@ describe("routeInboundMessage", () => {
     expect(outcome.status).toBe("forwarded");
     expect(appendUserMessage).toHaveBeenCalledWith(
       "sesn_abc",
-      `${DATE_LINE}\ninigo_athlete_id: a-1\nchat_id: 32475123456@c.us\nmessage: yo`
+      `${DATE_LINE}\ninigo_athlete_id: a-1\nmessage: yo`
     );
   });
 
@@ -125,7 +125,7 @@ describe("routeInboundMessage", () => {
     expect(findByPhone).not.toHaveBeenCalled();
     expect(appendUserMessage).toHaveBeenCalledWith(
       "sesn_abc",
-      `${DATE_LINE}\ninigo_athlete_id: a-1\nchat_id: 10325252415590@lid\nmessage: ok`
+      `${DATE_LINE}\ninigo_athlete_id: a-1\nmessage: ok`
     );
     expect(outcome).toEqual({
       status: "forwarded",

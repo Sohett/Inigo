@@ -11,21 +11,25 @@ beforeAll(() => {
   // shared config schema, this value turned a valid bearer into a 401.
   process.env["ADMIN_USER"] = "x";
   process.env["ADMIN_PASSWORD"] = "short";
+  // And deliberately NO OpenWA variables: they live outside the shared config schema, so
+  // their absence must not stop this route from serving, only calling the tool.
+  delete process.env["OPENWA_BASE_URL"];
+  delete process.env["OPENWA_API_KEY"];
 });
 
-describe("athlete-data MCP route", () => {
+describe("whatsapp MCP route", () => {
   it("exports GET and POST handlers", async () => {
     const route = await import("./route");
     expect(typeof route.GET).toBe("function");
     expect(typeof route.POST).toBe("function");
   });
 
-  // Regression: with the admin credentials required in the shared config, `getDeps()`
-  // threw inside the auth verifier and `withMcpAuth` turned it into a 401 — the brain
-  // silently lost its data access even with the right token.
+  // Guards the basePath: `mcp-handler` derives its endpoint from it, so a basePath that no
+  // longer matches the folder answers 404 while the 401 case keeps passing. It also proves
+  // the route serves with no OpenWA credentials configured.
   it("accepts a valid bearer token and answers the MCP call", async () => {
     const { POST } = await import("./route");
-    const request = new Request("http://localhost/api/mcp", {
+    const request = new Request("http://localhost/api/whatsapp/mcp", {
       method: "POST",
       headers: {
         authorization: "Bearer a-very-long-mcp-bearer-token",
@@ -40,7 +44,7 @@ describe("athlete-data MCP route", () => {
 
   it("rejects requests without a bearer token (401)", async () => {
     const { POST } = await import("./route");
-    const request = new Request("http://localhost/api/mcp", {
+    const request = new Request("http://localhost/api/whatsapp/mcp", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" })

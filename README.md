@@ -31,7 +31,7 @@ Pour lancer un service en développement, voir son README (ex. `pnpm dev:coach`)
 | Service | Description | Doc |
 |---|---|---|
 | `landing-page` | Landing page one-page (Astro) — présente le coach et capte un numéro WhatsApp | [`apps/landing-page/README.md`](apps/landing-page/README.md) |
-| `coach` | Backend (Next.js) reliant WhatsApp (gateway OpenWA) au coach Managed Agent ; héberge les serveurs MCP athlete-data (`/api/mcp`) et Intervals.icu (`/api/intervals/mcp`) | [`apps/coach/README.md`](apps/coach/README.md) |
+| `coach` | Backend (Next.js) reliant WhatsApp (gateway OpenWA) au coach Managed Agent ; héberge les trois serveurs MCP coaching-data (`/api/coaching-data/mcp`), Intervals.icu (`/api/intervals/mcp`) et WhatsApp (`/api/whatsapp/mcp`) | [`apps/coach/README.md`](apps/coach/README.md) |
 
 ## Contribuer
 

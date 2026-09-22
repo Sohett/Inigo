@@ -28,8 +28,9 @@ aura besoin de compute persistant (queue, batch long) — pas avant.
 proxy.ts                                # HTTP Basic sur /admin + /api/admin/* (Next 16 ; runtime Node imposé)
 app/
   api/webhooks/whatsapp/route.ts        # entrée HTTP fine : (verif HMAC optionnelle) → parse → use-case → 200
-  api/[transport]/route.ts              # endpoint MCP athlete-data statique (/api/mcp), bearer requis
+  api/coaching-data/[transport]/route.ts # endpoint MCP coaching-data statique (/api/coaching-data/mcp), bearer requis
   api/intervals/[transport]/route.ts    # endpoint MCP Intervals.icu statique (/api/intervals/mcp), bearer requis
+  api/whatsapp/[transport]/route.ts     # endpoint MCP WhatsApp statique (/api/whatsapp/mcp), bearer requis
   api/admin/athletes/[athleteId]/session/route.ts  # POST : ouvre une session et repointe l'athlète
   (admin)/admin/page.tsx                # la page admin (server component) + _components/ (client)
   layout.tsx, page.tsx, globals.css     # minimal + Tailwind
@@ -50,12 +51,19 @@ src/
     routeInboundMessage.ts         # use-case de routing : une seule fonction publique execute()
     startAthleteSession.ts         # use-case admin : clone la session courante, repointe l'athlète
     loadAdminOverview.ts           # use-case admin (lecture) : athlètes + sessions live + inventaire
+    sendAthleteMessage.ts          # use-case : la seule façon de parler à l'athlète (chat + session de passerelle)
+  repositories/whatsappGatewayRepository.ts  # PORT : la session de passerelle (en base, pas en env)
   mappers/
     whatsappPayload.ts             # schémas zod + normalisation du payload OpenWA + senderPhone
   brain/managedAgents.ts           # FRONTIÈRE cerveau : appendUserMessage + readSession + createSession + listInventory
   mcp/
     repository/athleteDataRepository.ts  # accès Neon scopé par athlete (createDb → forAthlete(id)), mappe rows→modèles (domain/coaching) ; seul autre layer @inigo/db-aware
     tools/{index,result,profile,thresholds,goals,plan,adaptationLog}.ts  # tools MCP fins (reads + writes gated)
+  whatsapp/
+    client/                        # client REST OpenWA typé (POST send-text ; zéro retry, un envoi n'est pas idempotent)
+    credentials.ts                 # lit OPENWA_BASE_URL/API_KEY dans l'env — JAMAIS dans configSchema (cf. §Admin)
+    resolveClient.ts               # createOpenWaResolver() : résout le client à l'appel, pas au boot
+    mcp-tools/{index,result}.ts    # un seul tool : send_whatsapp_message(athleteId, text) — mapping pur, zéro décision
   intervals/
     client/                        # client REST Intervals.icu typé (repris de intervals-icu-mcp, inchangé)
     mcp-tools/{index,result,tools/*}.ts  # tools MCP Intervals fins ; chaque tool prend athleteId + résout un client par requête
@@ -75,20 +83,22 @@ src/
    athlète sans session (`no_session`), sender illisible (`invalid_sender`) → route en 200.
    Seules les erreurs infra (Neon / Anthropic) throw → 502.
 4. Sur un athlète résolu avec session : persiste `chat_id` si nouveau (`repo.setChatId`),
-   formate l'enveloppe `inigo_athlete_id: <uuid>\nchat_id: <jid>\nmessage: <body>` et **append**
+   formate l'enveloppe `inigo_athlete_id: <uuid>\nmessage: <body>` et **append**
    à **sa** session via `brain.appendUserMessage` (dernier effet de bord → pas de doublon sur
    retry OpenWA). `inigo_athlete_id` = l'`athlete.id` interne (Neon), que l'agent repasse en
-   argument `athleteId` aux tools du MCP athlete-data (`/api/mcp`) — **pas** l'id Intervals.icu.
-   **Fire-and-forget** : on n'attend pas le run, l'agent répond via son MCP OpenWA
-   (tools exécutés server-side via le vault).
+   argument `athleteId` aux tools du MCP athlete-data (`/api/coaching-data/mcp`) — **pas** l'id Intervals.icu.
+   **Fire-and-forget** : on n'attend pas le run ; l'agent répond lui-même via le MCP WhatsApp
+   de cette app (`send_whatsapp_message`). Le `chat_id` n'est **pas** dans l'enveloppe : il est
+   persisté (`repo.setChatId`) et résolu côté serveur au moment de l'envoi.
 
-## MCP athlete-data (le brain lit/écrit la donnée coaching)
+## MCP coaching-data (le brain lit/écrit la donnée coaching)
 
 Un serveur MCP hébergé **dans coach** (choix assumé : pas d'app séparée) donne au brain
 (Managed Agent) un accès runtime à la donnée athlète structurée en Neon. Calqué sur
 `intervals-icu-mcp` : `mcp-handler` + `withMcpAuth` + tools fins.
 
-- **Endpoint statique** : `POST/GET /api/mcp` (`basePath: "/api"`, comme `intervals-icu-mcp`).
+- **Endpoint statique** : `POST/GET /api/coaching-data/mcp` (`basePath: "/api/coaching-data"`). Les trois
+  serveurs MCP ont la même forme `app/api/<domaine>/[transport]/route.ts` + `basePath: "/api/<domaine>"`.
   **Pas d'URL dynamique par athlète** : un Managed Agent configure une seule URL de serveur MCP,
   fixe et partagée par toute la topologie d'agents et par tous les athlètes. L'athlète est donc
   **passé en argument de chaque tool** (`athleteId`), pas dans l'URL.
@@ -133,7 +143,7 @@ Un serveur MCP hébergé **dans coach** (choix assumé : pas d'app séparée) do
 ## MCP Intervals.icu (le brain lit/écrit Intervals via coach) — INI-7
 
 Un **second** serveur MCP hébergé dans coach (`POST/GET /api/intervals/mcp`, `basePath:
-"/api/intervals"`), **distinct** de l'athlete-data (`/api/mcp`). Rapatrié depuis l'ex-app
+"/api/intervals"`), **distinct** de l'athlete-data (`/api/coaching-data/mcp`). Rapatrié depuis l'ex-app
 standalone `intervals-icu-mcp` pour passer en **multi-athlète** : la clé Intervals.icu n'est
 plus une seule clé en env, mais **une par athlète** stockée chiffrée dans Neon
 (`athlete_credential`, cf. `@inigo/db`).
@@ -151,6 +161,48 @@ plus une seule clé en env, mais **une par athlète** stockée chiffrée dans Ne
 - **Auth** : même bearer global `MCP_BEARER_TOKEN` que coach-data (`withMcpAuth({ required: true })`).
 - **Écriture d'une clé** : `setIntervalsKey` (`@inigo/db`) — écriture chiffrée + rotation
   (`rotatedAt`). La **capture par onboarding WhatsApp est hors périmètre** (ticket dédié).
+
+## MCP WhatsApp (le brain répond à l'athlète) — INI-37
+
+Le **troisième** serveur MCP (`POST/GET /api/whatsapp/mcp`, `basePath: "/api/whatsapp"`), qui
+remplace l'accès direct de l'agent au serveur MCP de la passerelle OpenWA.
+
+- **La décision vit dans un use-case**, `sendAthleteMessage` : c'est lui qui assemble ce qu'un
+  envoi demande (quel athlète, quel chat, quelle session de passerelle) et qui rend un
+  `SendMessageOutcome`. Le tool MCP ne fait que traduire cet outcome en résultat MCP, comme une
+  route le traduirait en HTTP. Les échecs métier sont **retournés**, la panne de passerelle
+  **throw** : ce n'est pas une décision, c'est une rupture, et le message du client dit déjà si
+  une nouvelle tentative est sûre.
+- **Un seul tool** : `send_whatsapp_message(athleteId, text)`. Le serveur OpenWA en publie 51
+  pour celui-là seul, soit ≈ 8 600 tokens de définitions rechargés à chaque requête modèle du
+  coordinateur. Et il exigeait de l'agent le `sessionId` de la passerelle, un identifiant
+  d'infra qu'il n'avait aucun moyen de résoudre : les credentials de vault
+  `environment_variable` sont substitués à la **sortie du sandbox**, alors que les appels MCP
+  partent des serveurs d'Anthropic. D'où INI-24, et un coach muet.
+- **Rien d'infra dans le contexte du modèle** : le `chatId` vient de Neon (`athlete.chat_id`,
+  appris par le routing), le `sessionId` de l'env du serveur. L'agent nomme un athlète.
+- **Pourquoi MCP et pas un custom tool** : un custom tool Managed Agents est exécuté côté
+  client, la session passe en `requires_action` et attend un `user.custom_tool_result` sur le
+  flux d'événements. Coach est fire-and-forget sur Vercel et n'écoute pas ce flux ; il faudrait
+  un worker persistant. Un serveur MCP est appelé en serveur à serveur, donc rien ne change.
+- **Credentials hors `configSchema`** (`src/whatsapp/credentials.ts`, même règle que l'admin) :
+  `OPENWA_BASE_URL` et `OPENWA_API_KEY`. Une absence dégrade ce seul endpoint. `deps.whatsapp`
+  est un **resolver**, pas un client : le construire au boot ferait échouer `getDeps()` pour le
+  webhook et les deux autres MCP.
+- **La session de la passerelle vit en base, pas en env** (table `whatsapp_gateway`, une seule
+  ligne, `WhatsappGatewayRepository`). Elle change à chaque ré-appairage WhatsApp (session
+  tombée, QR rescanné) : en variable d'environnement, rendre sa voix au coach demanderait un
+  redeploy. Un formulaire dans `/admin` l'écrit, `POST /api/admin/whatsapp-session`.
+- **Transport vers OpenWA : REST**, `POST /api/sessions/<session>/messages/send-text` avec
+  `X-API-Key` et `{chatId, text}`. La route accepte le nom de session comme son id, ce qui fait
+  disparaître le piège nom-contre-UUID du tool MCP d'OpenWA.
+- **Zéro retry sur l'envoi** (`src/whatsapp/client/client.ts`) : un envoi n'est pas idempotent,
+  une seconde tentative après timeout est un doublon chez l'athlète. Et comme l'agent lit le
+  message d'erreur, le cas timeout dit explicitement de ne pas réessayer.
+- **Un 2xx ne veut pas dire envoyé** : la passerelle remonte ses échecs métier dans le corps
+  (`success: false`). Le client en fait une vraie erreur.
+- **Ni la session ni la clé n'apparaissent dans un message d'erreur** : ces messages remontent
+  au modèle en résultat de tool, donc le client les redacte avant de composer l'erreur.
 
 ## Admin (`/admin`) — ouvrir une session
 
@@ -213,11 +265,10 @@ coordinateur et écrit son id dans `athlete.anthropic_session_id`.
 - **Enveloppe du webhook OpenWA** : `whatsappPayload.ts` est tolérant (accepte `{event,data}`
   ou message plat ; texte dans `body` ou `text`). Confronter à une vraie livraison
   (webhook.site) et resserrer si besoin.
-- **Outil d'envoi MCP** = `MessageSendText` (confirmé via `tools/list`), exige `sessionId`
-  (UUID de session OpenWA) + `chatId` + `text` → géré dans le **prompt système de l'agent**.
-  Depuis OpenWA 0.8.1 il n'est monté que si `MCP_READONLY=false` (comparaison stricte, non
-  validée au boot) : sans ça `tools/list` ne rend que les 25 outils de lecture et l'agent se
-  prend « is not an available tool ». Détails et vérif → `docs/railway-cookbook.md` §5.
+- **`MCP_READONLY=false` reste obligatoire sur la passerelle OpenWA** : sans ça `MessageSendText`
+  n'est pas monté (25 outils de lecture au lieu de 51) et c'est désormais **coach** qui se prend
+  l'erreur, plus l'agent. Comparaison stricte, non validée au boot → revérifier après chaque
+  redeploy. Détails → `docs/railway-cookbook.md` §5.
 
 ## Skills du Managed Agent
 
@@ -246,7 +297,14 @@ le skill Claude Code `managed-agents-api`.
   invalide, 200 clone, 200 première session, 409 sans rien à cloner, 404, 502. Côté MCP :
   intégration `InMemoryTransport` (reads + writes présents dont
   `save_training_plan`, un call renvoie du JSON, validation de date rejetée), route (401 sans
-  bearer, 400 UUID invalide). Pas de réseau. Le store `saveTrainingPlan` (create, update
+  bearer, 400 UUID invalide). Les trois routes MCP ont un cas **200** qui garde le `basePath` :
+  un `basePath` désaligné répond 404 alors que le cas 401 continue de passer.
+  Côté WhatsApp : `send_whatsapp_message` est le seul tool exposé et ne prend que
+  `athleteId` + `text` (garde : le `sessionId` ne doit jamais redevenir une entrée), athlète
+  inconnu et athlète sans `chat_id` donnent une erreur propre sans rien envoyer, passerelle non
+  configurée devient une erreur de tool ; le client couvre le succès, la trame SSE, le
+  `success:false` sous un HTTP 200, le non-2xx, **l'absence de retry** et le fait que la clé
+  d'API n'apparaît pas dans l'erreur. Pas de réseau. Le store `saveTrainingPlan` (create, update
   replace-all, archivage de l'actif, scoping cross-athlète) est couvert par la spec d'intégration
   Neon (skip sans `DATABASE_URL`).
 - Les specs d'intégration Neon (`*.integration.spec.ts` : adapter Drizzle **et** store MCP)

@@ -11,7 +11,8 @@ export default function HomePage() {
       </p>
       <p className="text-sm text-muted-foreground">
         Webhook endpoint: <code>/api/webhooks/whatsapp</code>. MCP servers:{" "}
-        <code>/api/mcp</code> and <code>/api/intervals/mcp</code>. See <code>README.md</code>.
+        <code>/api/coaching-data/mcp</code>, <code>/api/intervals/mcp</code> and{" "}
+        <code>/api/whatsapp/mcp</code>. See <code>README.md</code>.
       </p>
       <p className="text-sm">
         <Link href="/admin" className="underline underline-offset-4">
