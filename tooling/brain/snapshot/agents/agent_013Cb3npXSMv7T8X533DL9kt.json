@@ -33,22 +33,22 @@
       {
         "id": "agent_01Sp4ghn8GHc5Lbd9JJptEzR",
         "type": "agent",
-        "version": 6
+        "version": 7
       },
       {
         "id": "agent_01CTK33Z2CLPwtDyq9vKDsVG",
         "type": "agent",
-        "version": 10
+        "version": 11
       },
       {
         "id": "agent_01Dbg6WeAF41xSs8bTfiE8XD",
         "type": "agent",
-        "version": 6
+        "version": 7
       },
       {
         "id": "agent_012ethnUdHzvRW9iPxdzzbTx",
         "type": "agent",
-        "version": 10
+        "version": 11
       }
     ],
     "type": "coordinator"
@@ -188,6 +188,6 @@
     }
   ],
   "type": "agent",
-  "updated_at": "2026-09-22T12:33:04.604104Z",
-  "version": 17
+  "updated_at": "2026-09-22T15:02:16.305789Z",
+  "version": 18
 }
