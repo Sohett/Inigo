@@ -93,7 +93,7 @@ export function createRouteInboundMessage(deps: RouteInboundMessageDeps): RouteI
       }
       await deps.brain.appendUserMessage(
         athlete.anthropicSessionId,
-        formatTurn(athlete.id, chatId, text)
+        formatTurn(athlete.id, text)
       );
 
       return { status: "forwarded", athleteId: athlete.id, sessionId: athlete.anthropicSessionId, chatId };

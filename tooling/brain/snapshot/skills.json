@@ -21,19 +21,19 @@
     "type": "skill",
     "id": "xlsx",
     "created_at": "2025-10-14T08:41:11.530827Z",
-    "updated_at": "2026-08-29T01:00:31.073935Z",
+    "updated_at": "2026-09-14T21:00:33.324012Z",
     "display_title": "xlsx",
     "source": "anthropic",
-    "latest_version": "20260829"
+    "latest_version": "20260914"
   },
   {
     "type": "skill",
     "id": "pptx",
     "created_at": "2025-10-14T08:41:11.530747Z",
-    "updated_at": "2026-08-28T02:00:39.535636Z",
+    "updated_at": "2026-09-14T21:00:33.306681Z",
     "display_title": "pptx",
     "source": "anthropic",
-    "latest_version": "20260828"
+    "latest_version": "20260914"
   },
   {
     "type": "skill",
@@ -48,9 +48,9 @@
     "type": "skill",
     "id": "docx",
     "created_at": "2025-10-14T08:41:11.530393Z",
-    "updated_at": "2026-08-31T20:00:31.499122Z",
+    "updated_at": "2026-09-14T21:00:33.279708Z",
     "display_title": "docx",
     "source": "anthropic",
-    "latest_version": "20260831"
+    "latest_version": "20260914"
   }
 ]

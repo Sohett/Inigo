@@ -12,15 +12,15 @@
     {
       "name": "inigo-coach-data",
       "type": "url",
-      "url": "https://app.inigo-coach.com/api/mcp"
+      "url": "https://app.inigo-coach.com/api/coaching-data/mcp"
     }
   ],
   "metadata": {},
   "model": {
     "effort": {
-      "type": "xhigh"
+      "type": "medium"
     },
-    "id": "claude-opus-4-8",
+    "id": "claude-sonnet-5",
     "speed": "standard"
   },
   "multiagent": null,
@@ -67,9 +67,45 @@
       "type": "agent_toolset_20260401"
     },
     {
-      "configs": [],
+      "configs": [
+        {
+          "enabled": true,
+          "name": "get_events",
+          "permission_policy": {
+            "type": "always_allow"
+          }
+        },
+        {
+          "enabled": true,
+          "name": "get_fitness",
+          "permission_policy": {
+            "type": "always_allow"
+          }
+        },
+        {
+          "enabled": true,
+          "name": "get_athlete_profile",
+          "permission_policy": {
+            "type": "always_allow"
+          }
+        },
+        {
+          "enabled": true,
+          "name": "create_or_update_event",
+          "permission_policy": {
+            "type": "always_allow"
+          }
+        },
+        {
+          "enabled": true,
+          "name": "delete_event",
+          "permission_policy": {
+            "type": "always_allow"
+          }
+        }
+      ],
       "default_config": {
-        "enabled": true,
+        "enabled": false,
         "permission_policy": {
           "type": "always_allow"
         }
@@ -90,6 +126,6 @@
     }
   ],
   "type": "agent",
-  "updated_at": "2026-07-25T13:38:31.553486Z",
-  "version": 9
+  "updated_at": "2026-09-22T12:33:04.097678Z",
+  "version": 10
 }

@@ -1,27 +1,31 @@
 import { createMcpHandler, withMcpAuth } from "mcp-handler";
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
-import { registerIntervalsIcuTools } from "../../../../src/intervals/mcp-tools";
+import { registerWhatsappTools } from "../../../../src/whatsapp/mcp-tools";
+import { createSendAthleteMessage } from "../../../../src/use-cases/sendAthleteMessage";
 import { getDeps } from "../../../../src/deps";
 import { verifyBearerToken } from "../../../../src/auth";
 
 // MCP requests are dynamic and must never be statically cached.
 export const dynamic = "force-dynamic";
 
-// A second static MCP endpoint (/api/intervals/mcp), distinct from the athlete-data one
-// (/api/coaching-data/mcp) so the brain keeps its `intervals-icu` server name and per-agent read/write
-// toolset allowlists unchanged. Each tool takes an `athleteId` argument (the same
-// `inigo_athlete_id` coach injects into every message); the resolver fetches + decrypts that
-// athlete's Intervals.icu key from Neon at request time, so the secret never reaches the LLM.
+// The third static MCP endpoint (/api/whatsapp/mcp), same shape as the other two. It exposes a
+// single tool so the agent never carries the gateway session id nor a WhatsApp chat id: the
+// `sendAthleteMessage` use-case resolves both, from Neon and from the environment.
 const handler = createMcpHandler(
   (server) => {
-    const { intervalsResolver } = getDeps();
-    registerIntervalsIcuTools(server, intervalsResolver);
+    const { whatsapp, repo, whatsappGateway } = getDeps();
+    const sendMessage = createSendAthleteMessage({
+      repo,
+      gateway: whatsappGateway,
+      resolveClient: whatsapp
+    });
+    registerWhatsappTools(server, { sendMessage });
   },
   {
-    serverInfo: { name: "intervals-icu-mcp", version: "0.1.0" },
+    serverInfo: { name: "whatsapp-mcp", version: "0.1.0" },
     capabilities: { tools: {} }
   },
-  { basePath: "/api/intervals" }
+  { basePath: "/api/whatsapp" }
 );
 
 const authHandler = withMcpAuth(

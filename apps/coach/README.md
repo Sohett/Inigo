@@ -3,13 +3,16 @@
 Backend d'Inigo (Next.js, full-stack, sur Vercel). Aujourd'hui il expose **un webhook**
 qui **route** les messages WhatsApp entrants (depuis une gateway **OpenWA** auto-hébergée)
 vers la **bonne session de Managed Agent Anthropic**, résolue par le **`phone_num`** de
-l'athlète en base (Neon). L'agent répond ensuite **lui-même** sur WhatsApp via son outil
-MCP OpenWA (`MessageSendText`).
+l'athlète en base (Neon). L'agent répond ensuite **lui-même** sur WhatsApp, via le serveur
+MCP WhatsApp de cette app.
 
-Il expose aussi **deux serveurs MCP** pour le brain : **`athlete-data`** (`/api/mcp`) pour la
-donnée coaching structurée en base (profil, seuils, objectifs, plan, journal d'adaptation), et
-**Intervals.icu** (`/api/intervals/mcp`) pour la donnée d'entraînement live, avec la clé résolue
-par athlète depuis Neon (rapatrié de l'ex-app `intervals-icu-mcp`, INI-7).
+Il expose **trois serveurs MCP** pour le brain, tous de la forme `api/<domaine>/mcp` :
+**`coaching-data`** (`/api/coaching-data/mcp`) pour la donnée coaching structurée en base
+(profil, seuils, objectifs, plan, journal d'adaptation) ; **Intervals.icu**
+(`/api/intervals/mcp`) pour la donnée d'entraînement live, avec la clé résolue par athlète
+depuis Neon (rapatrié de l'ex-app `intervals-icu-mcp`, INI-7) ; et **WhatsApp**
+(`/api/whatsapp/mcp`), un unique outil `send_whatsapp_message` qui relaie vers la passerelle
+OpenWA (INI-37).
 
 À terme, cette même app hébergera l'**admin** (dashboards, actions, triggers sur le brain).
 
@@ -22,17 +25,17 @@ par athlète depuis Neon (rapatrié de l'ex-app `intervals-icu-mcp`, INI-7).
 WhatsApp (athlète)
    ⇅
 OpenWA (Railway) — webhook message.received ──►  coach
-                 ◄── MCP /mcp : l'agent appelle MessageSendText (la réponse) ── Managed Agent
+                 ◄── REST send-text ── coach  ◄── MCP send_whatsapp_message ── Managed Agent
    ⇅
 coach (Vercel)
    POST /api/webhooks/whatsapp → routeInboundMessage.execute
      → résout l'athlète + sa session via phone_num (Neon) → append user.message à SA session
    ⇅
-Managed Agent (Anthropic) — session de l'athlète = mémoire ; MCP: coach (athlete-data + Intervals) + OpenWA ; répond via MessageSendText
+Managed Agent (Anthropic) — session de l'athlète = mémoire ; MCP: coach (coaching-data + Intervals + WhatsApp) ; répond via send_whatsapp_message
 ```
 
 Le use-case dérive le numéro de l'expéditeur depuis le JID WhatsApp, résout l'athlète en base,
-formate `chat_id: …\nmessage: …`, et **append** à **sa** session. Un numéro inconnu, un athlète
+formate `inigo_athlete_id: …\nmessage: …`, et **append** à **sa** session. Un numéro inconnu, un athlète
 sans session ou un sender illisible sont gérés explicitement (aucun forward, réponse 200).
 L'agent tourne côté Anthropic (les tools MCP s'exécutent server-side via le vault), donc **rien
 ici n'a besoin d'écouter la réponse** ni d'envoyer le message.
@@ -53,8 +56,10 @@ Validées au boot par `src/config/config.ts`. Copie `.env.example` → `.env` **
 | `DATABASE_URL` | Connexion Neon (base coaching partagée via `@inigo/db`), server-side |
 | `DB_ENCRYPTION_KEY` | Clé base64 32 octets (AES-256-GCM) pour sceller les secrets par athlète |
 | `WHATSAPP_WEBHOOK_SECRET` | Optionnel : vérif HMAC `X-OpenWA-Signature` si renseigné |
-| `MCP_BEARER_TOKEN` | Bearer que le brain présente aux MCP athlete-data et Intervals.icu (min 16 car., server-side) |
+| `MCP_BEARER_TOKEN` | Bearer que le brain présente aux trois MCP (min 16 car., server-side) |
 | `INTERVALS_BASE_URL` | Optionnel : override de l'URL de l'API Intervals.icu (défaut `https://intervals.icu/api/v1`) |
+| `OPENWA_BASE_URL` | URL de la passerelle OpenWA vers laquelle le coach relaie les réponses |
+| `OPENWA_API_KEY` | Clé API OpenWA (rôle OPERATOR), server-side |
 | `ADMIN_USER` | Identifiant HTTP Basic de l'admin (`/admin`, `/api/admin/*`), min 3 car. |
 | `ADMIN_PASSWORD` | Mot de passe HTTP Basic de l'admin, min 16 car., server-side |
 
@@ -73,10 +78,10 @@ webhook WhatsApp et les deux MCP avec elle. Elles sont lues et validées là où
    automatique d'un nouvel athlète reste hors périmètre.
    > Les *deployments* Managed servent uniquement aux runs planifiés (cron) ; ici on n'en utilise pas : le coach pousse les messages à une session existante via l'API (`POST /v1/sessions/:id/events`).
 3. **Prompt système de l'agent** : « tu reçois des messages WhatsApp au format
-   `inigo_athlete_id: …\nchat_id: …\nmessage: …`. `inigo_athlete_id` est l'id athlète Inigo
-   (à utiliser pour le MCP athlete-data ; ce n'est pas l'id Intervals.icu). Réponds en appelant
-   `MessageSendText(sessionId="<UUID session OpenWA>", chatId=<le chat_id fourni>, text=…)` ;
-   concis, adapté à WhatsApp ».
+   `date_du_jour: …\ninigo_athlete_id: …\nmessage: …`. `inigo_athlete_id` est l'id athlète Inigo
+   (à utiliser pour les trois MCP ; ce n'est pas l'id Intervals.icu). Réponds en appelant
+   `send_whatsapp_message(athleteId=<l'inigo_athlete_id>, text=…)` ; concis, adapté à
+   WhatsApp ». Ni chat ni session de passerelle à fournir : le backend les résout.
 4. **Webhook OpenWA** → URL `https://<coach>/api/webhooks/whatsapp`, event
    `message.received`.
 
@@ -117,9 +122,9 @@ bouton remplace la manœuvre d'avant (commande locale, puis `UPDATE` SQL à la m
   simplement plus rien n'y est routé. Le bouton demande donc confirmation quand l'athlète a
   déjà une session.
 
-## MCP athlete-data (accès du brain à la donnée coaching)
+## MCP coaching-data (accès du brain à la donnée coaching)
 
-Endpoint **statique** : `GET/POST /api/mcp` (un Managed Agent configure une seule URL de serveur
+Endpoint **statique** : `GET/POST /api/coaching-data/mcp` (un Managed Agent configure une seule URL de serveur
 MCP, fixe et partagée). L'athlète n'est donc **pas** dans l'URL : chaque tool prend un argument
 `athleteId` (l'UUID Inigo, = `inigo_athlete_id` du message), et la requête est scopée à cet
 athlète (`store.forAthlete(athleteId)`). Auth par **bearer** `MCP_BEARER_TOKEN` (401 sinon).
@@ -137,7 +142,7 @@ Tools : lecture `get_profile`, `get_thresholds`, `get_goals`, `get_training_plan
 planifié). La FTP de décision vient d'ici (`get_thresholds`) ; Intervals reste le calcul live.
 
 **Côté Managed Agent** : ajouter à la session un vault `static_bearer`
-(`url=https://<coach>/api/mcp`, `token=MCP_BEARER_TOKEN`) et déclarer le serveur dans les
+(`url=https://<coach>/api/coaching-data/mcp`, `token=MCP_BEARER_TOKEN`) et déclarer le serveur dans les
 `mcp_servers` de l'agent. Le bearer prouve que l'appelant est le brain, pas quel athlète :
 l'isolation repose sur l'`athleteId` passé par l'agent (durcissement futur : bearer par athlète).
 
@@ -154,15 +159,15 @@ curl -X POST http://localhost:3000/api/webhooks/whatsapp \
   -d '{"chatId":"628@c.us","body":"salut coach","type":"text"}'
 # -> {"ok":true} ; le message est append à la session (voir logs).
 
-# Lister les tools du MCP athlete-data :
-curl -X POST "http://localhost:3000/api/mcp" \
+# Lister les tools du MCP coaching-data :
+curl -X POST "http://localhost:3000/api/coaching-data/mcp" \
   -H "authorization: Bearer $MCP_BEARER_TOKEN" \
   -H "accept: application/json, text/event-stream" \
   -H "content-type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
 
 # Lire le profil d'un athlète (athleteId = UUID Inigo en base) :
-curl -X POST "http://localhost:3000/api/mcp" \
+curl -X POST "http://localhost:3000/api/coaching-data/mcp" \
   -H "authorization: Bearer $MCP_BEARER_TOKEN" \
   -H "accept: application/json, text/event-stream" \
   -H "content-type: application/json" \
@@ -172,8 +177,14 @@ curl -X POST "http://localhost:3000/api/mcp" \
 ## Déploiement
 
 Vercel (Next.js). Variables via le dashboard Vercel (dont `MCP_BEARER_TOKEN`, requis, à poser
-**avant** deploy). Endpoints : `/api/webhooks/whatsapp`, `/api/mcp`, `/api/intervals/mcp` et
-`/admin`.
+**avant** deploy). Endpoints : `/api/webhooks/whatsapp`, `/api/coaching-data/mcp`, `/api/intervals/mcp`,
+`/api/whatsapp/mcp` et `/admin`.
+
+Poser aussi `OPENWA_BASE_URL` et `OPENWA_API_KEY`, sans quoi le coach ne peut pas répondre.
+Elles sont hors du schéma zod partagé, donc leur absence ne casse que `/api/whatsapp/mcp` :
+le déploiement passe et rien ne le signale au boot. La **session** de la passerelle, elle,
+n'est pas une variable d'env : elle vit en base et se règle depuis `/admin`, parce qu'elle
+change à chaque ré-appairage WhatsApp.
 
 Pour utiliser l'admin, poser `ADMIN_USER` (min 3 car.) et `ADMIN_PASSWORD` (min 16 car.).
 Absentes ou trop courtes, seul l'admin est indisponible (503, avec un log qui dit quoi

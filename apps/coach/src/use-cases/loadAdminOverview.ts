@@ -2,6 +2,7 @@ import type { ManagedAgentBrain } from "../brain/managedAgents";
 import type { Athlete } from "../domain/athlete";
 import type { BrainInventory, RunningSession } from "../domain/brain";
 import type { AthleteRepository } from "../repositories/athleteRepository";
+import type { WhatsappGatewayRepository } from "../repositories/whatsappGatewayRepository";
 
 /** One athlete plus what their session actually runs on, when it can be read. */
 export interface AthleteOverview {
@@ -17,11 +18,15 @@ export interface AdminOverview {
   /** What exists in the control plane, for opening a first session. Null if unreachable. */
   inventory: BrainInventory | null;
   inventoryError: string | null;
+  /** The recorded WhatsApp gateway session. Null when none is set, or it could not be read. */
+  whatsappSessionId: string | null;
+  whatsappSessionError: string | null;
 }
 
 export interface LoadAdminOverviewDeps {
   repo: AthleteRepository;
   brain: ManagedAgentBrain;
+  gateway: WhatsappGatewayRepository;
 }
 
 export interface LoadAdminOverview {
@@ -46,6 +51,11 @@ export function createLoadAdminOverview(deps: LoadAdminOverviewDeps): LoadAdminO
   return {
     async execute(): Promise<AdminOverview> {
       const athletes = await deps.repo.listAll();
+
+      const gatewayResult = await deps.gateway.getSessionId().then(
+        (sessionId): { sessionId: string | null; error: string | null } => ({ sessionId, error: null }),
+        (error: unknown) => ({ sessionId: null, error: messageOf(error) })
+      );
 
       const needsInventory = athletes.some((athlete) => athlete.anthropicSessionId === null);
       const [inventoryResult, ...sessionResults] = await Promise.all([
@@ -78,7 +88,9 @@ export function createLoadAdminOverview(deps: LoadAdminOverviewDeps): LoadAdminO
           sessionError: sessionResults[index]?.sessionError ?? null
         })),
         inventory: inventoryResult.inventory,
-        inventoryError: inventoryResult.error
+        inventoryError: inventoryResult.error,
+        whatsappSessionId: gatewayResult.sessionId,
+        whatsappSessionError: gatewayResult.error
       };
     }
   };
