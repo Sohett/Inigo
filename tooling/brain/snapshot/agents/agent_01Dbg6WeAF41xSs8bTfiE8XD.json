@@ -18,9 +18,9 @@
   "metadata": {},
   "model": {
     "effort": {
-      "type": "xhigh"
+      "type": "medium"
     },
-    "id": "claude-opus-4-8",
+    "id": "claude-sonnet-5",
     "speed": "standard"
   },
   "multiagent": null,

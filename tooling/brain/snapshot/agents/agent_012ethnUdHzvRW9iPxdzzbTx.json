@@ -18,9 +18,9 @@
   "metadata": {},
   "model": {
     "effort": {
-      "type": "xhigh"
+      "type": "medium"
     },
-    "id": "claude-opus-4-8",
+    "id": "claude-sonnet-5",
     "speed": "standard"
   },
   "multiagent": null,
@@ -67,9 +67,45 @@
       "type": "agent_toolset_20260401"
     },
     {
-      "configs": [],
+      "configs": [
+        {
+          "enabled": true,
+          "name": "get_events",
+          "permission_policy": {
+            "type": "always_allow"
+          }
+        },
+        {
+          "enabled": true,
+          "name": "get_fitness",
+          "permission_policy": {
+            "type": "always_allow"
+          }
+        },
+        {
+          "enabled": true,
+          "name": "get_athlete_profile",
+          "permission_policy": {
+            "type": "always_allow"
+          }
+        },
+        {
+          "enabled": true,
+          "name": "create_or_update_event",
+          "permission_policy": {
+            "type": "always_allow"
+          }
+        },
+        {
+          "enabled": true,
+          "name": "delete_event",
+          "permission_policy": {
+            "type": "always_allow"
+          }
+        }
+      ],
       "default_config": {
-        "enabled": true,
+        "enabled": false,
         "permission_policy": {
           "type": "always_allow"
         }
