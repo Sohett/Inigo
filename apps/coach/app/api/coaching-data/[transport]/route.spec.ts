@@ -13,7 +13,7 @@ beforeAll(() => {
   process.env["ADMIN_PASSWORD"] = "short";
 });
 
-describe("athlete-data MCP route", () => {
+describe("coaching-data MCP route", () => {
   it("exports GET and POST handlers", async () => {
     const route = await import("./route");
     expect(typeof route.GET).toBe("function");
@@ -25,7 +25,7 @@ describe("athlete-data MCP route", () => {
   // silently lost its data access even with the right token.
   it("accepts a valid bearer token and answers the MCP call", async () => {
     const { POST } = await import("./route");
-    const request = new Request("http://localhost/api/mcp", {
+    const request = new Request("http://localhost/api/coaching-data/mcp", {
       method: "POST",
       headers: {
         authorization: "Bearer a-very-long-mcp-bearer-token",
@@ -40,7 +40,7 @@ describe("athlete-data MCP route", () => {
 
   it("rejects requests without a bearer token (401)", async () => {
     const { POST } = await import("./route");
-    const request = new Request("http://localhost/api/mcp", {
+    const request = new Request("http://localhost/api/coaching-data/mcp", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" })

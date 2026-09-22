@@ -195,15 +195,24 @@ ANTHROPIC_API_KEY        = sk-ant-…
 DATABASE_URL             = postgresql://…@…neon.tech/…?sslmode=require
 DB_ENCRYPTION_KEY        = <clé base64 32 octets>
 WHATSAPP_WEBHOOK_SECRET  = $OWA_WEBHOOK_SECRET   # optionnel
+OPENWA_BASE_URL          = $OWA_URL
+OPENWA_API_KEY           = $OWA_API_KEY
+OPENWA_SESSION_ID        = <UUID de la session, PAS son nom>
 ```
-(le routing est fire-and-forget : l'agent envoie la réponse via son MCP OpenWA → pas de
-variable OpenWA côté app. Plus de session fixe en env : la session est résolue par
-`phone_num` dans Neon.)
+Depuis INI-37, l'agent n'appelle plus la passerelle : il appelle `/api/whatsapp/mcp` sur coach,
+qui relaie. D'où les trois variables `OPENWA_*` **côté app** (elles ne sont pas dans
+`configSchema` : une absence ne dégrade que cet endpoint). Le routing reste fire-and-forget, et
+la session Managed Agent est toujours résolue par `phone_num` dans Neon.
+
+⚠️ `OPENWA_SESSION_ID` est l'**UUID** renvoyé par `GET $OWA_URL/api/sessions`, pas le nom
+(`default`). `MessageSendText` rejette le nom avec « Session '<x>' is not active » : c'est
+exactement ce qui a rendu le coach muet (INI-24).
 
 ### Côté Managed Agent (contrôle Anthropic, une fois)
-- **Vault `static_bearer`** pour le MCP OpenWA : **URL = `$OWA_URL/mcp`**, **token = `$OWA_API_KEY`**.
-- **Session par athlète** créée avec l'agent coach + le vault (static_bearer OpenWA + les bearers
-  des MCP coach `athlete-data` et Intervals.icu) → son id stocké en base dans
+- **Plus de vault `static_bearer` pour OpenWA** : l'agent ne parle plus à la passerelle, c'est
+  coach qui la contacte avec ses propres variables d'env. L'entrée peut être retirée du vault.
+- **Session par athlète** créée avec l'agent coach + le vault (les bearers des trois MCP coach :
+  `coaching-data`, `intervals-icu` et `whatsapp`) → son id stocké en base dans
   `athlete.anthropic_session_id` (avec le `phone_num`).
 - **Prompt système** : reçoit `chat_id: …\nmessage: …` → répond via
   `MessageSendText(sessionId="<UUID session OpenWA>", chatId=<fourni>, text=…)`.

@@ -12,6 +12,8 @@ import {
 } from "./mcp/repository/athleteDataRepository";
 import { createIntervalsResolver } from "./intervals/resolveClient";
 import type { ResolveClient } from "./intervals/mcp-tools/result";
+import { createOpenWaResolver } from "./whatsapp/resolveClient";
+import type { ResolveOpenWaClient } from "./whatsapp/resolveClient";
 
 export interface Deps {
   config: Config;
@@ -21,6 +23,12 @@ export interface Deps {
   athleteData: AthleteDataRepository;
   /** Resolves a per-athlete Intervals.icu client (key fetched + decrypted from Neon). */
   intervalsResolver: ResolveClient;
+  /**
+   * Resolves the OpenWA gateway client. A resolver, not a client: its credentials live
+   * outside `configSchema`, so building it here would make a missing WhatsApp variable
+   * throw on every request path instead of only on `/api/whatsapp/mcp`.
+   */
+  whatsapp: ResolveOpenWaClient;
 }
 
 let cached: Deps | null = null;
@@ -47,7 +55,8 @@ export function getDeps(): Deps {
         db,
         config.DB_ENCRYPTION_KEY,
         config.INTERVALS_BASE_URL
-      )
+      ),
+      whatsapp: createOpenWaResolver()
     };
   }
   return cached;

@@ -101,4 +101,4 @@ Les exigences de test propres à un service (mocks, transports) sont dans son do
 Chaque service documente ses détails dans son `AGENTS.md` (agents) et `README.md` (humains) :
 
 - **`landing-page`** : landing one-page Astro (capte des leads WhatsApp).
-- **`coach`** : backend Next.js reliant WhatsApp (gateway OpenWA) au coach Managed Agent ; héberge aussi les serveurs MCP **athlete-data** (`/api/mcp`) et **Intervals.icu** (`/api/intervals/mcp`).
+- **`coach`** : backend Next.js reliant WhatsApp (gateway OpenWA) au coach Managed Agent ; héberge aussi les trois serveurs MCP **coaching-data** (`/api/coaching-data/mcp`), **Intervals.icu** (`/api/intervals/mcp`) et **WhatsApp** (`/api/whatsapp/mcp`).

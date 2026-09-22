@@ -3,13 +3,16 @@
 Backend d'Inigo (Next.js, full-stack, sur Vercel). Aujourd'hui il expose **un webhook**
 qui **route** les messages WhatsApp entrants (depuis une gateway **OpenWA** auto-hébergée)
 vers la **bonne session de Managed Agent Anthropic**, résolue par le **`phone_num`** de
-l'athlète en base (Neon). L'agent répond ensuite **lui-même** sur WhatsApp via son outil
-MCP OpenWA (`MessageSendText`).
+l'athlète en base (Neon). L'agent répond ensuite **lui-même** sur WhatsApp, via le serveur
+MCP WhatsApp de cette app.
 
-Il expose aussi **deux serveurs MCP** pour le brain : **`athlete-data`** (`/api/mcp`) pour la
-donnée coaching structurée en base (profil, seuils, objectifs, plan, journal d'adaptation), et
-**Intervals.icu** (`/api/intervals/mcp`) pour la donnée d'entraînement live, avec la clé résolue
-par athlète depuis Neon (rapatrié de l'ex-app `intervals-icu-mcp`, INI-7).
+Il expose **trois serveurs MCP** pour le brain, tous de la forme `api/<domaine>/mcp` :
+**`coaching-data`** (`/api/coaching-data/mcp`) pour la donnée coaching structurée en base
+(profil, seuils, objectifs, plan, journal d'adaptation) ; **Intervals.icu**
+(`/api/intervals/mcp`) pour la donnée d'entraînement live, avec la clé résolue par athlète
+depuis Neon (rapatrié de l'ex-app `intervals-icu-mcp`, INI-7) ; et **WhatsApp**
+(`/api/whatsapp/mcp`), un unique outil `send_whatsapp_message` qui relaie vers la passerelle
+OpenWA (INI-37).
 
 À terme, cette même app hébergera l'**admin** (dashboards, actions, triggers sur le brain).
 
@@ -119,7 +122,7 @@ bouton remplace la manœuvre d'avant (commande locale, puis `UPDATE` SQL à la m
 
 ## MCP athlete-data (accès du brain à la donnée coaching)
 
-Endpoint **statique** : `GET/POST /api/mcp` (un Managed Agent configure une seule URL de serveur
+Endpoint **statique** : `GET/POST /api/coaching-data/mcp` (un Managed Agent configure une seule URL de serveur
 MCP, fixe et partagée). L'athlète n'est donc **pas** dans l'URL : chaque tool prend un argument
 `athleteId` (l'UUID Inigo, = `inigo_athlete_id` du message), et la requête est scopée à cet
 athlète (`store.forAthlete(athleteId)`). Auth par **bearer** `MCP_BEARER_TOKEN` (401 sinon).
@@ -137,7 +140,7 @@ Tools : lecture `get_profile`, `get_thresholds`, `get_goals`, `get_training_plan
 planifié). La FTP de décision vient d'ici (`get_thresholds`) ; Intervals reste le calcul live.
 
 **Côté Managed Agent** : ajouter à la session un vault `static_bearer`
-(`url=https://<coach>/api/mcp`, `token=MCP_BEARER_TOKEN`) et déclarer le serveur dans les
+(`url=https://<coach>/api/coaching-data/mcp`, `token=MCP_BEARER_TOKEN`) et déclarer le serveur dans les
 `mcp_servers` de l'agent. Le bearer prouve que l'appelant est le brain, pas quel athlète :
 l'isolation repose sur l'`athleteId` passé par l'agent (durcissement futur : bearer par athlète).
 
@@ -155,14 +158,14 @@ curl -X POST http://localhost:3000/api/webhooks/whatsapp \
 # -> {"ok":true} ; le message est append à la session (voir logs).
 
 # Lister les tools du MCP athlete-data :
-curl -X POST "http://localhost:3000/api/mcp" \
+curl -X POST "http://localhost:3000/api/coaching-data/mcp" \
   -H "authorization: Bearer $MCP_BEARER_TOKEN" \
   -H "accept: application/json, text/event-stream" \
   -H "content-type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
 
 # Lire le profil d'un athlète (athleteId = UUID Inigo en base) :
-curl -X POST "http://localhost:3000/api/mcp" \
+curl -X POST "http://localhost:3000/api/coaching-data/mcp" \
   -H "authorization: Bearer $MCP_BEARER_TOKEN" \
   -H "accept: application/json, text/event-stream" \
   -H "content-type: application/json" \
@@ -172,7 +175,7 @@ curl -X POST "http://localhost:3000/api/mcp" \
 ## Déploiement
 
 Vercel (Next.js). Variables via le dashboard Vercel (dont `MCP_BEARER_TOKEN`, requis, à poser
-**avant** deploy). Endpoints : `/api/webhooks/whatsapp`, `/api/mcp`, `/api/intervals/mcp` et
+**avant** deploy). Endpoints : `/api/webhooks/whatsapp`, `/api/coaching-data/mcp`, `/api/intervals/mcp` et
 `/admin`.
 
 Pour utiliser l'admin, poser `ADMIN_USER` (min 3 car.) et `ADMIN_PASSWORD` (min 16 car.).

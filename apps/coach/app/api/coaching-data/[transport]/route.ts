@@ -1,27 +1,26 @@
 import { createMcpHandler, withMcpAuth } from "mcp-handler";
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
-import { registerIntervalsIcuTools } from "../../../../src/intervals/mcp-tools";
+import { registerAthleteDataTools } from "../../../../src/mcp/tools";
 import { getDeps } from "../../../../src/deps";
 import { verifyBearerToken } from "../../../../src/auth";
 
 // MCP requests are dynamic and must never be statically cached.
 export const dynamic = "force-dynamic";
 
-// A second static MCP endpoint (/api/intervals/mcp), distinct from the athlete-data one
-// (/api/coaching-data/mcp) so the brain keeps its `intervals-icu` server name and per-agent read/write
-// toolset allowlists unchanged. Each tool takes an `athleteId` argument (the same
-// `inigo_athlete_id` coach injects into every message); the resolver fetches + decrypts that
-// athlete's Intervals.icu key from Neon at request time, so the secret never reaches the LLM.
+// A single static endpoint (/api/coaching-data/mcp) shared by all athletes: a Managed Agent configures one
+// fixed MCP server URL, so the athlete cannot be a dynamic URL segment. Each tool takes an
+// `athleteId` argument (fed by the `inigo_athlete_id` line coach injects into every message),
+// and the store scopes the query to that athlete.
 const handler = createMcpHandler(
   (server) => {
-    const { intervalsResolver } = getDeps();
-    registerIntervalsIcuTools(server, intervalsResolver);
+    const { athleteData } = getDeps();
+    registerAthleteDataTools(server, athleteData);
   },
   {
-    serverInfo: { name: "intervals-icu-mcp", version: "0.1.0" },
+    serverInfo: { name: "athlete-data-mcp", version: "0.1.0" },
     capabilities: { tools: {} }
   },
-  { basePath: "/api/intervals" }
+  { basePath: "/api/coaching-data" }
 );
 
 const authHandler = withMcpAuth(

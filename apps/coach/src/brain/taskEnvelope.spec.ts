@@ -23,9 +23,15 @@ describe("formatDateDuJour", () => {
 });
 
 describe("formatTurn", () => {
-  it("prepends date_du_jour ahead of the athlete id, chat id and message", () => {
-    expect(formatTurn("a-1", "32475123456@c.us", "salut", FIXED_NOW, "Europe/Brussels")).toBe(
-      "date_du_jour: 2026-07-09 (jeudi)\ninigo_athlete_id: a-1\nchat_id: 32475123456@c.us\nmessage: salut"
+  it("prepends date_du_jour ahead of the athlete id and the message", () => {
+    expect(formatTurn("a-1", "salut", FIXED_NOW, "Europe/Brussels")).toBe(
+      "date_du_jour: 2026-07-09 (jeudi)\ninigo_athlete_id: a-1\nmessage: salut"
     );
+  });
+
+  // The chat id used to travel in the envelope, which forced the agent to carry a WhatsApp
+  // identifier it had no use for. `send_whatsapp_message` resolves it from the athlete now.
+  it("does not carry the WhatsApp chat id", () => {
+    expect(formatTurn("a-1", "salut", FIXED_NOW, "Europe/Brussels")).not.toContain("chat_id");
   });
 });

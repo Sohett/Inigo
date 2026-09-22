@@ -12,7 +12,7 @@
     {
       "name": "inigo-coach-data",
       "type": "url",
-      "url": "https://app.inigo-coach.com/api/mcp"
+      "url": "https://app.inigo-coach.com/api/coaching-data/mcp"
     }
   ],
   "metadata": {},
