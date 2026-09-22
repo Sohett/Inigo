@@ -1,5 +1,5 @@
 {
-  "fetchedAt": "2026-09-22T15:02:27.266Z",
+  "fetchedAt": "2026-09-22T16:53:12.995Z",
   "counts": {
     "agents": 5,
     "environments": 1,
@@ -11,17 +11,17 @@
     {
       "id": "agent_013Cb3npXSMv7T8X533DL9kt",
       "name": "inigo-coordinateur",
-      "version": 18
+      "version": 19
     },
     {
       "id": "agent_01Sp4ghn8GHc5Lbd9JJptEzR",
       "name": "inigo-architecte-macro",
-      "version": 7
+      "version": 8
     },
     {
       "id": "agent_01CTK33Z2CLPwtDyq9vKDsVG",
       "name": "inigo-constructeur-hebdo",
-      "version": 11
+      "version": 12
     },
     {
       "id": "agent_01Dbg6WeAF41xSs8bTfiE8XD",
