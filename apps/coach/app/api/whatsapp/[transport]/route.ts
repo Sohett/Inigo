@@ -12,8 +12,8 @@ export const dynamic = "force-dynamic";
 // resolved here, from the environment and from Neon.
 const handler = createMcpHandler(
   (server) => {
-    const { whatsapp, repo } = getDeps();
-    registerWhatsappTools(server, { resolve: whatsapp, repo });
+    const { whatsapp, repo, whatsappGateway } = getDeps();
+    registerWhatsappTools(server, { resolve: whatsapp, repo, gateway: whatsappGateway });
   },
   {
     serverInfo: { name: "whatsapp-mcp", version: "0.1.0" },

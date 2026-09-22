@@ -17,8 +17,8 @@ export function createOpenWaResolver(env: NodeJS.ProcessEnv = process.env): Reso
     const credentials = openWaCredentials(env);
     if (!credentials) {
       throw new Error(
-        "WhatsApp gateway is not configured. Set OPENWA_BASE_URL, OPENWA_API_KEY and " +
-          "OPENWA_SESSION_ID on the coach deployment (see apps/coach/.env.example)."
+        "WhatsApp gateway is not configured. Set OPENWA_BASE_URL and OPENWA_API_KEY on the " +
+          "coach deployment (see apps/coach/.env.example)."
       );
     }
     return new OpenWaClient(credentials);

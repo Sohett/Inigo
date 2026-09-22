@@ -58,6 +58,10 @@ function makeDeps(
       listAll: vi.fn(() => Promise.resolve(athletes)),
       setSession: vi.fn()
     },
+    gateway: {
+      getSessionId: vi.fn(() => Promise.resolve("gateway-session")),
+      setSessionId: vi.fn()
+    },
     brain: {
       appendUserMessage: vi.fn(),
       createSession: vi.fn(),

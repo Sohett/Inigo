@@ -15,7 +15,6 @@ beforeAll(() => {
   // their absence must not stop this route from serving, only calling the tool.
   delete process.env["OPENWA_BASE_URL"];
   delete process.env["OPENWA_API_KEY"];
-  delete process.env["OPENWA_SESSION_ID"];
 });
 
 describe("whatsapp MCP route", () => {

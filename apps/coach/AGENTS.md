@@ -51,6 +51,7 @@ src/
     routeInboundMessage.ts         # use-case de routing : une seule fonction publique execute()
     startAthleteSession.ts         # use-case admin : clone la session courante, repointe l'athlète
     loadAdminOverview.ts           # use-case admin (lecture) : athlètes + sessions live + inventaire
+  repositories/whatsappGatewayRepository.ts  # PORT : la session de passerelle (en base, pas en env)
   mappers/
     whatsappPayload.ts             # schémas zod + normalisation du payload OpenWA + senderPhone
   brain/managedAgents.ts           # FRONTIÈRE cerveau : appendUserMessage + readSession + createSession + listInventory
@@ -58,8 +59,8 @@ src/
     repository/athleteDataRepository.ts  # accès Neon scopé par athlete (createDb → forAthlete(id)), mappe rows→modèles (domain/coaching) ; seul autre layer @inigo/db-aware
     tools/{index,result,profile,thresholds,goals,plan,adaptationLog}.ts  # tools MCP fins (reads + writes gated)
   whatsapp/
-    client/                        # client OpenWA typé (JSON-RPC tools/call sur MessageSendText ; zéro retry, un envoi n'est pas idempotent)
-    credentials.ts                 # lit OPENWA_* dans l'env — JAMAIS dans configSchema (cf. §Admin)
+    client/                        # client REST OpenWA typé (POST send-text ; zéro retry, un envoi n'est pas idempotent)
+    credentials.ts                 # lit OPENWA_BASE_URL/API_KEY dans l'env — JAMAIS dans configSchema (cf. §Admin)
     resolveClient.ts               # createOpenWaResolver() : résout le client à l'appel, pas au boot
     mcp-tools/{index,result}.ts    # un seul tool : send_whatsapp_message(athleteId, text)
   intervals/
@@ -178,18 +179,23 @@ remplace l'accès direct de l'agent au serveur MCP de la passerelle OpenWA.
   flux d'événements. Coach est fire-and-forget sur Vercel et n'écoute pas ce flux ; il faudrait
   un worker persistant. Un serveur MCP est appelé en serveur à serveur, donc rien ne change.
 - **Credentials hors `configSchema`** (`src/whatsapp/credentials.ts`, même règle que l'admin) :
-  `OPENWA_BASE_URL`, `OPENWA_API_KEY`, `OPENWA_SESSION_ID`. Une absence dégrade ce seul endpoint.
-  `deps.whatsapp` est un **resolver**, pas un client : le construire au boot ferait échouer
-  `getDeps()` pour le webhook et les deux autres MCP.
-- **`OPENWA_SESSION_ID` porte l'UUID de session, pas son nom.** Le nom est rejeté par
-  `MessageSendText` (« Session '<x>' is not active »). C'est le piège qui a cassé la prod.
+  `OPENWA_BASE_URL` et `OPENWA_API_KEY`. Une absence dégrade ce seul endpoint. `deps.whatsapp`
+  est un **resolver**, pas un client : le construire au boot ferait échouer `getDeps()` pour le
+  webhook et les deux autres MCP.
+- **La session de la passerelle vit en base, pas en env** (table `whatsapp_gateway`, une seule
+  ligne, `WhatsappGatewayRepository`). Elle change à chaque ré-appairage WhatsApp (session
+  tombée, QR rescanné) : en variable d'environnement, rendre sa voix au coach demanderait un
+  redeploy. Un formulaire dans `/admin` l'écrit, `POST /api/admin/whatsapp-session`.
+- **Transport vers OpenWA : REST**, `POST /api/sessions/<session>/messages/send-text` avec
+  `X-API-Key` et `{chatId, text}`. La route accepte le nom de session comme son id, ce qui fait
+  disparaître le piège nom-contre-UUID du tool MCP d'OpenWA.
 - **Zéro retry sur l'envoi** (`src/whatsapp/client/client.ts`) : un envoi n'est pas idempotent,
-  une seconde tentative après timeout est un doublon chez l'athlète.
-- **Transport vers OpenWA** : son endpoint MCP (`POST /mcp`, JSON-RPC `tools/call` sur
-  `MessageSendText`). Pas de REST : la passerelle ne publie pas d'OpenAPI et aucune route
-  d'envoi n'est documentée. Détail d'implémentation derrière `OpenWaClient`.
-- **Un 200 ne veut pas dire envoyé** : OpenWA remonte ses échecs métier dans le corps du
-  résultat (`success: false`). Le client les convertit en erreur.
+  une seconde tentative après timeout est un doublon chez l'athlète. Et comme l'agent lit le
+  message d'erreur, le cas timeout dit explicitement de ne pas réessayer.
+- **Un 2xx ne veut pas dire envoyé** : la passerelle remonte ses échecs métier dans le corps
+  (`success: false`). Le client en fait une vraie erreur.
+- **Ni la session ni la clé n'apparaissent dans un message d'erreur** : ces messages remontent
+  au modèle en résultat de tool, donc le client les redacte avant de composer l'erreur.
 
 ## Admin (`/admin`) — ouvrir une session
 

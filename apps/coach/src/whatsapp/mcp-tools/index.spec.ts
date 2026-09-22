@@ -23,11 +23,22 @@ function createRepo(athlete: Athlete | null): AthleteRepository {
   return { findById: async () => athlete } as unknown as AthleteRepository;
 }
 
-async function connect(athlete: Athlete | null, sendText = vi.fn(async () => undefined)) {
+const SESSION = "gateway-session";
+
+function createGateway(sessionId: string | null) {
+  return { getSessionId: async () => sessionId, setSessionId: async () => undefined };
+}
+
+async function connect(
+  athlete: Athlete | null,
+  sendText = vi.fn(async () => undefined),
+  sessionId: string | null = SESSION
+) {
   const server = new McpServer({ name: "test", version: "0.0.0" });
   registerWhatsappTools(server, {
     resolve: () => ({ sendText }) as never,
-    repo: createRepo(athlete)
+    repo: createRepo(athlete),
+    gateway: createGateway(sessionId)
   });
 
   const client = new Client({ name: "test-client", version: "0.0.0" });
@@ -63,7 +74,7 @@ describe("whatsapp MCP tools", () => {
       arguments: { athleteId: ATHLETE_ID, text: "salut" }
     });
 
-    expect(sendText).toHaveBeenCalledWith("32475123456@c.us", "salut");
+    expect(sendText).toHaveBeenCalledWith(SESSION, "32475123456@c.us", "salut");
     expect(textOf(result)).toContain("\"sent\": true");
   });
 
@@ -91,6 +102,19 @@ describe("whatsapp MCP tools", () => {
     expect(sendText).not.toHaveBeenCalled();
   });
 
+  // The session is re-paired often, so "none recorded yet" is a normal state the admin fixes.
+  it("says where to set the session when none is recorded, and sends nothing", async () => {
+    const { client, sendText } = await connect(ATHLETE, vi.fn(async () => undefined), null);
+    const result = await client.callTool({
+      name: "send_whatsapp_message",
+      arguments: { athleteId: ATHLETE_ID, text: "salut" }
+    });
+
+    expect(result.isError).toBe(true);
+    expect(textOf(result)).toContain("Set it from the coach admin");
+    expect(sendText).not.toHaveBeenCalled();
+  });
+
   // A gateway misconfiguration must surface as a tool error, never as a 500 that would look
   // to the agent like the whole MCP server is down.
   it("turns an unconfigured gateway into a tool error", async () => {
@@ -99,7 +123,8 @@ describe("whatsapp MCP tools", () => {
       resolve: () => {
         throw new Error("WhatsApp gateway is not configured. Set OPENWA_BASE_URL, …");
       },
-      repo: createRepo(ATHLETE)
+      repo: createRepo(ATHLETE),
+      gateway: createGateway(SESSION)
     });
     const client = new Client({ name: "test-client", version: "0.0.0" });
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();

@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FirstSessionForm } from "./_components/first-session-form";
 import { NewSessionButton } from "./_components/new-session-button";
+import { WhatsappSessionForm } from "./_components/whatsapp-session-form";
 
 // Reads live DB and control-plane state, so it must never be prerendered or cached.
 export const dynamic = "force-dynamic";
@@ -68,7 +69,11 @@ function SessionSummary({
 
 export default async function AdminPage() {
   const deps = getDeps();
-  const overview = await createLoadAdminOverview({ repo: deps.repo, brain: deps.brain }).execute();
+  const overview = await createLoadAdminOverview({
+    repo: deps.repo,
+    brain: deps.brain,
+    gateway: deps.whatsappGateway
+  }).execute();
 
   return (
     <main className="mx-auto grid max-w-4xl gap-6 px-4 py-10">
@@ -82,6 +87,25 @@ export default async function AdminPage() {
           Anthropic, rien n'est stocké de ce côté.
         </p>
       </header>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Passerelle WhatsApp</CardTitle>
+          <CardDescription>
+            La voix du coach. Tout le reste peut marcher sans que l'athlète reçoive quoi que ce
+            soit.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {overview.whatsappSessionError ? (
+            <p className="text-sm text-destructive">
+              Session illisible en base : {overview.whatsappSessionError}
+            </p>
+          ) : (
+            <WhatsappSessionForm current={overview.whatsappSessionId} />
+          )}
+        </CardContent>
+      </Card>
 
       {overview.athletes.length === 0 ? (
         <p className="text-sm text-muted-foreground">Aucun athlète en base.</p>

@@ -197,16 +197,16 @@ DB_ENCRYPTION_KEY        = <clé base64 32 octets>
 WHATSAPP_WEBHOOK_SECRET  = $OWA_WEBHOOK_SECRET   # optionnel
 OPENWA_BASE_URL          = $OWA_URL
 OPENWA_API_KEY           = $OWA_API_KEY
-OPENWA_SESSION_ID        = <UUID de la session, PAS son nom>
 ```
 Depuis INI-37, l'agent n'appelle plus la passerelle : il appelle `/api/whatsapp/mcp` sur coach,
-qui relaie. D'où les trois variables `OPENWA_*` **côté app** (elles ne sont pas dans
-`configSchema` : une absence ne dégrade que cet endpoint). Le routing reste fire-and-forget, et
-la session Managed Agent est toujours résolue par `phone_num` dans Neon.
+qui relaie vers `POST $OWA_URL/api/sessions/<session>/messages/send-text`. D'où ces deux
+variables **côté app** (hors `configSchema` : une absence ne dégrade que cet endpoint). Le
+routing reste fire-and-forget, et la session Managed Agent est toujours résolue par `phone_num`
+dans Neon.
 
-⚠️ `OPENWA_SESSION_ID` est l'**UUID** renvoyé par `GET $OWA_URL/api/sessions`, pas le nom
-(`default`). `MessageSendText` rejette le nom avec « Session '<x>' is not active » : c'est
-exactement ce qui a rendu le coach muet (INI-24).
+⚠️ **La session de la passerelle n'est pas une variable d'env.** Elle change à chaque
+ré-appairage WhatsApp, donc elle vit en base (`whatsapp_gateway`) et se règle depuis `/admin`.
+Si le coach devient muet après un rescan de QR, c'est là qu'on la remet, sans redeploy.
 
 ### Côté Managed Agent (contrôle Anthropic, une fois)
 - **Plus de vault `static_bearer` pour OpenWA** : l'agent ne parle plus à la passerelle, c'est

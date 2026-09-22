@@ -12,8 +12,9 @@ import {
 } from "./mcp/repository/athleteDataRepository";
 import { createIntervalsResolver } from "./intervals/resolveClient";
 import type { ResolveClient } from "./intervals/mcp-tools/result";
-import { createOpenWaResolver } from "./whatsapp/resolveClient";
-import type { ResolveOpenWaClient } from "./whatsapp/resolveClient";
+import { createOpenWaResolver, type ResolveOpenWaClient } from "./whatsapp/resolveClient";
+import { createDrizzleWhatsappGatewayRepository } from "./repositories/drizzleWhatsappGatewayRepository";
+import type { WhatsappGatewayRepository } from "./repositories/whatsappGatewayRepository";
 
 export interface Deps {
   config: Config;
@@ -29,6 +30,8 @@ export interface Deps {
    * throw on every request path instead of only on `/api/whatsapp/mcp`.
    */
   whatsapp: ResolveOpenWaClient;
+  /** Reads and writes the WhatsApp gateway session recorded in Neon. */
+  whatsappGateway: WhatsappGatewayRepository;
 }
 
 let cached: Deps | null = null;
@@ -56,7 +59,8 @@ export function getDeps(): Deps {
         config.DB_ENCRYPTION_KEY,
         config.INTERVALS_BASE_URL
       ),
-      whatsapp: createOpenWaResolver()
+      whatsapp: createOpenWaResolver(),
+      whatsappGateway: createDrizzleWhatsappGatewayRepository(db)
     };
   }
   return cached;

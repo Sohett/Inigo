@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AthleteRepository } from "../../repositories/athleteRepository";
+import type { WhatsappGatewayRepository } from "../../repositories/whatsappGatewayRepository";
 import type { ResolveOpenWaClient } from "../resolveClient";
 import { athleteIdShape, runTool } from "./result";
 
@@ -9,6 +10,8 @@ export interface WhatsappToolDeps {
   resolve: ResolveOpenWaClient;
   /** Reads the athlete's chat id, learned by the routing on the first inbound message. */
   repo: AthleteRepository;
+  /** Reads the gateway session, which lives in Neon because re-pairing WhatsApp changes it. */
+  gateway: WhatsappGatewayRepository;
 }
 
 /**
@@ -48,7 +51,14 @@ export function registerWhatsappTools(server: McpServer, deps: WhatsappToolDeps)
               `their first inbound message, so this athlete has to write first.`
           );
         }
-        await deps.resolve().sendText(athlete.chatId, args.text);
+        const sessionId = await deps.gateway.getSessionId();
+        if (!sessionId) {
+          throw new Error(
+            "No WhatsApp gateway session is recorded. Set it from the coach admin; it changes " +
+              "every time the WhatsApp session is re-paired."
+          );
+        }
+        await deps.resolve().sendText(sessionId, athlete.chatId, args.text);
         return { sent: true };
       })
   );
