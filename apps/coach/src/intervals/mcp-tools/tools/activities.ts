@@ -1,5 +1,10 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import {
+  COACHED_ACTIVITY_FIELDS,
+  DEFAULT_READ_BOUNDS
+} from "../../../domain/training";
+import { toCoachedActivities, toCoachedActivity } from "../../mappers/project";
 import { assertAthleteId, athleteIdShape, dateRangeShape, runAthleteTool, runTool, type ResolveClient } from "../result";
 import {
   ReadStreamsFailure,
@@ -8,7 +13,7 @@ import {
 } from "../../../use-cases/readActivityStreams";
 
 /** ISO date (YYYY-MM-DD) for `days` ago, used as a default range start. */
-function isoDaysAgo(days: number): string {
+export function isoDaysAgo(days: number): string {
   const date = new Date();
   date.setUTCDate(date.getUTCDate() - days);
   return date.toISOString().slice(0, 10);
@@ -24,20 +29,38 @@ export function registerActivityTools(
     {
       title: "List activities",
       description:
-        "List the athlete's activities for a date range (defaults to the last 30 days). Returns summary data (name, type, distance, training load) per activity.",
+        "List the athlete's activities over a date range, most recent first. Defaults to the " +
+        "last 30 days and the 15 most recent. Each activity carries what a coach reasons " +
+        "about: load, intensity, zone times, decoupling, felt effort, compliance with the " +
+        "planned session. Ask for `fields` only if you need something outside that.",
       inputSchema: {
         ...athleteIdShape,
         ...dateRangeShape,
-        limit: z.number().int().positive().optional().describe("Maximum number of activities to return.")
+        limit: z
+          .number()
+          .int()
+          .positive()
+          .optional()
+          .describe(`Maximum number of activities (default ${String(DEFAULT_READ_BOUNDS.activityLimit)}).`),
+        fields: z
+          .array(z.string())
+          .optional()
+          .describe(
+            "Override the default field set, which is deliberately reduced. Name the Intervals.icu " +
+              "fields you need if one is missing from a result."
+          )
       }
     },
     (args) =>
-      runAthleteTool(resolve, args.athleteId, (client) =>
-        client.getActivities({
-          oldest: args.oldest ?? isoDaysAgo(30),
-          newest: args.newest,
-          limit: args.limit
-        })
+      runAthleteTool(resolve, args.athleteId, async (client) =>
+        toCoachedActivities(
+          await client.getActivities({
+            oldest: args.oldest ?? isoDaysAgo(30),
+            newest: args.newest,
+            limit: args.limit ?? DEFAULT_READ_BOUNDS.activityLimit,
+            fields: args.fields ?? COACHED_ACTIVITY_FIELDS
+          })
+        )
       )
   );
 
@@ -45,13 +68,18 @@ export function registerActivityTools(
     "get_activity",
     {
       title: "Get activity details",
-      description: "Get the full detail of a single activity by its id.",
+      description:
+        "Get one activity: what a coach reasons about (load, intensity, zone times, decoupling, " +
+        "felt effort, compliance with the planned session).",
       inputSchema: {
         ...athleteIdShape,
         activityId: z.string().describe("Activity id, e.g. 'i1234567'.")
       }
     },
-    (args) => runAthleteTool(resolve, args.athleteId, (client) => client.getActivity(args.activityId))
+    (args) =>
+      runAthleteTool(resolve, args.athleteId, async (client) =>
+        toCoachedActivity(await client.getActivity(args.activityId))
+      )
   );
 
   server.registerTool(

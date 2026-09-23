@@ -161,3 +161,99 @@ describe("registerIntervalsIcuTools without a stored credential", () => {
     expect(content[0]!.text).toContain("No Intervals.icu credential");
   });
 });
+
+describe("what the Intervals tools actually return", () => {
+  /** A client that records the options each read was called with. */
+  function recordingClient(overrides: Record<string, unknown> = {}) {
+    const calls: Record<string, unknown> = {};
+    const mock = {
+      getActivities: async (options: unknown) => {
+        calls["getActivities"] = options;
+        return [{ id: "i1", name: "Sortie", strava_id: 42, average_wind_speed: 12 }];
+      },
+      getWellness: async (options: unknown) => {
+        calls["getWellness"] = options;
+        return [{ id: "2026-09-21", ctl: 70, bloodGlucose: 5.4 }];
+      },
+      getEvents: async (options: unknown) => {
+        calls["getEvents"] = options;
+        return [{ id: 1, name: "VO2", workout_doc: { steps: ["…"] }, push_errors: [] }];
+      },
+      getEvent: async () => ({ id: 1, name: "VO2", workout_doc: { steps: ["…"] }, uid: "x" }),
+      ...overrides
+    };
+    return { client: mock as unknown as IntervalsIcuClient, calls };
+  }
+
+  async function connectRecording(overrides: Record<string, unknown> = {}) {
+    const { client, calls } = recordingClient(overrides);
+    const { resolve } = recordingResolver(client);
+    return { mcpClient: await connect(resolve), calls };
+  }
+
+  function parse(result: unknown): unknown {
+    const content = (result as { content: { text: string }[] }).content;
+    return JSON.parse(content[0]!.text);
+  }
+
+  it("applies the default activity limit and asks Intervals for the coach field list", async () => {
+    const { mcpClient, calls } = await connectRecording();
+
+    await mcpClient.callTool({ name: "get_activities", arguments: { athleteId: ATHLETE_ID } });
+
+    const options = calls["getActivities"] as { limit: number; fields: readonly string[] };
+    expect(options.limit).toBe(15);
+    expect(options.fields).toContain("icu_training_load");
+    expect(options.fields).not.toContain("average_wind_speed");
+  });
+
+  it("projects the activity listing, even on fields Intervals sent anyway", async () => {
+    const { mcpClient } = await connectRecording();
+
+    const result = await mcpClient.callTool({
+      name: "get_activities",
+      arguments: { athleteId: ATHLETE_ID }
+    });
+
+    expect(parse(result)).toEqual([{ id: "i1", name: "Sortie" }]);
+  });
+
+  it("defaults the wellness range instead of reading all of history", async () => {
+    const { mcpClient, calls } = await connectRecording();
+
+    await mcpClient.callTool({ name: "get_wellness", arguments: { athleteId: ATHLETE_ID } });
+
+    const options = calls["getWellness"] as { oldest: string };
+    expect(options.oldest).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("drops medical fields from wellness", async () => {
+    const { mcpClient } = await connectRecording();
+
+    const result = await mcpClient.callTool({
+      name: "get_wellness",
+      arguments: { athleteId: ATHLETE_ID }
+    });
+
+    expect(parse(result)).toEqual([{ id: "2026-09-21", ctl: 70 }]);
+  });
+
+  // A week is five to seven sessions: their step-by-step structures do not belong in a listing.
+  it("leaves the session structure out of the listing but serves it on a single read", async () => {
+    const { mcpClient } = await connectRecording();
+
+    const listed = await mcpClient.callTool({
+      name: "get_events",
+      arguments: { athleteId: ATHLETE_ID }
+    });
+    const single = await mcpClient.callTool({
+      name: "get_event",
+      arguments: { athleteId: ATHLETE_ID, eventId: "1" }
+    });
+
+    expect(JSON.stringify(parse(listed))).not.toContain("workout_doc");
+    expect(JSON.stringify(parse(listed))).not.toContain("push_errors");
+    expect(JSON.stringify(parse(single))).toContain("workout_doc");
+    expect(JSON.stringify(parse(single))).not.toContain("uid");
+  });
+});

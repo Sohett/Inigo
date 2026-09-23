@@ -54,6 +54,54 @@ describe("IntervalsIcuClient", () => {
     expect(url!.searchParams.get("limit")).toBe("10");
   });
 
+  // `fields` is one of only two endpoints where Intervals can project server-side, and it
+  // excludes nulls too: fewer keys AND no empty ones.
+  it("sends the coach field list, comma separated, when listing activities", async () => {
+    let url: URL | null = null;
+    server.use(
+      http.get(`${BASE_URL}/athlete/${ATHLETE}/activities`, ({ request }) => {
+        url = new URL(request.url);
+        return HttpResponse.json([]);
+      })
+    );
+
+    await makeClient().getActivities({ fields: ["id", "name", "icu_training_load"] });
+
+    expect(url!.searchParams.get("fields")).toBe("id,name,icu_training_load");
+  });
+
+  // The tool four of the five agents call. It reads three fields out of the 46 a wellness
+  // record carries, so it asks for three.
+  it("asks wellness for only the three fields getFitness reads", async () => {
+    let url: URL | null = null;
+    server.use(
+      http.get(`${BASE_URL}/athlete/${ATHLETE}/wellness`, ({ request }) => {
+        url = new URL(request.url);
+        return HttpResponse.json([]);
+      })
+    );
+
+    await makeClient().getFitness({ oldest: "2026-01-01" });
+
+    expect(url!.searchParams.get("fields")).toBe("id,ctl,atl");
+  });
+
+  it("forwards the events limit the API offers", async () => {
+    let url: URL | null = null;
+    server.use(
+      http.get(`${BASE_URL}/athlete/${ATHLETE}/events`, ({ request }) => {
+        url = new URL(request.url);
+        return HttpResponse.json([]);
+      })
+    );
+
+    await makeClient().getEvents({ limit: 30 });
+
+    expect(url!.searchParams.get("limit")).toBe("30");
+    // `ext` would append the workout file as base64 to every event.
+    expect(url!.searchParams.has("ext")).toBe(false);
+  });
+
   it("parses and returns an activity", async () => {
     server.use(
       http.get(`${BASE_URL}/activity/abc`, () =>

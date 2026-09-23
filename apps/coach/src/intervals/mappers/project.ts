@@ -7,9 +7,12 @@
  */
 import {
   COACHED_ACTIVITY_FIELDS,
+  EVENT_SUMMARY_FIELDS,
   WELLNESS_DAY_FIELDS,
   type CoachedActivity,
+  type CoachedEvent,
   type CurveSeries,
+  type EventField,
   type WellnessDay
 } from "../../domain/training";
 
@@ -99,4 +102,18 @@ export function toCurveSeriesList(raw: unknown): CurveSeries[] {
   return list
     .filter((entry): entry is Record<string, unknown> => entry !== null && typeof entry === "object")
     .map(toCurveSeries);
+}
+
+/** One event, reduced to the fields a coach reasons about. `fields` picks listing or detail. */
+export function toCoachedEvent(
+  raw: Record<string, unknown>,
+  fields: readonly EventField[]
+): CoachedEvent {
+  const projected = pick(raw, fields);
+  return { ...projected, id: raw["id"] as string | number };
+}
+
+/** The week's calendar: no `workout_doc`, which `get_event` serves for one session. */
+export function toCoachedEvents(raw: Record<string, unknown>[]): CoachedEvent[] {
+  return raw.map((event) => toCoachedEvent(event, EVENT_SUMMARY_FIELDS));
 }

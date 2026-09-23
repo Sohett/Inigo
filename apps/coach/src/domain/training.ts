@@ -173,3 +173,61 @@ export interface CurveSeries {
   /** Power curves only: the same values per kilogram. */
   wattsPerKg?: number[];
 }
+
+/**
+ * The event fields a coach reasons about, out of the 60 Intervals returns.
+ *
+ * Split between the listing and the single read on purpose. `workout_doc` carries the whole
+ * step-by-step structure of a session: useful when the athlete asks what a session is, wasteful
+ * seven times over when the question is what the week looks like. The listing answers "what is
+ * planned", `get_event` answers "what exactly is this session".
+ */
+export const EVENT_SUMMARY_FIELDS = [
+  // Identity and placement in the calendar
+  "id",
+  "start_date_local",
+  "end_date_local",
+  "category",
+  "type",
+  "sub_type",
+  "name",
+  "description",
+  // The prescription: intended load and targets
+  "icu_training_load",
+  "icu_intensity",
+  "moving_time",
+  "distance",
+  "load_target",
+  "time_target",
+  "distance_target",
+  "target",
+  // Execution context
+  "indoor",
+  "carbs_per_hour"
+] as const;
+
+/** The listing fields plus the full session structure. */
+export const EVENT_DETAIL_FIELDS = [...EVENT_SUMMARY_FIELDS, "workout_doc"] as const;
+
+export type EventField = (typeof EVENT_DETAIL_FIELDS)[number];
+
+/** A calendar event as the coach sees it. */
+export type CoachedEvent = { id: string | number } & Partial<
+  Record<Exclude<EventField, "id">, unknown>
+>;
+
+/**
+ * How much history a read returns when the caller names no bounds.
+ *
+ * These are coaching choices, not technical limits, so they are declared here rather than
+ * invented in an adapter. A month of activities and of wellness is what a coach looks back on
+ * to judge current form; beyond that the agent asks for a range explicitly.
+ */
+export const DEFAULT_READ_BOUNDS = {
+  /** Activities returned when no `limit` is given, on top of the existing 30-day window. */
+  activityLimit: 15,
+  /** Days of wellness returned when no range is given. */
+  wellnessDays: 30,
+  /** Events returned when no `limit` is given. The API already defaults to a 7-day window. */
+  eventLimit: 30
+} as const;

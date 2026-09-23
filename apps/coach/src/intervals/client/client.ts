@@ -218,10 +218,16 @@ export class IntervalsIcuClient {
   // ----- Events -----
 
   getEvents(
-    range: DateRange & { category?: string[] } = {}
+    range: DateRange & { category?: string[]; limit?: number } = {}
   ): Promise<z.infer<typeof eventListSchema>> {
     return this.requestJson(`/athlete/${this.athleteId}/events`, eventListSchema, {
-      query: { oldest: range.oldest, newest: range.newest, category: range.category }
+      // `ext` is deliberately never passed: it appends the workout file as base64 to every event.
+      query: {
+        oldest: range.oldest,
+        newest: range.newest,
+        category: range.category,
+        limit: range.limit
+      }
     });
   }
 
