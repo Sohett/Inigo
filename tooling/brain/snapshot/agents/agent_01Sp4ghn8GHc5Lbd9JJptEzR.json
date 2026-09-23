@@ -20,7 +20,7 @@
     "effort": {
       "type": "medium"
     },
-    "id": "claude-opus-5",
+    "id": "claude-opus-5-5",
     "speed": "standard"
   },
   "multiagent": null,
@@ -114,6 +114,6 @@
     }
   ],
   "type": "agent",
-  "updated_at": "2026-09-22T12:33:02.619258Z",
-  "version": 6
+  "updated_at": "2026-09-22T16:53:02.483918Z",
+  "version": 8
 }

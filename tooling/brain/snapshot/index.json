@@ -1,5 +1,5 @@
 {
-  "fetchedAt": "2026-09-22T12:33:16.510Z",
+  "fetchedAt": "2026-09-22T16:53:12.995Z",
   "counts": {
     "agents": 5,
     "environments": 1,
@@ -11,27 +11,27 @@
     {
       "id": "agent_013Cb3npXSMv7T8X533DL9kt",
       "name": "inigo-coordinateur",
-      "version": 17
+      "version": 19
     },
     {
       "id": "agent_01Sp4ghn8GHc5Lbd9JJptEzR",
       "name": "inigo-architecte-macro",
-      "version": 6
+      "version": 8
     },
     {
       "id": "agent_01CTK33Z2CLPwtDyq9vKDsVG",
       "name": "inigo-constructeur-hebdo",
-      "version": 10
+      "version": 12
     },
     {
       "id": "agent_01Dbg6WeAF41xSs8bTfiE8XD",
       "name": "inigo-analyste-post-seance",
-      "version": 6
+      "version": 7
     },
     {
       "id": "agent_012ethnUdHzvRW9iPxdzzbTx",
       "name": "inigo-readaptateur",
-      "version": 10
+      "version": 11
     }
   ],
   "memoryStores": [
