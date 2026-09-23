@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AthleteDataRepository } from "../repository/athleteDataRepository";
 import type { ProfilePatch } from "../../domain/coaching";
-import { athleteIdShape, runTool } from "./result";
+import { athleteIdShape, runAthleteTool } from "./result";
 
 const constraintsShape = z
   .object({
@@ -42,7 +42,7 @@ export function registerProfileReadTools(server: McpServer, store: AthleteDataRe
         "(preferences, health rules, targets) — live fitness/FTP/zones come from the Intervals.icu MCP.",
       inputSchema: { ...athleteIdShape }
     },
-    (args) => runTool(() => store.forAthlete(args.athleteId).getProfile())
+    (args) => runAthleteTool(store, args.athleteId, (scoped) => scoped.getProfile())
   );
 }
 
@@ -69,7 +69,7 @@ export function registerProfileWriteTools(server: McpServer, store: AthleteDataR
       }
     },
     (args) =>
-      runTool(async () => {
+      runAthleteTool(store, args.athleteId, async (scoped) => {
         const patch: ProfilePatch = {};
         if (args.weightTargetKg !== undefined) patch.weightTargetKg = String(args.weightTargetKg);
         if (args.constraints !== undefined) patch.constraints = args.constraints;
@@ -79,7 +79,7 @@ export function registerProfileWriteTools(server: McpServer, store: AthleteDataR
         if (Object.keys(patch).length === 0) {
           throw new Error("update_profile requires at least one field to update.");
         }
-        return store.forAthlete(args.athleteId).updateProfile(patch);
+        return scoped.updateProfile(patch);
       })
   );
 }

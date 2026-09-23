@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
@@ -181,5 +181,61 @@ describe("registerAthleteDataTools", () => {
     expect(result.isError).toBe(true);
     const content = result.content as { type: string; text: string }[];
     expect(content[0]!.text).toMatch(/at least one field to update/i);
+  });
+});
+
+function textOf(result: unknown): string {
+  const content = (result as { content: { type: string; text?: string }[] }).content;
+  return content.find((block) => block.type === "text")?.text ?? "";
+}
+
+describe("athlete-data tool inputs", () => {
+  // Le regex d'UUID ne doit jamais revenir dans le schéma : il fait 166 caractères que le
+  // modèle relit à chaque requête, sur chacun des outils, pour recopier un id qu'on lui donne.
+  it("declares athleteId as a plain string, with no regex in the schema", async () => {
+    const client = await connect();
+    const { tools } = await client.listTools();
+
+    for (const tool of tools) {
+      const athleteId = (tool.inputSchema.properties as Record<string, unknown>)["athleteId"];
+      expect(athleteId, `${tool.name} n'expose plus athleteId`).toBeDefined();
+      expect(JSON.stringify(athleteId), tool.name).not.toContain("pattern");
+      expect(JSON.stringify(athleteId), tool.name).not.toContain("format");
+    }
+  });
+
+  // La validation n'est pas supprimée, elle est déplacée côté serveur.
+  it("rejects a malformed athleteId with a clean error, without touching the store", async () => {
+    const getGoals = vi.fn(async () => []);
+    const client = await connect({ getGoals });
+    const result = await client.callTool({
+      name: "get_goals",
+      arguments: { athleteId: "pas-un-uuid" }
+    });
+
+    expect(result.isError).toBe(true);
+    expect(textOf(result)).toContain("Invalid athleteId");
+    expect(getGoals).not.toHaveBeenCalled();
+  });
+
+  it("still accepts a well-formed athleteId", async () => {
+    const client = await connect();
+    const result = await client.callTool({
+      name: "get_goals",
+      arguments: { athleteId: ATHLETE_ID }
+    });
+
+    expect(result.isError).toBeFalsy();
+  });
+
+  // Une entrée de journal fait 2 390 caractères en moyenne : vingt d'un coup, c'est ~17 000
+  // tokens écrits en cache puis relus à chaque requête suivante du thread.
+  it("caps the adaptation log at 30 entries", async () => {
+    const client = await connect();
+    const { tools } = await client.listTools();
+    const log = tools.find((tool) => tool.name === "get_adaptation_log");
+    const limit = (log?.inputSchema.properties as Record<string, { maximum?: number }>)["limit"];
+
+    expect(limit?.maximum).toBe(30);
   });
 });

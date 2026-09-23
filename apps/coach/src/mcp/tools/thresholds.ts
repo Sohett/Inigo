@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AthleteDataRepository } from "../repository/athleteDataRepository";
-import { athleteIdShape, runTool } from "./result";
+import { athleteIdShape, runAthleteTool } from "./result";
 
 export function registerThresholdTools(server: McpServer, store: AthleteDataRepository): void {
   server.registerTool(
@@ -21,6 +21,6 @@ export function registerThresholdTools(server: McpServer, store: AthleteDataRepo
           .describe("Filter to one sport. Omit to get the latest thresholds for every sport.")
       }
     },
-    (args) => runTool(() => store.forAthlete(args.athleteId).getThresholds(args.sport))
+    (args) => runAthleteTool(store, args.athleteId, (scoped) => scoped.getThresholds(args.sport))
   );
 }

@@ -59,7 +59,7 @@ describe("whatsapp MCP tools", () => {
     const result = await call(client);
 
     expect(execute).toHaveBeenCalledWith(ATHLETE_ID, "salut");
-    expect(textOf(result)).toContain('"sent": true');
+    expect(textOf(result)).toBe('{"sent":true}');
   });
 
   it.each([
