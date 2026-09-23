@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import type { Athlete } from "../domain/athlete";
+import type { Athlete, AthleteSession } from "../domain/athlete";
 import type { BrainInventory, RunningSession } from "../domain/brain";
 import { createLoadAdminOverview, type LoadAdminOverviewDeps } from "./loadAdminOverview";
 
@@ -45,6 +45,7 @@ function makeDeps(
   overrides: {
     readSession?: LoadAdminOverviewDeps["brain"]["readSession"];
     listInventory?: LoadAdminOverviewDeps["brain"]["listInventory"];
+    listSessions?: LoadAdminOverviewDeps["repo"]["listSessions"];
   } = {}
 ) {
   const readSession = vi.fn(overrides.readSession ?? (() => Promise.resolve(running)));
@@ -56,7 +57,8 @@ function makeDeps(
       setChatId: vi.fn(),
       findById: vi.fn(),
       listAll: vi.fn(() => Promise.resolve(athletes)),
-      setSession: vi.fn()
+      setSession: vi.fn(),
+      listSessions: vi.fn(overrides.listSessions ?? (() => Promise.resolve([])))
     },
     gateway: {
       getSessionId: vi.fn(() => Promise.resolve("gateway-session")),
@@ -80,7 +82,7 @@ describe("loadAdminOverview", () => {
 
     expect(readSession).toHaveBeenCalledWith("sesn_1");
     expect(overview.athletes).toEqual([
-      { athlete: withSession, session: running, sessionError: null }
+      { athlete: withSession, session: running, sessionError: null, pastSessions: [] }
     ]);
   });
 
@@ -103,7 +105,8 @@ describe("loadAdminOverview", () => {
     expect(overview.athletes[0]).toEqual({
       athlete: withoutSession,
       session: null,
-      sessionError: null
+      sessionError: null,
+      pastSessions: []
     });
   });
 
@@ -134,5 +137,27 @@ describe("loadAdminOverview", () => {
     expect(overview.inventory).toBeNull();
     expect(overview.inventoryError).toContain("anthropic down");
     expect(overview.athletes).toHaveLength(1);
+  });
+
+  it("lists the sessions a newer one replaced, without the live one", async () => {
+    const live: AthleteSession = {
+      sessionId: "sesn_1",
+      agentId: "agent_coord",
+      startedAt: new Date("2026-09-02T00:00:00Z"),
+      endedAt: null
+    };
+    const replaced: AthleteSession = {
+      sessionId: "sesn_0",
+      agentId: "agent_coord",
+      startedAt: new Date("2026-09-01T00:00:00Z"),
+      endedAt: new Date("2026-09-02T00:00:00Z")
+    };
+    const listSessions = vi.fn(() => Promise.resolve([live, replaced]));
+    const { deps } = makeDeps([withSession], { listSessions });
+
+    const overview = await createLoadAdminOverview(deps).execute();
+
+    expect(listSessions).toHaveBeenCalledWith("a-1");
+    expect(overview.athletes[0]?.pastSessions).toEqual([replaced]);
   });
 });

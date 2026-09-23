@@ -29,7 +29,8 @@ function makeAthlete(overrides: Partial<Athlete> = {}): Athlete {
 const unusedRepoMethods = () => ({
   findById: vi.fn(() => Promise.resolve(null)),
   listAll: vi.fn(() => Promise.resolve([])),
-  setSession: vi.fn(() => Promise.resolve())
+  setSession: vi.fn(() => Promise.resolve()),
+  listSessions: vi.fn(() => Promise.resolve([]))
 });
 const unusedBrainMethods = () => ({
   createSession: vi.fn(() => Promise.resolve({ sessionId: "sesn_unused", agentVersion: 1 })),

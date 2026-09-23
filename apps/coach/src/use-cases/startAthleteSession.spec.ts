@@ -58,7 +58,8 @@ function makeDeps(
         Promise.resolve(overrides.athlete === undefined ? athlete : overrides.athlete)
       ),
       listAll: vi.fn(() => Promise.resolve([athlete])),
-      setSession
+      setSession,
+      listSessions: vi.fn()
     },
     brain: {
       appendUserMessage: vi.fn(),

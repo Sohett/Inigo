@@ -1,5 +1,5 @@
 import type { ManagedAgentBrain } from "../brain/managedAgents";
-import type { Athlete } from "../domain/athlete";
+import type { Athlete, AthleteSession } from "../domain/athlete";
 import type { BrainInventory, RunningSession } from "../domain/brain";
 import type { AthleteRepository } from "../repositories/athleteRepository";
 import type { WhatsappGatewayRepository } from "../repositories/whatsappGatewayRepository";
@@ -11,6 +11,8 @@ export interface AthleteOverview {
   session: RunningSession | null;
   /** Why the session could not be read. Null when there was nothing to read, or it worked. */
   sessionError: string | null;
+  /** Sessions a newer one replaced, newest first. Still readable at Anthropic. */
+  pastSessions: AthleteSession[];
 }
 
 export interface AdminOverview {
@@ -57,6 +59,10 @@ export function createLoadAdminOverview(deps: LoadAdminOverviewDeps): LoadAdminO
         (error: unknown) => ({ sessionId: null, error: messageOf(error) })
       );
 
+      // Session history is our own table: a read failure is a DB outage, like `listAll`,
+      // so it fails the page instead of being captured per athlete.
+      const histories = await Promise.all(athletes.map((athlete) => deps.repo.listSessions(athlete.id)));
+
       const needsInventory = athletes.some((athlete) => athlete.anthropicSessionId === null);
       const [inventoryResult, ...sessionResults] = await Promise.all([
         needsInventory
@@ -85,7 +91,8 @@ export function createLoadAdminOverview(deps: LoadAdminOverviewDeps): LoadAdminO
         athletes: athletes.map((athlete, index) => ({
           athlete,
           session: sessionResults[index]?.session ?? null,
-          sessionError: sessionResults[index]?.sessionError ?? null
+          sessionError: sessionResults[index]?.sessionError ?? null,
+          pastSessions: (histories[index] ?? []).filter((session) => session.endedAt !== null)
         })),
         inventory: inventoryResult.inventory,
         inventoryError: inventoryResult.error,
