@@ -6,7 +6,8 @@ owner of the coaching database schema and its migrations. Consumers (`coach` tod
 
 ## What lives here vs. Intervals.icu
 
-The DB owns the **coaching layer**: athlete identity/routing, encrypted secrets,
+The DB owns the **coaching layer**: athlete identity/routing, the history of their agent
+sessions (`athlete_session`, one live), encrypted secrets,
 profile (physiology + historised thresholds), goals, the macro-plan (`training_plan`
 → `plan_block` with weekly targets), weekly propositions (the gate workflow), and the
 append-only `adaptation_log`.

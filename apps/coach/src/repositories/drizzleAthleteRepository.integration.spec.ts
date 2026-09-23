@@ -1,13 +1,14 @@
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { athlete, createDb, type Db } from "@inigo/db";
+import { athlete, athleteSession, createDb, type Db } from "@inigo/db";
 import { createDrizzleAthleteRepository } from "./drizzleAthleteRepository";
 
 /**
  * Live round-trip of the inline adapter query against a real Neon branch. Skipped
  * unless DATABASE_URL is set, so `pnpm verify` stays offline and green in CI. The
  * query text lives in the coach adapter (not @inigo/db), so this is where it is
- * exercised end-to-end. Provisions and tears down its own athlete row.
+ * exercised end-to-end. Provisions and tears down its own athlete row (its sessions
+ * go with it by cascade).
  *
  * Run it with:
  *   DATABASE_URL=postgres://... pnpm --filter @inigo/coach test
@@ -28,13 +29,15 @@ describe.skipIf(!databaseUrl)("drizzleAthleteRepository (integration)", () => {
       .values({
         phoneNum: TEST_PHONE,
         whatsappLid: TEST_LID,
-        displayName: "Repo Integration",
-        anthropicSessionId: "sesn_test"
+        displayName: "Repo Integration"
       })
       .returning({ id: athlete.id });
     const row = inserted[0];
     expect(row).toBeDefined();
     athleteId = row!.id;
+    await db
+      .insert(athleteSession)
+      .values({ athleteId, anthropicSessionId: "sesn_test", managedAgentId: "agent_test" });
   });
 
   afterAll(async () => {
@@ -49,7 +52,7 @@ describe.skipIf(!databaseUrl)("drizzleAthleteRepository (integration)", () => {
     expect(found).not.toBeNull();
     expect(found!.id).toBe(athleteId);
     expect(found!.phoneNum).toBe(TEST_PHONE);
-    expect(found!.anthropicSessionId).toBe("sesn_test");
+    expect(found!.activeSession).toEqual({ sessionId: "sesn_test", agentId: "agent_test" });
   });
 
   it("returns null for an unknown phone", async () => {
@@ -75,5 +78,24 @@ describe.skipIf(!databaseUrl)("drizzleAthleteRepository (integration)", () => {
     await repo.setChatId(athleteId, "320000000005@c.us");
     const found = await repo.findByPhone(TEST_PHONE);
     expect(found!.chatId).toBe("320000000005@c.us");
+  });
+
+  it("switches the live session while keeping the previous one in the history", async () => {
+    const repo = createDrizzleAthleteRepository(db);
+    await repo.setSession(athleteId, "sesn_test_2", "agent_test");
+
+    const found = await repo.findById(athleteId);
+    expect(found!.activeSession?.sessionId).toBe("sesn_test_2");
+
+    const sessions = await repo.listSessions(athleteId);
+    expect(sessions.map((session) => session.sessionId)).toEqual(["sesn_test_2", "sesn_test"]);
+    expect(sessions[0]!.endedAt).toBeNull();
+    expect(sessions[1]!.endedAt).toBeInstanceOf(Date);
+  });
+
+  it("refuses a second live session for the same athlete", async () => {
+    await expect(
+      db.insert(athleteSession).values({ athleteId, anthropicSessionId: "sesn_test_rogue", managedAgentId: "agent_test" })
+    ).rejects.toThrow();
   });
 });

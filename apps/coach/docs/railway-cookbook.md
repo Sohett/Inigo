@@ -212,8 +212,8 @@ Si le coach devient muet après un rescan de QR, c'est là qu'on la remet, sans 
 - **Plus de vault `static_bearer` pour OpenWA** : l'agent ne parle plus à la passerelle, c'est
   coach qui la contacte avec ses propres variables d'env. L'entrée peut être retirée du vault.
 - **Session par athlète** créée avec l'agent coach + le vault (les bearers des trois MCP coach :
-  `coaching-data`, `intervals-icu` et `whatsapp`) → son id stocké en base dans
-  `athlete.anthropic_session_id` (avec le `phone_num`).
+  `coaching-data`, `intervals-icu` et `whatsapp`) → ouverte depuis `/admin`,
+  qui l'enregistre comme session active de l'athlète dans `athlete_session`.
 - **Prompt système** : reçoit `chat_id: …\nmessage: …` → répond via
   `MessageSendText(sessionId="<UUID session OpenWA>", chatId=<fourni>, text=…)`.
 

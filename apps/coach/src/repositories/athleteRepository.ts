@@ -1,4 +1,4 @@
-import type { Athlete } from "../domain/athlete";
+import type { Athlete, AthleteSession } from "../domain/athlete";
 
 /**
  * Port for athlete persistence. Business logic (the routing use-case) depends only
@@ -17,8 +17,11 @@ export interface AthleteRepository {
   /** Every athlete, oldest first — the admin roster. */
   listAll(): Promise<Athlete[]>;
   /**
-   * Point an athlete at a freshly created Managed Agent session. Writes the agent id
-   * alongside so the row always says which agent the live session actually runs.
+   * Make a freshly created Managed Agent session the athlete's live one. The previous
+   * live session is closed, not overwritten, so it stays in the history. Records the
+   * agent id alongside so the history always says which agent each session runs.
    */
   setSession(athleteId: string, sessionId: string, agentId: string): Promise<void>;
+  /** Every session the athlete has been routed to, newest first, the live one included. */
+  listSessions(athleteId: string): Promise<AthleteSession[]>;
 }

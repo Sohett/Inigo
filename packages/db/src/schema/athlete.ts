@@ -4,12 +4,11 @@ import { timestamps } from "./columns";
 import type { AthleteStatus } from "./types";
 
 /**
- * The athlete: identity, WhatsApp routing, and pointers into the Managed Agent
- * control plane. This is the routing core (INI-5: a message reaches the right
- * session via `phoneNum`; a CRON resumes a conversation via `anthropicSessionId`).
+ * The athlete: identity and WhatsApp routing. This is the routing core (INI-5: a
+ * message reaches the right athlete via `phoneNum` or `whatsappLid`).
  *
- * One athlete = one conversation/session in this phase, so the session/agent
- * pointers live inline — no premature multi-session abstraction.
+ * The Managed Agent sessions the athlete is routed to live in `athlete_session`,
+ * which keeps the history and marks the live one.
  */
 export const athlete = pgTable(
   "athlete",
@@ -30,12 +29,6 @@ export const athlete = pgTable(
     timezone: text("timezone").notNull().default("Europe/Brussels"),
     locale: text("locale").default("fr"),
     status: text("status").$type<AthleteStatus>().notNull().default("active"),
-    /** Managed Agent session (`sesn_…`) this athlete's messages are appended to. */
-    anthropicSessionId: text("anthropic_session_id"),
-    /** Managed Agent (`agent_…`), the coordinator. */
-    managedAgentId: text("managed_agent_id"),
-    /** Legacy per-athlete memory store (`memstore_…`), kept for ops/routing. */
-    memoryStoreId: text("memory_store_id"),
     ...timestamps()
   },
   (t) => [check("athlete_status_check", sql`${t.status} in ('active', 'paused', 'ended')`)]

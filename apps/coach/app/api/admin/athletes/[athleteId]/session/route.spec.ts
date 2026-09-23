@@ -12,8 +12,7 @@ const athlete: Athlete = {
   whatsappLid: null,
   chatId: null,
   status: "active",
-  anthropicSessionId: "sesn_old",
-  managedAgentId: "agent_old"
+  activeSession: { sessionId: "sesn_old", agentId: "agent_old" }
 };
 
 const running: RunningSession = {
@@ -150,7 +149,7 @@ describe("POST /api/admin/athletes/[athleteId]/session", () => {
   });
 
   it("answers 409 for an athlete with no session and no elements supplied", async () => {
-    fake.findById.mockResolvedValue({ ...athlete, anthropicSessionId: null });
+    fake.findById.mockResolvedValue({ ...athlete, activeSession: null });
     const { POST } = await import("./route");
     const response = await POST(
       post(athlete.id, { authorization: basic() }),
@@ -162,7 +161,7 @@ describe("POST /api/admin/athletes/[athleteId]/session", () => {
   });
 
   it("opens a first session from the supplied elements (200)", async () => {
-    fake.findById.mockResolvedValue({ ...athlete, anthropicSessionId: null });
+    fake.findById.mockResolvedValue({ ...athlete, activeSession: null });
     const { POST } = await import("./route");
     const response = await POST(
       post(
@@ -179,7 +178,7 @@ describe("POST /api/admin/athletes/[athleteId]/session", () => {
   });
 
   it("answers 400 with the offending fields when the elements are malformed", async () => {
-    fake.findById.mockResolvedValue({ ...athlete, anthropicSessionId: null });
+    fake.findById.mockResolvedValue({ ...athlete, activeSession: null });
     const { POST } = await import("./route");
     const response = await POST(
       post(

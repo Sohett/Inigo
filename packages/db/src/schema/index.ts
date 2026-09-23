@@ -1,6 +1,6 @@
 /**
- * V0 schema barrel. Nine tables owned by Neon: the athlete core (identity/routing,
- * secret, profile, historised thresholds, goals) and the coaching output
+ * V0 schema barrel. The tables owned by Neon: the athlete core (identity/routing,
+ * agent sessions, secret, profile, historised thresholds, goals) and the coaching output
  * (macro-plan, blocks, weekly propositions, adaptation journal).
  *
  * Deliberately NOT here (owned by Intervals.icu, never duplicated): activities,
@@ -8,6 +8,7 @@
  * The `flag` signals table is V0+ and lands in a dedicated issue.
  */
 export { athlete } from "./athlete";
+export { athleteSession } from "./athleteSession";
 export { athleteCredential } from "./credential";
 export { athleteProfile } from "./profile";
 export { athleteThreshold } from "./threshold";
