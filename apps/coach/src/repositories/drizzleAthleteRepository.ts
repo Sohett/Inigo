@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, type SQL } from "drizzle-orm";
+import { and, desc, eq, isNull, sql, type SQL } from "drizzle-orm";
 import { athlete, athleteSession, type Db } from "@inigo/db";
 import type { Athlete, AthleteSession } from "../domain/athlete";
 import type { AthleteRepository } from "./athleteRepository";
@@ -79,9 +79,10 @@ export function createDrizzleAthleteRepository(db: Db): AthleteRepository {
     async setSession(athleteId: string, sessionId: string, agentId: string): Promise<void> {
       // Close the live session, then open the new one. Neon's HTTP driver has no interactive
       // transaction, so `db.batch` (one non-interactive Postgres transaction) makes the swap
-      // atomic: the athlete is never left without a live session, nor with two.
+      // atomic: the athlete is never left without a live session, nor with two. Both sides use
+      // the transaction's `now()`, so the old session ends exactly when the new one starts.
       await db.batch([
-        db.update(athleteSession).set({ endedAt: new Date() }).where(isLiveSessionOf(athleteId)),
+        db.update(athleteSession).set({ endedAt: sql`now()` }).where(isLiveSessionOf(athleteId)),
         db.insert(athleteSession).values({ athleteId, anthropicSessionId: sessionId, managedAgentId: agentId })
       ]);
     },
