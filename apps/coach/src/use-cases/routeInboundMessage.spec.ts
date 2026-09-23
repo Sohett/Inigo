@@ -16,8 +16,7 @@ function makeAthlete(overrides: Partial<Athlete> = {}): Athlete {
     whatsappLid: null,
     chatId: "32475123456@c.us",
     status: "active",
-    anthropicSessionId: "sesn_abc",
-    managedAgentId: "agent_abc",
+    activeSession: { sessionId: "sesn_abc", agentId: "agent_abc" },
     ...overrides
   };
 }
@@ -154,7 +153,7 @@ describe("routeInboundMessage", () => {
   });
 
   it("ignores a known number that has no session yet", async () => {
-    const { deps, appendUserMessage, setChatId } = makeDeps(makeAthlete({ anthropicSessionId: null }));
+    const { deps, appendUserMessage, setChatId } = makeDeps(makeAthlete({ activeSession: null }));
     const outcome = await createRouteInboundMessage(deps).execute(inbound);
 
     expect(outcome).toEqual({ status: "ignored", reason: "no_session" });

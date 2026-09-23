@@ -52,8 +52,7 @@ describe.skipIf(!databaseUrl)("drizzleAthleteRepository (integration)", () => {
     expect(found).not.toBeNull();
     expect(found!.id).toBe(athleteId);
     expect(found!.phoneNum).toBe(TEST_PHONE);
-    expect(found!.anthropicSessionId).toBe("sesn_test");
-    expect(found!.managedAgentId).toBe("agent_test");
+    expect(found!.activeSession).toEqual({ sessionId: "sesn_test", agentId: "agent_test" });
   });
 
   it("returns null for an unknown phone", async () => {
@@ -86,7 +85,7 @@ describe.skipIf(!databaseUrl)("drizzleAthleteRepository (integration)", () => {
     await repo.setSession(athleteId, "sesn_test_2", "agent_test");
 
     const found = await repo.findById(athleteId);
-    expect(found!.anthropicSessionId).toBe("sesn_test_2");
+    expect(found!.activeSession?.sessionId).toBe("sesn_test_2");
 
     const sessions = await repo.listSessions(athleteId);
     expect(sessions.map((session) => session.sessionId)).toEqual(["sesn_test_2", "sesn_test"]);

@@ -13,8 +13,7 @@ const ATHLETE: Athlete = {
   whatsappLid: null,
   chatId: "32475123456@c.us",
   status: "active",
-  anthropicSessionId: "sesn_1",
-  managedAgentId: "agent_1"
+  activeSession: { sessionId: "sesn_1", agentId: "agent_1" }
 };
 
 function build(

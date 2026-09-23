@@ -213,8 +213,10 @@ coordinateur et en fait la session active de l'athlète dans `athlete_session`.
   La session active est la ligne sans `ended_at` ; un index unique partiel interdit d'en
   avoir deux par athlète. `setSession` clôt l'active et insère la nouvelle dans un seul
   `db.batch` (une transaction Postgres, le driver HTTP Neon n'a pas de transaction
-  interactive). Les lectures d'athlète joignent la session active, donc le modèle `Athlete`
-  garde `anthropicSessionId` / `managedAgentId` et les use-cases n'en savent rien. L'admin
+  interactive). Les lectures d'athlète joignent la session active dans la même requête (via l'index
+  partiel, jamais tout l'historique) : le modèle `Athlete` porte `activeSession`
+  (`{ sessionId, agentId }` ou null), c'est ce que le routing lit. L'historique complet
+  n'est lu que par `listSessions`, pour l'admin. L'admin
   liste les sessions remplacées, toujours lisibles chez Anthropic.
 
 - **Pourquoi une nouvelle session** : référencer l'agent **par id** épingle sa *dernière*

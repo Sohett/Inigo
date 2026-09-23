@@ -85,18 +85,16 @@ export function createRouteInboundMessage(deps: RouteInboundMessageDeps): RouteI
         athlete = await deps.repo.findByPhone(phone);
       }
       if (!athlete) return ignored(IgnoreReason.UnknownNumber);
-      if (!athlete.anthropicSessionId) return ignored(IgnoreReason.NoSession);
+      const { activeSession } = athlete;
+      if (!activeSession) return ignored(IgnoreReason.NoSession);
 
       // Learn the reply target on first contact (or if it changed), then forward.
       if (athlete.chatId !== chatId) {
         await deps.repo.setChatId(athlete.id, chatId);
       }
-      await deps.brain.appendUserMessage(
-        athlete.anthropicSessionId,
-        formatTurn(athlete.id, text)
-      );
+      await deps.brain.appendUserMessage(activeSession.sessionId, formatTurn(athlete.id, text));
 
-      return { status: "forwarded", athleteId: athlete.id, sessionId: athlete.anthropicSessionId, chatId };
+      return { status: "forwarded", athleteId: athlete.id, sessionId: activeSession.sessionId, chatId };
     }
   };
 }

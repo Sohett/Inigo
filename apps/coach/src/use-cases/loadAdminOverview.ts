@@ -63,7 +63,7 @@ export function createLoadAdminOverview(deps: LoadAdminOverviewDeps): LoadAdminO
       // so it fails the page instead of being captured per athlete.
       const histories = await Promise.all(athletes.map((athlete) => deps.repo.listSessions(athlete.id)));
 
-      const needsInventory = athletes.some((athlete) => athlete.anthropicSessionId === null);
+      const needsInventory = athletes.some((athlete) => athlete.activeSession === null);
       const [inventoryResult, ...sessionResults] = await Promise.all([
         needsInventory
           ? deps.brain.listInventory().then(
@@ -76,10 +76,10 @@ export function createLoadAdminOverview(deps: LoadAdminOverviewDeps): LoadAdminO
           : Promise.resolve({ inventory: null, error: null }),
         ...athletes.map(
           (athlete): Promise<{ session: RunningSession | null; sessionError: string | null }> => {
-            if (!athlete.anthropicSessionId) {
+            if (!athlete.activeSession) {
               return Promise.resolve({ session: null, sessionError: null });
             }
-            return deps.brain.readSession(athlete.anthropicSessionId).then(
+            return deps.brain.readSession(athlete.activeSession.sessionId).then(
               (session) => ({ session, sessionError: null }),
               (error: unknown) => ({ session: null, sessionError: messageOf(error) })
             );

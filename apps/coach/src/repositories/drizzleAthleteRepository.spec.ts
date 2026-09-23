@@ -43,21 +43,19 @@ describe("toAthlete", () => {
       whatsappLid: "10325252415590@lid",
       chatId: "32475123456@c.us",
       status: "active",
-      anthropicSessionId: "sesn_abc",
-      managedAgentId: "agent_abc"
+      activeSession: { sessionId: "sesn_abc", agentId: "agent_abc" }
     });
   });
 
-  it("maps an athlete without a live session to null pointers", () => {
+  it("maps an athlete without a live session to a null active session", () => {
     const mapped = toAthlete(makeRow({ chatId: null }), null);
     expect(mapped.chatId).toBeNull();
-    expect(mapped.anthropicSessionId).toBeNull();
-    expect(mapped.managedAgentId).toBeNull();
+    expect(mapped.activeSession).toBeNull();
   });
 
   it("does not leak DB-only columns (timezone, timestamps)", () => {
     expect(Object.keys(toAthlete(makeRow(), makeSessionRow())).sort()).toEqual(
-      ["anthropicSessionId", "chatId", "displayName", "id", "managedAgentId", "phoneNum", "status", "whatsappLid"].sort()
+      ["activeSession", "chatId", "displayName", "id", "phoneNum", "status", "whatsappLid"].sort()
     );
   });
 });

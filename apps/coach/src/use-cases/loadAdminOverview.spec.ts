@@ -10,16 +10,14 @@ const withSession: Athlete = {
   whatsappLid: null,
   chatId: null,
   status: "active",
-  anthropicSessionId: "sesn_1",
-  managedAgentId: "agent_coord"
+  activeSession: { sessionId: "sesn_1", agentId: "agent_coord" }
 };
 
 const withoutSession: Athlete = {
   ...withSession,
   id: "a-2",
   displayName: "Nouvelle",
-  anthropicSessionId: null,
-  managedAgentId: null
+  activeSession: null
 };
 
 const running: RunningSession = {
@@ -111,7 +109,7 @@ describe("loadAdminOverview", () => {
   });
 
   it("surfaces a broken session on its own row without losing the others", async () => {
-    const other: Athlete = { ...withSession, id: "a-3", anthropicSessionId: "sesn_gone" };
+    const other: Athlete = { ...withSession, id: "a-3", activeSession: { sessionId: "sesn_gone", agentId: "agent_coord" } };
     const { deps } = makeDeps([withSession, other], {
       readSession: vi.fn((sessionId: string) =>
         sessionId === "sesn_gone"

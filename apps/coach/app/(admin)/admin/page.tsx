@@ -154,7 +154,7 @@ export default async function AdminPage() {
               {sessionError && (
                 <div className="grid gap-1 text-xs">
                   <p className="text-destructive">
-                    La session <span className="font-mono">{athlete.anthropicSessionId}</span> est
+                    La session <span className="font-mono">{athlete.activeSession?.sessionId}</span> est
                     illisible chez Anthropic.
                   </p>
                   <p className="text-muted-foreground">{sessionError}</p>

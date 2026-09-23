@@ -19,8 +19,9 @@ export function toAthlete(row: AthleteRow, liveSession: AthleteSessionRow | null
     whatsappLid: row.whatsappLid,
     chatId: row.chatId,
     status: row.status,
-    anthropicSessionId: liveSession?.anthropicSessionId ?? null,
-    managedAgentId: liveSession?.managedAgentId ?? null
+    activeSession: liveSession
+      ? { sessionId: liveSession.anthropicSessionId, agentId: liveSession.managedAgentId }
+      : null
   };
 }
 
@@ -45,7 +46,7 @@ function isLiveSessionOf(athleteId: typeof athlete.id | string) {
  */
 export function createDrizzleAthleteRepository(db: Db): AthleteRepository {
   /** Athletes joined with their live session (at most one, enforced by a partial unique index). */
-  function selectAthletes() {
+  function selectAthletesWithActiveSession() {
     return db
       .select({ athlete, liveSession: athleteSession })
       .from(athlete)
@@ -53,7 +54,7 @@ export function createDrizzleAthleteRepository(db: Db): AthleteRepository {
   }
 
   async function findOne(where: SQL): Promise<Athlete | null> {
-    const rows = await selectAthletes().where(where).limit(1);
+    const rows = await selectAthletesWithActiveSession().where(where).limit(1);
     const row = rows[0];
     return row ? toAthlete(row.athlete, row.liveSession) : null;
   }
@@ -73,7 +74,7 @@ export function createDrizzleAthleteRepository(db: Db): AthleteRepository {
       return findOne(eq(athlete.id, athleteId));
     },
     async listAll(): Promise<Athlete[]> {
-      const rows = await selectAthletes().orderBy(athlete.createdAt);
+      const rows = await selectAthletesWithActiveSession().orderBy(athlete.createdAt);
       return rows.map((row) => toAthlete(row.athlete, row.liveSession));
     },
     async setSession(athleteId: string, sessionId: string, agentId: string): Promise<void> {

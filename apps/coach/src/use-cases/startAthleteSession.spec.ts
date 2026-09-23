@@ -16,8 +16,7 @@ const athlete: Athlete = {
   whatsappLid: null,
   chatId: "32470000000@c.us",
   status: "active",
-  anthropicSessionId: "sesn_old",
-  managedAgentId: "agent_coord"
+  activeSession: { sessionId: "sesn_old", agentId: "agent_coord" }
 };
 
 const running: RunningSession = {
@@ -178,7 +177,7 @@ describe("startAthleteSession — cloning a live session", () => {
 });
 
 describe("startAthleteSession — first session", () => {
-  const newcomer = { ...athlete, anthropicSessionId: null, managedAgentId: null };
+  const newcomer = { ...athlete, activeSession: null };
 
   it("builds the session from the supplied elements, without reading anything", async () => {
     const { deps, readSession, createSession, setSession } = makeDeps({ athlete: newcomer });

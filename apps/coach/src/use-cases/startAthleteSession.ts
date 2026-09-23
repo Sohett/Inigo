@@ -126,8 +126,8 @@ export function createStartAthleteSession(
       let source: "cloned" | "chosen";
       let sessionElements: SessionElements;
 
-      if (athlete.anthropicSessionId) {
-        const running = await deps.brain.readSession(athlete.anthropicSessionId);
+      if (athlete.activeSession) {
+        const running = await deps.brain.readSession(athlete.activeSession.sessionId);
         sessionElements = {
           agentId: running.agentId,
           environmentId: running.environmentId,
@@ -164,7 +164,7 @@ export function createStartAthleteSession(
         athleteId: athlete.id,
         sessionId: created.sessionId,
         agentVersion: created.agentVersion,
-        previousSessionId: athlete.anthropicSessionId,
+        previousSessionId: athlete.activeSession?.sessionId ?? null,
         source
       };
     }
