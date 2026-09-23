@@ -45,12 +45,12 @@ src/
     brain.ts                       # SessionElements / RunningSession / BrainInventory (indépendants du SDK)
     coaching.ts                    # modèles métier de la donnée coaching (contrat de sortie des tools MCP) + inputs
   repositories/
-    athleteRepository.ts           # PORT AthleteRepository (findByPhone, findByLid, setChatId, findById, listAll, setSession)
+    athleteRepository.ts           # PORT AthleteRepository (findByPhone, findByLid, setChatId, findById, listAll, setSession, listSessions)
     drizzleAthleteRepository.ts     # ADAPTER Drizzle (requête inline) + toAthlete(row→modèle)
   use-cases/
     routeInboundMessage.ts         # use-case de routing : une seule fonction publique execute()
     startAthleteSession.ts         # use-case admin : clone la session courante, repointe l'athlète
-    loadAdminOverview.ts           # use-case admin (lecture) : athlètes + sessions live + inventaire
+    loadAdminOverview.ts           # use-case admin (lecture) : athlètes + sessions live + historique + inventaire
     sendAthleteMessage.ts          # use-case : la seule façon de parler à l'athlète (chat + session de passerelle)
   repositories/whatsappGatewayRepository.ts  # PORT : la session de passerelle (en base, pas en env)
   mappers/
@@ -207,13 +207,21 @@ remplace l'accès direct de l'agent au serveur MCP de la passerelle OpenWA.
 ## Admin (`/admin`) — ouvrir une session
 
 Deuxième capacité de l'app. Un bouton par athlète crée une session Managed Agent sur l'agent
-coordinateur et écrit son id dans `athlete.anthropic_session_id`.
+coordinateur et en fait la session active de l'athlète dans `athlete_session`.
+
+- **Historique des sessions** (`athlete_session`, INI-38) : chaque session ouverte y reste.
+  La session active est la ligne sans `ended_at` ; un index unique partiel interdit d'en
+  avoir deux par athlète. `setSession` clôt l'active et insère la nouvelle dans un seul
+  `db.batch` (une transaction Postgres, le driver HTTP Neon n'a pas de transaction
+  interactive). Les lectures d'athlète joignent la session active, donc le modèle `Athlete`
+  garde `anthropicSessionId` / `managedAgentId` et les use-cases n'en savent rien. L'admin
+  liste les sessions remplacées, toujours lisibles chez Anthropic.
 
 - **Pourquoi une nouvelle session** : référencer l'agent **par id** épingle sa *dernière*
   version à la création, et une session **fige** cette config pour sa vie entière (seuls
   `tools`/`mcp_servers` changent après). Une nouvelle version d'agent n'a donc d'effet runtime
   qu'en (re)créant une session. Même raison que l'étape 3 de `brain:deploy`.
-- **Rien n'est stocké de la config de session.** `readSession` lit la session courante de
+- **Rien n'est stocké de la config de session** (seulement ses ids et ses dates). `readSession` lit la session courante de
   l'athlète (`agent.id`, `environment_id`, `vault_ids`, `resources`) et `createSession` la
   recrée. La session qui tourne **est** la source de vérité : une copie en base ou en env peut
   diverger du plan de contrôle, elle non. Ne réintroduis pas de table de config ici.
@@ -230,7 +238,7 @@ coordinateur et écrit son id dans `athlete.anthropic_session_id`.
   la dérive que cette page doit rendre visible. Même règle que les lectures de `@inigo/brain`.
 - **Ordre des effets** : la session est créée **avant** l'écriture du pointeur, donc un échec
   Anthropic laisse l'athlète sur sa session précédente plutôt que orphelin. `setSession` écrit
-  aussi `managed_agent_id`, pour que la ligne dise toujours quel agent tourne vraiment.
+  aussi `managed_agent_id`, pour que l'historique dise toujours quel agent tournait vraiment.
 - **Ce qui reste dans `tooling/brain`** : appliquer les configs d'agents depuis le snapshot et
   re-pinner le roster (Vercel n'a pas le snapshot git). L'admin ouvre la session, rien de plus.
 - **Auth** : HTTP Basic (`ADMIN_USER`/`ADMIN_PASSWORD`) posée par `proxy.ts`, matcher limité à
@@ -286,14 +294,16 @@ le skill Claude Code `managed-agents-api`.
   auth (HMAC + bearer + Basic : en-tête absent/malformé, mauvais user, mauvais mot de passe,
   deux-points dans le mot de passe ; `adminCredentials` qui échoue fermé sur absent/trop court),
   **routes webhook et MCP bootées avec un admin inutilisable** (la régression de prod),
-  parsing/normalisation du payload + `senderPhone`, mapping `toAthlete`, **use-case
+  parsing/normalisation du payload + `senderPhone`, mapping `toAthlete` / `toAthleteSession`
+  (intégration Neon, skippée sans `DATABASE_URL` : bascule de session qui garde l'ancienne,
+  deuxième session active refusée par la DB), **use-case
   `routeInboundMessage`** (4 cas de routing + filtres + throws infra, repo & brain fakes),
   brain (fake SDK : append, readSession qui retire les champs output-only, createSession,
   listInventory), **`startAthleteSession`** (clone nominal, éléments ignorés quand il y a une
   session, ressources reportées telles quelles, première session depuis des éléments choisis,
   préfixes d'ids refusés, athlète inconnu, échec de lecture ou de création qui n'écrit rien) et
   **`loadAdminOverview`** (session cassée isolée sur sa ligne, inventaire injoignable qui
-  dégrade au lieu de casser). Route admin : 401 sans/avec mauvais identifiants, 400 UUID
+  dégrade au lieu de casser, historique sans la session active). Route admin : 401 sans/avec mauvais identifiants, 400 UUID
   invalide, 200 clone, 200 première session, 409 sans rien à cloner, 404, 502. Côté MCP :
   intégration `InMemoryTransport` (reads + writes présents dont
   `save_training_plan`, un call renvoie du JSON, validation de date rejetée), route (401 sans

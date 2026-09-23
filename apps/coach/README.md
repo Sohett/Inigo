@@ -72,8 +72,8 @@ webhook WhatsApp et les deux MCP avec elle. Elles sont lues et validées là où
 
 1. **Gateway OpenWA sur Railway** — voir [`docs/railway-cookbook.md`](docs/railway-cookbook.md).
 2. **Session Managed par athlète** : ouverte depuis l'**admin** (`/admin`, bouton
-   « Nouvelle session »), qui la crée et écrit son id dans `athlete.anthropic_session_id` —
-   c'est ce que le routing résout. Rien n'est stocké de la config de session : l'admin lit la
+   « Nouvelle session »), qui la crée et en fait la session active de l'athlète dans `athlete_session`
+   (les précédentes restent dans l'historique) : c'est ce que le routing résout. Rien n'est stocké de la config de session : l'admin lit la
    session que l'athlète fait déjà tourner et la recrée à l'identique. L'onboarding
    automatique d'un nouvel athlète reste hors périmètre.
    > Les *deployments* Managed servent uniquement aux runs planifiés (cron) ; ici on n'en utilise pas : le coach pousse les messages à une session existante via l'API (`POST /v1/sessions/:id/events`).
