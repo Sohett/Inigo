@@ -115,10 +115,5 @@ export type Gear = z.infer<typeof gearSchema>;
  */
 export const curveSchema = z.unknown();
 
-/** A single fitness data point derived from wellness records. */
-export interface FitnessPoint {
-  date: string;
-  ctl: number | null;
-  atl: number | null;
-  form: number | null;
-}
+/** Re-exported for the client's own signatures; the model lives in the domain. */
+export type { FitnessPoint } from "../../domain/training";

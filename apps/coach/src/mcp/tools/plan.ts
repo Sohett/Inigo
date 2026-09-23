@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AthleteDataRepository } from "../repository/athleteDataRepository";
 import type { TrainingPlanInput } from "../../domain/coaching";
-import { athleteIdShape, runTool } from "./result";
+import { athleteIdShape, runAthleteTool } from "./result";
 
 export function registerPlanTools(server: McpServer, store: AthleteDataRepository): void {
   server.registerTool(
@@ -15,7 +15,7 @@ export function registerPlanTools(server: McpServer, store: AthleteDataRepositor
         "gate-validated weekly sessions and the live calendar live on Intervals.icu.",
       inputSchema: { ...athleteIdShape }
     },
-    (args) => runTool(() => store.forAthlete(args.athleteId).getTrainingPlan())
+    (args) => runAthleteTool(store, args.athleteId, (scoped) => scoped.getTrainingPlan())
   );
 }
 
@@ -83,7 +83,7 @@ export function registerPlanWriteTools(server: McpServer, store: AthleteDataRepo
       }
     },
     (args) =>
-      runTool(async () => {
+      runAthleteTool(store, args.athleteId, async (scoped) => {
         const input: TrainingPlanInput = {
           name: args.name,
           startDate: args.startDate,
@@ -96,7 +96,7 @@ export function registerPlanWriteTools(server: McpServer, store: AthleteDataRepo
         if (args.goalId !== undefined) input.goalId = args.goalId;
         if (args.rationale !== undefined) input.rationale = args.rationale;
 
-        const result = await store.forAthlete(args.athleteId).saveTrainingPlan(input);
+        const result = await scoped.saveTrainingPlan(input);
         if (input.id && result === null) {
           throw new Error(`Training plan ${input.id} not found for this athlete.`);
         }
