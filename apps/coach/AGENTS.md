@@ -52,6 +52,7 @@ src/
     startAthleteSession.ts         # use-case admin : clone la session courante, repointe l'athlète
     loadAdminOverview.ts           # use-case admin (lecture) : athlètes + sessions live + historique + inventaire
     sendAthleteMessage.ts          # use-case : la seule façon de parler à l'athlète (chat + session de passerelle)
+    readActivityStreams.ts         # use-case : fenêtre obligatoire + refus au-delà du plafond, jamais de troncature
   repositories/whatsappGatewayRepository.ts  # PORT : la session de passerelle (en base, pas en env)
   mappers/
     whatsappPayload.ts             # schémas zod + normalisation du payload OpenWA + senderPhone
@@ -65,7 +66,8 @@ src/
     resolveClient.ts               # createOpenWaResolver() : résout le client à l'appel, pas au boot
     mcp-tools/{index,result}.ts    # un seul tool : send_whatsapp_message(athleteId, text) — mapping pur, zéro décision
   intervals/
-    client/                        # client REST Intervals.icu typé (repris de intervals-icu-mcp, inchangé)
+    client/                        # client REST Intervals.icu typé — transport seul, ajoute fields/limit, ne projette rien
+    mappers/project.ts             # projection objet brut Intervals → modèle du coach (aucune décision)
     mcp-tools/{index,result,tools/*}.ts  # tools MCP Intervals fins ; chaque tool prend athleteId + résout un client par requête
     resolveClient.ts               # createIntervalsResolver(db, encKey, baseUrl) : getIntervalsKey → déchiffre → IntervalsIcuClient
   deps.ts                          # singleton lazy { config, brain, db, repo, athleteData, intervalsResolver }
@@ -203,6 +205,42 @@ remplace l'accès direct de l'agent au serveur MCP de la passerelle OpenWA.
   (`success: false`). Le client en fait une vraie erreur.
 - **Ni la session ni la clé n'apparaissent dans un message d'erreur** : ces messages remontent
   au modèle en résultat de tool, donc le client les redacte avant de composer l'erreur.
+
+## Volume renvoyé aux agents — INI-39
+
+Tout ce qui entre dans le contexte d'un thread est payé **une fois à l'écriture du cache puis
+~5 fois à la relecture** (ratio mesuré sur une vraie session : 2,47 M de tokens écrits pour
+12,58 M relus). Un résultat d'outil de N tokens coûte donc `N × 3,50 $ / 1M` aux tarifs
+`claude-sonnet-5`, pas N tokens payés une fois. D'où les règles suivantes.
+
+- **`domain/training.ts` est le contrat de sortie côté Intervals**, symétrique de
+  `domain/coaching.ts` pour la donnée Neon. Avant, les tools Intervals renvoyaient l'objet brut
+  de l'API : c'est cette asymétrie qui laissait remonter 174 champs par activité.
+- **Les listes de champs y sont l'unique source de vérité.** La même constante alimente le
+  paramètre `fields` envoyé à Intervals et la projection appliquée en sortie. Demander un champ
+  qu'on jette ensuite n'est pas exprimable. Les classifications complètes (174 champs d'Activity,
+  46 de Wellness, 60 d'Event) sont sur INI-39, **vérifiées par script** : gardés + jetés = total,
+  aucun non classé.
+- **`fields` n'existe que sur deux endpoints de l'API** (activities et wellness), et il exclut
+  aussi les nulls. Partout ailleurs la projection se fait chez nous.
+- **Jamais de rééchantillonnage des streams.** Le constructeur programme du 30/15 Rønnestad
+  (30 s à 106-115 % FTP, 15 s à ~50 %) et l'analyste vérifie l'exécution : toute moyenne de
+  bucket plus grossière que quelques secondes efface ce qu'il y avait à vérifier. C'est donc
+  l'appelant qui cible une fenêtre, à résolution pleine, et un appel au-delà de
+  `MAX_STREAM_VALUES` est **refusé** avec de quoi le resserrer. Une troncature silencieuse ferait
+  raisonner l'agent sur un effort partiel sans qu'il le sache.
+- **Les courbes ne renvoient plus `activities`**, qui était une map d'objets Activity complets
+  sans aucun paramètre d'API pour l'exclure.
+- **Liste contre détail** : `get_events` ne porte pas `workout_doc`, `get_event` le porte. Une
+  semaine fait cinq à sept séances.
+- **Résultats minifiés** (`JSON.stringify(data)`), sur les trois serveurs.
+- **`athleteId` est déclaré `z.string()`** : `z.uuid()` émettait un regex de 166 caractères dans
+  le schéma de chacun des 26 outils. La validation est faite côté serveur, dans les wrappers
+  `runAthleteTool`, pour qu'elle ne puisse pas être oubliée sur un outil neuf.
+
+Règle de partage quand tu ajoutes un tool : **choix produit → use-case**, **transformation sans
+décision → mapper**, **forme à nommer → interface de domaine**. Jamais une liste de champs métier
+ni un plafond en dur dans un adaptateur MCP.
 
 ## Admin (`/admin`) — ouvrir une session
 
