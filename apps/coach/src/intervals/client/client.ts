@@ -1,4 +1,5 @@
 import type { z } from "zod";
+import { FITNESS_FIELDS } from "../../domain/training";
 import { IntervalsIcuApiError } from "./errors";
 import {
   activityListSchema,
@@ -133,10 +134,17 @@ export class IntervalsIcuClient {
   // ----- Activities -----
 
   getActivities(
-    range: DateRange & { limit?: number } = {}
+    range: DateRange & { limit?: number; fields?: readonly string[] } = {}
   ): Promise<z.infer<typeof activityListSchema>> {
     return this.requestJson(`/athlete/${this.athleteId}/activities`, activityListSchema, {
-      query: { oldest: range.oldest, newest: range.newest, limit: range.limit }
+      query: {
+        oldest: range.oldest,
+        newest: range.newest,
+        limit: range.limit,
+        // Comma separated, as the API documents it. It also excludes null values, so asking
+        // for fewer fields shrinks the payload twice over.
+        fields: range.fields ? range.fields.join(",") : undefined
+      }
     });
   }
 
@@ -159,15 +167,26 @@ export class IntervalsIcuClient {
 
   // ----- Wellness & fitness -----
 
-  getWellness(range: DateRange = {}): Promise<z.infer<typeof wellnessListSchema>> {
+  getWellness(
+    range: DateRange & { fields?: readonly string[] } = {}
+  ): Promise<z.infer<typeof wellnessListSchema>> {
     return this.requestJson(`/athlete/${this.athleteId}/wellness`, wellnessListSchema, {
-      query: { oldest: range.oldest, newest: range.newest }
+      query: {
+        oldest: range.oldest,
+        newest: range.newest,
+        fields: range.fields ? range.fields.join(",") : undefined
+      }
     });
   }
 
-  /** CTL/ATL/TSB series derived from wellness records (form = ctl - atl). */
+  /**
+   * CTL/ATL/TSB series derived from wellness records (form = ctl - atl).
+   *
+   * Asks Intervals for the three fields it reads and nothing else. A wellness record carries 46
+   * of them, and this is the tool four of the five agents call.
+   */
   async getFitness(range: DateRange = {}): Promise<FitnessPoint[]> {
-    const wellness = await this.getWellness(range);
+    const wellness = await this.getWellness({ ...range, fields: FITNESS_FIELDS });
     return wellness.map((record) => {
       const ctl = record.ctl ?? null;
       const atl = record.atl ?? null;

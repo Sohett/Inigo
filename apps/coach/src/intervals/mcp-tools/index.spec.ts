@@ -4,6 +4,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { IntervalsIcuClient } from "../client";
 import { registerIntervalsIcuTools } from "./index";
+import { createReadActivityStreams } from "../../use-cases/readActivityStreams";
 import type { ResolveClient } from "./result";
 
 const ATHLETE_ID = "550e8400-e29b-41d4-a716-446655440000";
@@ -30,7 +31,10 @@ function recordingResolver(client: IntervalsIcuClient) {
 
 async function connect(resolve: ResolveClient) {
   const server = new McpServer({ name: "test", version: "0.0.0" });
-  registerIntervalsIcuTools(server, resolve);
+  registerIntervalsIcuTools(server, {
+    resolve,
+    readActivityStreams: createReadActivityStreams({ resolveClient: resolve })
+  });
 
   const client = new Client({ name: "test-client", version: "0.0.0" });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();

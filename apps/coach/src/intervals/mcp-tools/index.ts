@@ -1,5 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ResolveClient } from "./result";
+import type { ReadActivityStreams } from "../../use-cases/readActivityStreams";
 import { registerAthleteTools, registerAthleteWriteTools } from "./tools/athlete";
 import { registerActivityTools } from "./tools/activities";
 import { registerWellnessTools } from "./tools/wellness";
@@ -15,9 +16,17 @@ import { registerEventReadTools, registerEventWriteTools } from "./tools/events"
  * Access is bounded by the MCP bearer and, per agent, by the Managed Agent toolset allowlists —
  * so reads and writes are both always registered here.
  */
-export function registerIntervalsIcuTools(server: McpServer, resolve: ResolveClient): void {
+export interface IntervalsToolDeps {
+  /** Resolves the per-athlete Intervals.icu client. */
+  resolve: ResolveClient;
+  /** Owns the window rule and the refusal above the value cap. */
+  readActivityStreams: ReadActivityStreams;
+}
+
+export function registerIntervalsIcuTools(server: McpServer, deps: IntervalsToolDeps): void {
+  const { resolve } = deps;
   registerAthleteTools(server, resolve);
-  registerActivityTools(server, resolve);
+  registerActivityTools(server, resolve, deps.readActivityStreams);
   registerWellnessTools(server, resolve);
   registerFitnessTools(server, resolve);
   registerCurveTools(server, resolve);
