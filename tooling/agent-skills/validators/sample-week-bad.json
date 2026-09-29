@@ -5,6 +5,7 @@
   "athlete_ref": { "ftp_w": 305, "ctl": 45.0, "atl": 48.0, "tsb": -3.0 },
   "phase_targets": { "weekly_tss": [430, 580], "max_z4plus_pct": 15, "ctl_weekly_ramp_max": 5.0 },
   "health_flags": { "run_paused": true },
+  "constraints": [],
   "days": [
     { "date": "2026-06-29", "sport": "Ride", "label": "Spin", "intensity": "recovery", "duration_min": 40, "tss": 25,
       "blocks": [ { "pct_ftp": 50, "minutes": 40 } ] },

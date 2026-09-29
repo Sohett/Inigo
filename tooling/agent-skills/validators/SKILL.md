@@ -48,13 +48,16 @@ Huit checks déterministes, chacun bloquant en cas d'échec :
 - `hard_day_spacing` — ≥ 48 h entre deux jours durs (sauf `intended_back_to_back`).
 - `power_target_sanity` — cibles de puissance dans [30, 160] % FTP ; une séance VO2 contient
   au moins un bloc de travail ≥ 100 %.
-- `fixed_slots` — créneaux fixes respectés (renfo du jeudi ; pas d'indoor en semaine de vacances).
+- `fixed_slots` — contraintes du profil respectées (`constraints` de `get_profile`, recopié tel
+  quel dans `proposed-week.json`) : créneaux fixes tenus, repos les jours indisponibles, pas
+  d'indoor en semaine de vacances.
 - `health` — aucune séance interdite par l'état santé (ex. course alors que `run_paused`).
 
 ## Tests
 
 `test_validators.py` couvre le gate de bout en bout (semaine valide → pass, semaine fautive →
-fail sur les bons checks, sous-charge et ramp excessif rejetés). Lance-le après toute
+fail sur les bons checks, sous-charge et ramp excessif rejetés, créneaux fixes et jours
+indisponibles lus depuis `constraints`). Lance-le après toute
 modification de `run.py` ou des fixtures :
 
 ```

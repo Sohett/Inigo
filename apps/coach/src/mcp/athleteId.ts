@@ -22,7 +22,8 @@ export const athleteIdShape = {
     .describe("The Inigo athlete id — the `inigo_athlete_id` from the incoming message envelope.")
 } as const;
 
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** A canonical UUID, the format of every id in Neon. */
+export const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Enforce the athlete id format here rather than in the tool's JSON Schema, so the regex stays

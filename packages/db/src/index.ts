@@ -15,6 +15,7 @@ export {
   insertAthleteProfileSchema,
   insertAthleteThresholdSchema,
   insertGoalSchema,
+  insertAthleteConstraintSchema,
   insertTrainingPlanSchema,
   insertPlanBlockSchema
 } from "./validation";

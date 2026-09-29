@@ -61,11 +61,91 @@ def test_malformed_input_fails_cleanly():
     print(f"OK  entrée malformée -> fail propre ({sorted(set(rep['blocking_failures']))})")
 
 
+def _fixed_slots(rep):
+    return next(c for c in rep["checks"] if c["id"] == "fixed_slots")
+
+
+def _tuesday_strength_week():
+    """La semaine valide, réordonnée pour poser le renfo le mardi (VO2 mer., seuil ven.)."""
+    w = load("sample-week-good.json")
+    days = w["days"]
+    contents = [days[i] for i in (0, 3, 1, 2, 4, 5, 6)]
+    w["days"] = [dict(c, date=d["date"]) for c, d in zip(contents, days)]
+    w["constraints"] = [{"id": "c-tue", "kind": "fixed_session", "weekday": 2, "activity": "strength"}]
+    return w
+
+
+def test_fixed_slot_read_from_profile_tuesday_passes():
+    # le cas réel (INI-34) : renfo le mardi dans le profil -> 8/8, plus aucun jeudi codé en dur
+    rep = validate(_tuesday_strength_week())
+    assert rep["verdict"] == "pass", f"attendu pass, obtenu {rep['blocking_failures']}"
+    assert len(rep["checks"]) == 8 and all(c["status"] == "pass" for c in rep["checks"])
+    print("OK  renfo mardi (profil) -> 8/8")
+
+
+def test_fixed_slot_missing_on_its_weekday_fails():
+    # profil = renfo mardi, mais la semaine pose le renfo le jeudi -> fail
+    w = load("sample-week-good.json")
+    w["constraints"] = [{"id": "c-tue", "kind": "fixed_session", "weekday": 2, "activity": "strength"}]
+    rep = validate(w)
+    assert "fixed_slots" in rep["blocking_failures"]
+    assert "mardi" in _fixed_slots(rep)["detail"], _fixed_slots(rep)["detail"]
+    print("OK  renfo absent le mardi -> fail (fixed_slots)")
+
+
+def test_session_on_unavailable_day_fails_and_rest_passes():
+    w = _tuesday_strength_week()
+    w["constraints"].append({"id": "c-off", "kind": "unavailable",
+                             "startDate": "2026-07-02", "endDate": "2026-07-02"})
+    rep = validate(w)
+    assert "fixed_slots" in rep["blocking_failures"], "séance un jour indisponible doit échouer"
+    thursday = next(d for d in w["days"] if d["date"] == "2026-07-02")
+    thursday.update(tss=0, blocks=[], duration_min=0)
+    assert _fixed_slots(validate(w))["status"] == "pass", "jour indisponible au repos doit passer"
+    print("OK  séance un jour indisponible -> fail ; repos -> pass")
+
+
+def test_dated_exception_suspends_recurring_fixed_slot():
+    # en déplacement (limited daté) le mardi : le renfo récurrent n'est pas exigé
+    w = load("sample-week-good.json")
+    w["constraints"] = [
+        {"id": "c-tue", "kind": "fixed_session", "weekday": 2, "activity": "strength"},
+        {"id": "c-trip", "kind": "limited", "startDate": "2026-06-29", "endDate": "2026-07-05",
+         "note": "Alpes, vélo outdoor"},
+    ]
+    assert _fixed_slots(validate(w))["status"] == "pass"
+    print("OK  exception datée -> créneau récurrent suspendu")
+
+
+def test_dated_fixed_session_is_enforced():
+    # un créneau fixe daté (ex. séance avec le coach ce lundi précis) est exigé, jamais suspendu
+    w = load("sample-week-good.json")
+    w["constraints"] = [{"id": "c-once", "kind": "fixed_session", "startDate": "2026-06-29",
+                         "endDate": "2026-06-29", "activity": "strength"}]
+    assert "fixed_slots" in validate(w)["blocking_failures"], "créneau fixe daté absent -> fail"
+    print("OK  créneau fixe daté absent -> fail")
+
+
+def test_missing_constraints_fails():
+    # sans `constraints`, le gate ne peut pas vérifier : fail explicite, jamais un faux pass
+    w = load("sample-week-good.json")
+    del w["constraints"]
+    rep = validate(w)
+    assert "fixed_slots" in rep["blocking_failures"]
+    print("OK  constraints absent -> fail (fixed_slots)")
+
+
 if __name__ == "__main__":
     fails = 0
     for fn in [test_good_week_passes, test_bad_week_fails_with_expected_reasons,
                test_undercharge_is_caught, test_ramp_rate_caught,
-               test_malformed_input_fails_cleanly]:
+               test_malformed_input_fails_cleanly,
+               test_fixed_slot_read_from_profile_tuesday_passes,
+               test_fixed_slot_missing_on_its_weekday_fails,
+               test_session_on_unavailable_day_fails_and_rest_passes,
+               test_dated_exception_suspends_recurring_fixed_slot,
+               test_dated_fixed_session_is_enforced,
+               test_missing_constraints_fails]:
         try:
             fn()
         except AssertionError as e:

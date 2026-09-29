@@ -11,13 +11,14 @@ import {
   uuid
 } from "drizzle-orm/pg-core";
 import { athlete } from "./athlete";
-import type { AthleteConstraints, CoachingTargets, Sex } from "./types";
+import type { CoachingTargets, Sex } from "./types";
 
 /**
  * Semi-stable athlete profile (1:1 with `athlete`). Physiology reference values plus
  * narrative coaching context. Current weight lives here as a reference; the weight
  * *series* and daily wellness stay on Intervals.icu. Thresholds are historised in
- * `athlete_threshold`, not frozen here. Objectives get their own structured table.
+ * `athlete_threshold`, not frozen here. Objectives and schedule constraints get their own
+ * structured tables (`goal`, `athlete_constraint`).
  */
 export const athleteProfile = pgTable(
   "athlete_profile",
@@ -33,9 +34,11 @@ export const athleteProfile = pgTable(
     weightTargetKg: numeric("weight_target_kg", { precision: 5, scale: 2 }),
     restingHr: integer("resting_hr"),
     maxHr: integer("max_hr"),
-    /** Machine-checkable availability (weekly hours, fixed slots, equipment). */
-    constraints: jsonb("constraints").$type<AthleteConstraints>(),
-    /** Narrative constraints the agent reads as prose. */
+    /** Usual weekly training volume available, in hours. */
+    weeklyHours: numeric("weekly_hours", { precision: 4, scale: 1 }),
+    /** Equipment at hand (home trainer, power meter, gym…). */
+    equipment: text("equipment").array(),
+    /** Narrative constraints the agent reads as prose. Structured slots live in `athlete_constraint`. */
     constraintsNotes: text("constraints_notes"),
     /** Active limitations + hard rules (markdown) the gate and agent must respect. */
     healthNotes: text("health_notes"),

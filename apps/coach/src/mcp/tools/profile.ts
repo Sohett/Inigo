@@ -4,22 +4,6 @@ import type { AthleteDataRepository } from "../repository/athleteDataRepository"
 import type { ProfilePatch } from "../../domain/coaching";
 import { athleteIdShape, runAthleteTool } from "./result";
 
-const constraintsShape = z
-  .object({
-    weeklyHours: z.number().positive().optional(),
-    fixedSlots: z
-      .array(
-        z.object({
-          day: z.string(),
-          start: z.string().optional(),
-          durationMin: z.number().int().positive().optional()
-        })
-      )
-      .optional(),
-    equipment: z.array(z.string()).optional()
-  })
-  .describe("Machine-checkable availability: weekly hours, fixed slots, equipment.");
-
 const coachingTargetsShape = z
   .object({
     peakEvent: z.string().optional(),
@@ -37,8 +21,9 @@ export function registerProfileReadTools(server: McpServer, store: AthleteDataRe
       description:
         "Read the athlete's structured coaching profile from the shared DB: identity " +
         "(display name, timezone, locale, status), physiology reference (birth date, sex, " +
-        "height, reference weight + target, resting/max HR), machine-checkable constraints, " +
-        "narrative constraints/health notes, and coaching targets. This is the coaching layer " +
+        "height, reference weight + target, resting/max HR), weekly hours, equipment, " +
+        "narrative constraints/health notes, coaching targets, and the active schedule " +
+        "constraints (every recurring one + dated ones not yet over). This is the coaching layer " +
         "(preferences, health rules, targets) — live fitness/FTP/zones come from the Intervals.icu MCP.",
       inputSchema: { ...athleteIdShape }
     },
@@ -53,14 +38,16 @@ export function registerProfileWriteTools(server: McpServer, store: AthleteDataR
       title: "Update athlete profile notes & preferences",
       description:
         "Update simple notes/preferences on the athlete's profile (upsert; only the fields " +
-        "you pass change). Use for target weight, availability constraints, health notes and " +
+        "you pass change). Use for target weight, weekly hours, equipment, health notes and " +
         "coaching targets — not for FTP/zones (those are historised via thresholds and computed " +
-        "by Intervals.icu). At least one field beyond athleteId is required.",
+        "by Intervals.icu), nor for schedule rules (upsert_constraint). At least one field " +
+        "beyond athleteId is required.",
       inputSchema: {
         ...athleteIdShape,
         weightTargetKg: z.number().positive().optional().describe("Target weight in kg."),
-        constraints: constraintsShape.optional(),
-        constraintsNotes: z.string().optional().describe("Narrative availability constraints (prose)."),
+        weeklyHours: z.number().positive().max(99.9).optional().describe("Usual weekly training time, hours."),
+        equipment: z.array(z.string()).optional().describe("Equipment at hand (replaces the list)."),
+        constraintsNotes: z.string().optional().describe("Narrative availability context (prose)."),
         healthNotes: z
           .string()
           .optional()
@@ -72,7 +59,8 @@ export function registerProfileWriteTools(server: McpServer, store: AthleteDataR
       runAthleteTool(store, args.athleteId, async (scoped) => {
         const patch: ProfilePatch = {};
         if (args.weightTargetKg !== undefined) patch.weightTargetKg = String(args.weightTargetKg);
-        if (args.constraints !== undefined) patch.constraints = args.constraints;
+        if (args.weeklyHours !== undefined) patch.weeklyHours = String(args.weeklyHours);
+        if (args.equipment !== undefined) patch.equipment = args.equipment;
         if (args.constraintsNotes !== undefined) patch.constraintsNotes = args.constraintsNotes;
         if (args.healthNotes !== undefined) patch.healthNotes = args.healthNotes;
         if (args.coachingTargets !== undefined) patch.coachingTargets = args.coachingTargets;

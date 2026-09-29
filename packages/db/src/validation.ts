@@ -3,6 +3,7 @@ import { athlete } from "./schema/athlete";
 import { athleteProfile } from "./schema/profile";
 import { athleteThreshold } from "./schema/threshold";
 import { goal } from "./schema/goal";
+import { athleteConstraint } from "./schema/constraint";
 import { planBlock, trainingPlan } from "./schema/plan";
 
 /**
@@ -19,5 +20,6 @@ export const selectAthleteSchema = createSelectSchema(athlete);
 export const insertAthleteProfileSchema = createInsertSchema(athleteProfile);
 export const insertAthleteThresholdSchema = createInsertSchema(athleteThreshold);
 export const insertGoalSchema = createInsertSchema(goal);
+export const insertAthleteConstraintSchema = createInsertSchema(athleteConstraint);
 export const insertTrainingPlanSchema = createInsertSchema(trainingPlan);
 export const insertPlanBlockSchema = createInsertSchema(planBlock);

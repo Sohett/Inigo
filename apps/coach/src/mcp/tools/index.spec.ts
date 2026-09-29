@@ -24,6 +24,8 @@ function createMockStore(overrides: Record<string, unknown> = {}): AthleteDataRe
     updateProfile: async () => ({ athleteId: ATHLETE_ID, profile: { healthNotes: "updated" } }),
     logAdaptation: async () => ({ id: "l2", summary: "logged an adaptation" }),
     upsertGoal: async () => ({ id: "g2", title: "New goal" }),
+    upsertConstraint: async (input: Record<string, unknown>) => ({ id: "c1", ...input }),
+    deleteConstraint: async () => true,
     saveTrainingPlan: async () => ({
       id: "p1",
       name: "Saved plan",
@@ -70,7 +72,14 @@ describe("registerAthleteDataTools", () => {
     const { tools } = await client.listTools();
     const names = tools.map((tool) => tool.name);
     expect(names).toEqual(
-      expect.arrayContaining(["update_profile", "log_adaptation", "upsert_goal", "save_training_plan"])
+      expect.arrayContaining([
+        "update_profile",
+        "log_adaptation",
+        "upsert_goal",
+        "save_training_plan",
+        "upsert_constraint",
+        "delete_constraint"
+      ])
     );
   });
 
@@ -181,6 +190,62 @@ describe("registerAthleteDataTools", () => {
     expect(result.isError).toBe(true);
     const content = result.content as { type: string; text: string }[];
     expect(content[0]!.text).toMatch(/at least one field to update/i);
+  });
+
+  it("saves a recurring constraint through upsert_constraint", async () => {
+    const result = await client.callTool({
+      name: "upsert_constraint",
+      arguments: { athleteId: ATHLETE_ID, kind: "fixed_session", weekday: 2, activity: "strength" }
+    });
+    expect(result.isError).toBeFalsy();
+    const content = result.content as { type: string; text: string }[];
+    expect(JSON.parse(content[0]!.text)).toEqual({
+      id: "c1",
+      kind: "fixed_session",
+      weekday: 2,
+      activity: "strength"
+    });
+  });
+
+  it("rejects a constraint that is both recurring and dated, with a readable reason", async () => {
+    const result = await client.callTool({
+      name: "upsert_constraint",
+      arguments: {
+        athleteId: ATHLETE_ID,
+        kind: "unavailable",
+        weekday: 3,
+        startDate: "2026-10-12",
+        endDate: "2026-10-14"
+      }
+    });
+    expect(result.isError).toBe(true);
+    const content = result.content as { type: string; text: string }[];
+    expect(content[0]!.text).toMatch(/exactly one/i);
+  });
+
+  it("rejects an out-of-range weekday at the schema", async () => {
+    let errored = false;
+    try {
+      const result = await client.callTool({
+        name: "upsert_constraint",
+        arguments: { athleteId: ATHLETE_ID, kind: "unavailable", weekday: 0 }
+      });
+      errored = result.isError === true;
+    } catch {
+      errored = true;
+    }
+    expect(errored).toBe(true);
+  });
+
+  it("surfaces delete_constraint on an id not owned as an error", async () => {
+    const notOwnedClient = await connect({ deleteConstraint: async () => false });
+    const result = await notOwnedClient.callTool({
+      name: "delete_constraint",
+      arguments: { athleteId: ATHLETE_ID, id: "44444444-4444-4444-8444-444444444444" }
+    });
+    expect(result.isError).toBe(true);
+    const content = result.content as { type: string; text: string }[];
+    expect(content[0]!.text).toMatch(/not found for this athlete/i);
   });
 });
 

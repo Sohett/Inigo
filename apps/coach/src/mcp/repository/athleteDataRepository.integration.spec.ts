@@ -83,6 +83,92 @@ describe.skipIf(!databaseUrl)("athleteDataRepository (integration)", () => {
     expect(profile!.profile?.healthNotes).toBe("updated health");
   });
 
+  it("stores weekly hours and equipment as profile columns", async () => {
+    const store = createAthleteDataRepository(db).forAthlete(athleteId);
+    await store.updateProfile({ weeklyHours: "12", equipment: ["home trainer", "power meter"] });
+    const profile = await store.getProfile();
+    expect(profile!.profile?.weeklyHours).toBe("12.0");
+    expect(profile!.profile?.equipment).toEqual(["home trainer", "power meter"]);
+  });
+
+  it("returns recurring and upcoming dated constraints, compact, never past ones", async () => {
+    const store = createAthleteDataRepository(db).forAthlete(athleteId);
+    const tuesday = await store.upsertConstraint({
+      kind: "fixed_session",
+      weekday: 2,
+      activity: "strength",
+      startTime: "07:00",
+      durationMin: 60
+    });
+    const upcoming = await store.upsertConstraint({
+      kind: "unavailable",
+      startDate: "2099-10-12",
+      endDate: "2099-10-14",
+      note: "déplacement"
+    });
+    const past = await store.upsertConstraint({
+      kind: "limited",
+      startDate: "2000-07-13",
+      endDate: "2000-07-19"
+    });
+    expect(tuesday).toEqual({
+      id: tuesday!.id,
+      kind: "fixed_session",
+      weekday: 2,
+      activity: "strength",
+      startTime: "07:00",
+      durationMin: 60
+    });
+
+    const ids = (await store.getProfile())!.constraints.map((c) => c.id);
+    expect(ids).toEqual([tuesday!.id, upcoming!.id]);
+    expect(ids).not.toContain(past!.id);
+  });
+
+  it("keeps a dated constraint through its last day (athlete timezone)", async () => {
+    const store = createAthleteDataRepository(db).forAthlete(athleteId);
+    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Brussels" }).format(new Date());
+    const endsToday = await store.upsertConstraint({ kind: "unavailable", startDate: "2000-01-01", endDate: today });
+    const ids = (await store.getProfile())!.constraints.map((c) => c.id);
+    expect(ids).toContain(endsToday!.id);
+    await store.deleteConstraint(endsToday!.id);
+  });
+
+  it("replaces a constraint whole: omitted fields are cleared", async () => {
+    const store = createAthleteDataRepository(db).forAthlete(athleteId);
+    const created = await store.upsertConstraint({ kind: "limited", weekday: 5, note: "short" });
+    const replaced = await store.upsertConstraint({
+      id: created!.id,
+      kind: "unavailable",
+      startDate: "2099-01-01",
+      endDate: "2099-01-01"
+    });
+    expect(replaced).toEqual({
+      id: created!.id,
+      kind: "unavailable",
+      startDate: "2099-01-01",
+      endDate: "2099-01-01"
+    });
+  });
+
+  it("rejects an incoherent constraint at the DB (CHECK)", async () => {
+    const store = createAthleteDataRepository(db).forAthlete(athleteId);
+    await expect(
+      store.upsertConstraint({ kind: "unavailable", weekday: 3, startDate: "2099-01-01", endDate: "2099-01-02" })
+    ).rejects.toThrow();
+    await expect(store.upsertConstraint({ kind: "fixed_session", weekday: 3 })).rejects.toThrow();
+  });
+
+  it("scopes constraint writes to the athlete", async () => {
+    const ours = createAthleteDataRepository(db).forAthlete(athleteId);
+    const created = await ours.upsertConstraint({ kind: "unavailable", weekday: 7 });
+    const other = createAthleteDataRepository(db).forAthlete(MISSING_ATHLETE);
+    expect(await other.upsertConstraint({ id: created!.id, kind: "unavailable", weekday: 1 })).toBeNull();
+    expect(await other.deleteConstraint(created!.id)).toBe(false);
+    expect(await ours.deleteConstraint(created!.id)).toBe(true);
+    expect(await ours.deleteConstraint(created!.id)).toBe(false);
+  });
+
   it("appends an adaptation-log entry and reads it back", async () => {
     const store = createAthleteDataRepository(db).forAthlete(athleteId);
     await store.logAdaptation({ summary: "integration entry", author: "test" });

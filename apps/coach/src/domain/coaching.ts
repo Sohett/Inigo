@@ -1,5 +1,5 @@
 import type {
-  AdaptationTrigger, AthleteConstraints, AthleteStatus, CoachingTargets, GoalPriority,
+  AdaptationTrigger, AthleteStatus, CoachingTargets, ConstraintActivity, ConstraintKind, GoalPriority,
   GoalStatus, GoalType, PhaseType, PlanAuthor, PlanStatus, Sex, Sport, ThresholdSource,
   WeeklyTarget, Zone
 } from "@inigo/db";
@@ -14,7 +14,8 @@ export interface ProfileDetails {
   weightTargetKg: string | null;
   restingHr: number | null;
   maxHr: number | null;
-  constraints: AthleteConstraints | null;
+  weeklyHours: string | null;
+  equipment: string[] | null;
   constraintsNotes: string | null;
   healthNotes: string | null;
   coachingTargets: CoachingTargets | null;
@@ -26,6 +27,25 @@ export interface CoachProfile {
   locale: string;
   status: AthleteStatus;
   profile: ProfileDetails | null;
+  /** Active schedule constraints: every recurring one + dated ones not yet over. */
+  constraints: AthleteConstraint[];
+}
+
+/**
+ * One schedule constraint, recurring (`weekday`, ISO 1 = Monday) or dated
+ * (`startDate`..`endDate` inclusive). Unset fields are omitted, not null: this list is
+ * read on every build, so it stays as small as the rule it carries.
+ */
+export interface AthleteConstraint {
+  id: string;
+  kind: ConstraintKind;
+  weekday?: number;
+  startDate?: string; // YYYY-MM-DD
+  endDate?: string;   // YYYY-MM-DD
+  activity?: ConstraintActivity;
+  startTime?: string; // HH:MM
+  durationMin?: number;
+  note?: string;
 }
 
 export interface Threshold {
@@ -86,10 +106,26 @@ export interface AdaptationLogEntry {
 
 export interface ProfilePatch {
   weightTargetKg?: string;
-  constraints?: AthleteConstraints;
+  weeklyHours?: string;
+  equipment?: string[];
   constraintsNotes?: string;
   healthNotes?: string;
   coachingTargets?: CoachingTargets;
+}
+/**
+ * A whole constraint rule. On update it replaces the stored rule (fields left out are
+ * cleared): a rule is small, and a full replace can't leave a half-recurring, half-dated row.
+ */
+export interface ConstraintInput {
+  id?: string;
+  kind: ConstraintKind;
+  weekday?: number;
+  startDate?: string;
+  endDate?: string;
+  activity?: ConstraintActivity;
+  startTime?: string;
+  durationMin?: number;
+  note?: string;
 }
 export interface AdaptationLogInput {
   summary: string;

@@ -124,12 +124,14 @@ Un serveur MCP hébergé **dans coach** (choix assumé : pas d'app séparée) do
 
 | Tool | Type | Effet |
 | -- | -- | -- |
-| `get_profile` | read | identité *sûre* (display_name, tz, locale, status) + `athlete_profile`. **Aucun** secret/PII (pas de phone, LID, chat_id, session/agent/memory ids). |
+| `get_profile` | read | identité *sûre* (display_name, tz, locale, status) + `athlete_profile` + `constraints` actives (`athlete_constraint` : toutes les récurrentes + les datées non terminées, date du jour dans le tz de l'athlète ; champs vides omis). **Aucun** secret/PII (pas de phone, LID, chat_id, session/agent/memory ids). |
 | `get_thresholds` | read | dernier `athlete_threshold` par sport (FTP, HR, zones…). Filtre `sport?`. |
 | `get_goals` | read | `goal` filtrés (`status?`, défaut active). |
 | `get_training_plan` | read | plan courant + `plan_block` ordonnés (weekly targets). |
 | `get_adaptation_log` | read | journal (`limit?` défaut 5, max 30, `since?`), plus récent d'abord. |
-| `update_profile` | write | upsert notes/prefs (`weightTargetKg`, `constraints`, `constraintsNotes`, `healthNotes`, `coachingTargets`). |
+| `update_profile` | write | upsert notes/prefs (`weightTargetKg`, `weeklyHours`, `equipment`, `constraintsNotes`, `healthNotes`, `coachingTargets`). |
+| `upsert_constraint` | write | create / **replace-all** (`id`) d'une règle d'horaire : `kind` (`fixed_session` \| `unavailable` \| `limited`), récurrente (`weekday` 1-7) **ou** datée (`startDate`..`endDate`). Règle validée par le use-case `saveAthleteConstraint`, puis par les CHECKs DB. Pas de tool de lecture : `get_profile` la renvoie. |
+| `delete_constraint` | write | supprime une règle (scopée par athleteId). Une datée terminée n'a pas besoin d'être supprimée. |
 | `log_adaptation` | write | append au journal (`summary` requis). |
 | `upsert_goal` | write | create/update d'un `goal` (update scopé par athleteId). |
 | `save_training_plan` | write | create (sans `id`) / update (`id`) du `training_plan` **+** ses `plan_block` en une écriture atomique (`db.batch`). Blocs en **replace-all** (`order_index` recalculé) ; `status=active` archive les autres plans actifs ; update scopé par athleteId (jamais le plan d'un autre). Dates I/O en `YYYY-MM-DD`. |

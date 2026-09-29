@@ -36,6 +36,20 @@
       "when": 1790154351526,
       "tag": "0004_silent_energizer",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790669808166,
+      "tag": "0005_athlete_constraint",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790669813798,
+      "tag": "0006_drop_profile_constraints_jsonb",
+      "breakpoints": true
     }
   ]
 }

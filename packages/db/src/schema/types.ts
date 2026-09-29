@@ -31,6 +31,11 @@ export type AdaptationTrigger =
   | "manual"
   | "scheduled";
 
+/** What a schedule constraint means for planning (see `athlete_constraint`). */
+export type ConstraintKind = "fixed_session" | "unavailable" | "limited";
+/** The activity a `fixed_session` constraint pins to its slot. */
+export type ConstraintActivity = "strength" | Sport;
+
 export type CredentialProvider = "intervals_icu";
 
 /** A single training zone bound (Coggan-style). */
@@ -40,12 +45,6 @@ export interface Zone {
   max: number;
 }
 
-/** Structured availability constraints (the narrative version lives in `constraintsNotes`). */
-export interface AthleteConstraints {
-  weeklyHours?: number;
-  fixedSlots?: { day: string; start?: string; durationMin?: number }[];
-  equipment?: string[];
-}
 
 /** Coaching configuration derived from goals, not from live Intervals.icu data. */
 export interface CoachingTargets {
