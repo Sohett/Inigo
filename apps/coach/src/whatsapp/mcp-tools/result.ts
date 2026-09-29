@@ -1,24 +1,18 @@
-import { z } from "zod";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import { assertAthleteId, athleteIdShape } from "../../mcp/athleteId";
 
 /** Result type returned by every WhatsApp tool. */
 export type ToolResult = CallToolResult;
 
 /**
- * Shared input field: the athlete to message. Same `athleteId` the agent passes to the
- * coaching-data and Intervals MCPs — the `inigo_athlete_id` from the message envelope.
- * The chat to reply to is resolved from it server-side, so the agent never carries a
- * WhatsApp chat id or a gateway session id.
+ * Wrap arbitrary data as a JSON text result.
+ *
+ * Minified on purpose: indentation is pure cost. Every token of a tool result is written to the
+ * thread's cache once and re-read on each following request (a measured 5:1 read/write ratio),
+ * and pretty-printing adds 23% on objects and over 100% on arrays of numbers.
  */
-export const athleteIdShape = {
-  athleteId: z
-    .uuid()
-    .describe("The Inigo athlete id — the `inigo_athlete_id` from the incoming message envelope.")
-} as const;
-
-/** Wrap arbitrary data as a JSON text result. */
 export function jsonResult(data: unknown): ToolResult {
-  return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+  return { content: [{ type: "text", text: JSON.stringify(data) }] };
 }
 
 /** Wrap an error as an MCP error result, never leaking secrets. */
@@ -35,3 +29,6 @@ export async function runTool(fn: () => Promise<unknown>): Promise<ToolResult> {
     return errorResult(error);
   }
 }
+
+// Re-exported so a tool module keeps importing everything it needs from one place.
+export { assertAthleteId, athleteIdShape };

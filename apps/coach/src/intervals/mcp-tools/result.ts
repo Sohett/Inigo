@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import { assertAthleteId, athleteIdShape } from "../../mcp/athleteId";
 import type { IntervalsIcuClient } from "../client";
 
 /** Result type returned by every Intervals.icu tool. */
@@ -13,23 +14,14 @@ export type ToolResult = CallToolResult;
 export type ResolveClient = (athleteId: string) => Promise<IntervalsIcuClient>;
 
 /**
- * Shared input field carried by every tool: the athlete to act on. Same `athleteId` the agent
- * passes to the athlete-data MCP — the `inigo_athlete_id` from the message envelope, our
- * internal id (NOT the Intervals.icu athlete id, which the server resolves from it).
+ * Wrap arbitrary data as a JSON text result.
+ *
+ * Minified on purpose: indentation is pure cost. Every token of a tool result is written to the
+ * thread's cache once and re-read on each following request (a measured 5:1 read/write ratio),
+ * and pretty-printing adds 23% on objects and over 100% on arrays of numbers.
  */
-export const athleteIdShape = {
-  athleteId: z
-    .uuid()
-    .describe(
-      "The Inigo athlete id to act on — the `inigo_athlete_id` value from the incoming " +
-        "message envelope. Our internal id; the server resolves this athlete's Intervals.icu " +
-        "API key and athlete id from it. NOT the Intervals.icu athlete id."
-    )
-} as const;
-
-/** Wrap arbitrary data as a pretty-printed JSON text result. */
 export function jsonResult(data: unknown): ToolResult {
-  return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+  return { content: [{ type: "text", text: JSON.stringify(data) }] };
 }
 
 /** Wrap an error as an MCP error result, never leaking secrets. */
@@ -57,7 +49,10 @@ export function runAthleteTool(
   athleteId: string,
   fn: (client: IntervalsIcuClient) => Promise<unknown>
 ): Promise<ToolResult> {
-  return runTool(async () => fn(await resolve(athleteId)));
+  return runTool(async () => {
+    assertAthleteId(athleteId);
+    return fn(await resolve(athleteId));
+  });
 }
 
 /** Shared input fields for date-range filtered tools. */
@@ -65,3 +60,6 @@ export const dateRangeShape = {
   oldest: z.string().optional().describe("Inclusive start date in ISO format (YYYY-MM-DD)."),
   newest: z.string().optional().describe("Inclusive end date in ISO format (YYYY-MM-DD).")
 } as const;
+
+// Re-exported so a tool module keeps importing everything it needs from one place.
+export { assertAthleteId, athleteIdShape };

@@ -8,9 +8,15 @@ import { z } from "zod";
 
 const id = z.union([z.string(), z.number()]);
 
+/**
+ * `id` is nullish, not required: the `fields` query parameter makes Intervals return **only**
+ * the named fields, so a caller asking for `hr_load` alone gets objects with no `id` at all.
+ * Requiring it turned that documented escape hatch into an opaque "response did not match
+ * expected schema".
+ */
 export const activitySchema = z
   .object({
-    id,
+    id: id.nullish(),
     name: z.string().nullish(),
     type: z.string().nullish(),
     start_date_local: z.string().nullish(),
@@ -115,10 +121,5 @@ export type Gear = z.infer<typeof gearSchema>;
  */
 export const curveSchema = z.unknown();
 
-/** A single fitness data point derived from wellness records. */
-export interface FitnessPoint {
-  date: string;
-  ctl: number | null;
-  atl: number | null;
-  form: number | null;
-}
+/** Re-exported for the client's own signatures; the model lives in the domain. */
+export type { FitnessPoint } from "../../domain/training";

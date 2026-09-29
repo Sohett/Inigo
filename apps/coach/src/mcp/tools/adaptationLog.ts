@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AthleteDataRepository } from "../repository/athleteDataRepository";
 import type { AdaptationLogInput } from "../../domain/coaching";
-import { athleteIdShape, runTool } from "./result";
+import { athleteIdShape, runAthleteTool } from "./result";
 
 export function registerAdaptationLogReadTools(server: McpServer, store: AthleteDataRepository): void {
   server.registerTool(
@@ -18,15 +18,15 @@ export function registerAdaptationLogReadTools(server: McpServer, store: Athlete
           .number()
           .int()
           .positive()
-          .max(200)
+          .max(30)
           .optional()
-          .describe("Maximum number of entries (default 20)."),
+          .describe("Maximum number of entries (default 5, max 30)."),
         since: z.string().optional().describe("Only entries on/after this ISO date/datetime.")
       }
     },
     (args) =>
-      runTool(() =>
-        store.forAthlete(args.athleteId).getAdaptationLog({ limit: args.limit, since: args.since })
+      runAthleteTool(store, args.athleteId, (scoped) =>
+        scoped.getAdaptationLog({ limit: args.limit, since: args.since })
       )
   );
 }
@@ -52,13 +52,13 @@ export function registerAdaptationLogWriteTools(server: McpServer, store: Athlet
       }
     },
     (args) =>
-      runTool(() => {
+      runAthleteTool(store, args.athleteId, (scoped) => {
         const entry: AdaptationLogInput = { summary: args.summary };
         if (args.author !== undefined) entry.author = args.author;
         if (args.trigger !== undefined) entry.trigger = args.trigger;
         if (args.detail !== undefined) entry.detail = args.detail;
         if (args.relatedWeek !== undefined) entry.relatedWeek = args.relatedWeek;
-        return store.forAthlete(args.athleteId).logAdaptation(entry);
+        return scoped.logAdaptation(entry);
       })
   );
 }

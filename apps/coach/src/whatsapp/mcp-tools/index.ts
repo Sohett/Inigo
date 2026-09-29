@@ -4,7 +4,7 @@ import {
   SendMessageFailure,
   type SendAthleteMessage
 } from "../../use-cases/sendAthleteMessage";
-import { athleteIdShape, runTool } from "./result";
+import { assertAthleteId, athleteIdShape, runTool } from "./result";
 
 export interface WhatsappToolDeps {
   /** The use-case that owns the send. This layer only turns its outcome into a tool result. */
@@ -53,6 +53,7 @@ export function registerWhatsappTools(server: McpServer, deps: WhatsappToolDeps)
     },
     (args) =>
       runTool(async () => {
+        assertAthleteId(args.athleteId);
         const outcome = await deps.sendMessage.execute(args.athleteId, args.text);
         if (outcome.status === "failed") throw new Error(FAILURE_MESSAGE[outcome.reason]);
         return { sent: true };

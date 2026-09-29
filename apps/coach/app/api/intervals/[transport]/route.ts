@@ -1,6 +1,7 @@
 import { createMcpHandler, withMcpAuth } from "mcp-handler";
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 import { registerIntervalsIcuTools } from "../../../../src/intervals/mcp-tools";
+import { createReadActivityStreams } from "../../../../src/use-cases/readActivityStreams";
 import { getDeps } from "../../../../src/deps";
 import { verifyBearerToken } from "../../../../src/auth";
 
@@ -15,7 +16,10 @@ export const dynamic = "force-dynamic";
 const handler = createMcpHandler(
   (server) => {
     const { intervalsResolver } = getDeps();
-    registerIntervalsIcuTools(server, intervalsResolver);
+    registerIntervalsIcuTools(server, {
+      resolve: intervalsResolver,
+      readActivityStreams: createReadActivityStreams({ resolveClient: intervalsResolver })
+    });
   },
   {
     serverInfo: { name: "intervals-icu-mcp", version: "0.1.0" },

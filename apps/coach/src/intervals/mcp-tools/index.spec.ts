@@ -4,7 +4,9 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { IntervalsIcuClient } from "../client";
 import { registerIntervalsIcuTools } from "./index";
+import { createReadActivityStreams } from "../../use-cases/readActivityStreams";
 import type { ResolveClient } from "./result";
+import { DEFAULT_READ_BOUNDS } from "../../domain/training";
 
 const ATHLETE_ID = "550e8400-e29b-41d4-a716-446655440000";
 
@@ -30,7 +32,10 @@ function recordingResolver(client: IntervalsIcuClient) {
 
 async function connect(resolve: ResolveClient) {
   const server = new McpServer({ name: "test", version: "0.0.0" });
-  registerIntervalsIcuTools(server, resolve);
+  registerIntervalsIcuTools(server, {
+    resolve,
+    readActivityStreams: createReadActivityStreams({ resolveClient: resolve })
+  });
 
   const client = new Client({ name: "test-client", version: "0.0.0" });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
@@ -155,5 +160,189 @@ describe("registerIntervalsIcuTools without a stored credential", () => {
     expect(result.isError).toBe(true);
     const content = result.content as TextContent;
     expect(content[0]!.text).toContain("No Intervals.icu credential");
+  });
+});
+
+describe("what the Intervals tools actually return", () => {
+  /** A client that records the options each read was called with. */
+  function recordingClient(overrides: Record<string, unknown> = {}) {
+    const calls: Record<string, unknown> = {};
+    const mock = {
+      getActivities: async (options: unknown) => {
+        calls["getActivities"] = options;
+        const all: Record<string, unknown> = {
+          id: "i1",
+          name: "Sortie",
+          strava_id: 42,
+          average_wind_speed: 12,
+          hr_load: 88
+        };
+        // Intervals honours `fields` literally: it returns ONLY the named fields, so an object
+        // can come back with no `id` at all. Mocking a fixed shape would hide that.
+        const fields = (options as { fields?: readonly string[] }).fields;
+        return [
+          fields === undefined
+            ? all
+            : Object.fromEntries(
+                fields.filter((field) => field in all).map((field) => [field, all[field]])
+              )
+        ];
+      },
+      getWellness: async (options: unknown) => {
+        calls["getWellness"] = options;
+        return [{ id: "2026-09-21", ctl: 70, bloodGlucose: 5.4 }];
+      },
+      getEvents: async (options: unknown) => {
+        calls["getEvents"] = options;
+        return [{ id: 1, name: "VO2", workout_doc: { steps: ["…"] }, push_errors: [] }];
+      },
+      getEvent: async () => ({ id: 1, name: "VO2", workout_doc: { steps: ["…"] }, uid: "x" }),
+      getActivityIntervals: async () => ({
+        id: "i1",
+        icu_intervals: [
+          { id: 0, type: "WORK", label: "1", average_watts: 300, average_dfa_a1: 0.7, wbal_start: 20 }
+        ],
+        icu_groups: [
+          {
+            id: "G1",
+            count: 8,
+            average_watts: 295,
+            average_lactate: 3.2,
+            // Per-repetition fields an aggregate has no business carrying.
+            label: "1",
+            end_index: 90
+          }
+        ],
+        analyzed: "2026-09-21T10:00:00Z"
+      }),
+      ...overrides
+    };
+    return { client: mock as unknown as IntervalsIcuClient, calls };
+  }
+
+  async function connectRecording(overrides: Record<string, unknown> = {}) {
+    const { client, calls } = recordingClient(overrides);
+    const { resolve } = recordingResolver(client);
+    return { mcpClient: await connect(resolve), calls };
+  }
+
+  function parse(result: unknown): unknown {
+    const content = (result as { content: { text: string }[] }).content;
+    return JSON.parse(content[0]!.text);
+  }
+
+  it("applies the default activity limit and asks Intervals for the coach field list", async () => {
+    const { mcpClient, calls } = await connectRecording();
+
+    await mcpClient.callTool({ name: "get_activities", arguments: { athleteId: ATHLETE_ID } });
+
+    const options = calls["getActivities"] as { limit: number; fields: readonly string[] };
+    expect(options.limit).toBe(15);
+    expect(options.fields).toContain("icu_training_load");
+    expect(options.fields).not.toContain("average_wind_speed");
+  });
+
+  it("projects the activity listing, even on fields Intervals sent anyway", async () => {
+    const { mcpClient } = await connectRecording();
+
+    const result = await mcpClient.callTool({
+      name: "get_activities",
+      arguments: { athleteId: ATHLETE_ID }
+    });
+
+    expect(parse(result)).toEqual([{ id: "i1", name: "Sortie" }]);
+  });
+
+  /**
+   * The escape hatch of the whole projection: a field outside the default set must come back
+   * when it is asked for. It used to be fetched and then dropped by a projection that ignored
+   * the request, so `fields: ["hr_load"]` answered `[{}]` and the loss was invisible.
+   */
+  it("serves the fields a caller names, instead of the default set", async () => {
+    const { mcpClient, calls } = await connectRecording();
+
+    const result = await mcpClient.callTool({
+      name: "get_activities",
+      arguments: { athleteId: ATHLETE_ID, fields: ["hr_load"] }
+    });
+
+    expect((calls["getActivities"] as { fields: string[] }).fields).toEqual(["hr_load"]);
+    // No `id`: Intervals was not asked for one, and inventing one would hand back an
+    // identifier that resolves to nothing.
+    expect(parse(result)).toEqual([{ hr_load: 88 }]);
+  });
+
+  // The default window is a coaching choice and lives in the domain, not in the adapter.
+  it("looks back the number of days the domain declares", async () => {
+    const { mcpClient, calls } = await connectRecording();
+
+    await mcpClient.callTool({ name: "get_activities", arguments: { athleteId: ATHLETE_ID } });
+
+    const expected = new Date();
+    expected.setUTCDate(expected.getUTCDate() - DEFAULT_READ_BOUNDS.activityDays);
+    expect((calls["getActivities"] as { oldest: string }).oldest).toBe(
+      expected.toISOString().slice(0, 10)
+    );
+  });
+
+  /**
+   * The largest unprojected read that was left, and the one the streams description now sends
+   * agents to: thirty-odd intervals at 75 fields each for a structured session.
+   */
+  it("projects both halves of the interval breakdown", async () => {
+    const { mcpClient } = await connectRecording();
+
+    const result = await mcpClient.callTool({
+      name: "get_activity_intervals",
+      arguments: { athleteId: ATHLETE_ID, activityId: "i1" }
+    });
+
+    expect(parse(result)).toEqual({
+      intervals: [{ id: 0, type: "WORK", label: "1", average_watts: 300 }],
+      // `count` is the whole point of a group: how many repetitions it sums.
+      groups: [{ id: "G1", count: 8, average_watts: 295 }]
+    });
+    // Laboratory sensors and the W'bal model are not what a coach reads off a repetition.
+    expect(JSON.stringify(parse(result))).not.toContain("average_dfa_a1");
+    expect(JSON.stringify(parse(result))).not.toContain("average_lactate");
+  });
+
+  it("defaults the wellness range instead of reading all of history", async () => {
+    const { mcpClient, calls } = await connectRecording();
+
+    await mcpClient.callTool({ name: "get_wellness", arguments: { athleteId: ATHLETE_ID } });
+
+    const options = calls["getWellness"] as { oldest: string };
+    expect(options.oldest).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("drops medical fields from wellness", async () => {
+    const { mcpClient } = await connectRecording();
+
+    const result = await mcpClient.callTool({
+      name: "get_wellness",
+      arguments: { athleteId: ATHLETE_ID }
+    });
+
+    expect(parse(result)).toEqual([{ id: "2026-09-21", ctl: 70 }]);
+  });
+
+  // A week is five to seven sessions: their step-by-step structures do not belong in a listing.
+  it("leaves the session structure out of the listing but serves it on a single read", async () => {
+    const { mcpClient } = await connectRecording();
+
+    const listed = await mcpClient.callTool({
+      name: "get_events",
+      arguments: { athleteId: ATHLETE_ID }
+    });
+    const single = await mcpClient.callTool({
+      name: "get_event",
+      arguments: { athleteId: ATHLETE_ID, eventId: "1" }
+    });
+
+    expect(JSON.stringify(parse(listed))).not.toContain("workout_doc");
+    expect(JSON.stringify(parse(listed))).not.toContain("push_errors");
+    expect(JSON.stringify(parse(single))).toContain("workout_doc");
+    expect(JSON.stringify(parse(single))).not.toContain("uid");
   });
 });

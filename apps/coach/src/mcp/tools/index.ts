@@ -26,4 +26,4 @@ export function registerAthleteDataTools(server: McpServer, store: AthleteDataRe
   registerPlanWriteTools(server, store);
 }
 
-export { jsonResult, errorResult, runTool, type ToolResult } from "./result";
+export { jsonResult, errorResult, runTool, runAthleteTool, type ToolResult } from "./result";

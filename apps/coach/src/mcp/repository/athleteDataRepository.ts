@@ -268,11 +268,17 @@ export function createAthleteDataRepository(db: Db) {
           return toTrainingPlan(plan, blocks);
         },
 
-        /** Most recent adaptation-log entries, newest first (default 20), optionally since a date. */
+        /**
+         * Most recent adaptation-log entries, newest first, optionally since a date.
+         *
+         * Default 5, not 20: entries average 2 390 characters, so twenty of them are ~17 000
+         * tokens written to the thread's cache and re-read on every following request. The
+         * caller asks for more when it needs more.
+         */
         async getAdaptationLog(
           options: { limit?: number; since?: string } = {}
         ): Promise<AdaptationLogEntry[]> {
-          const limit = options.limit ?? 20;
+          const limit = options.limit ?? 5;
           const where = options.since
             ? and(
                 eq(adaptationLog.athleteId, athleteId),
