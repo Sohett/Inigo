@@ -1,9 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { and, asc, desc, eq, gte, inArray, ne } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, ne, or } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import {
   adaptationLog,
   athlete,
+  athleteConstraint,
   athleteProfile,
   athleteThreshold,
   goal,
@@ -15,7 +16,9 @@ import type { GoalStatus, Sport } from "@inigo/db";
 import type {
   AdaptationLogEntry,
   AdaptationLogInput,
+  AthleteConstraint,
   CoachProfile,
+  ConstraintInput,
   Goal,
   GoalInput,
   PlanBlock,
@@ -64,7 +67,14 @@ function toIsoString(value: Date | string): string {
   return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
 }
 
+/** Today's calendar date (`YYYY-MM-DD`) in the athlete's IANA timezone, not the server's. */
+function todayIn(timezone: string): string {
+  // en-CA formats as YYYY-MM-DD.
+  return new Intl.DateTimeFormat("en-CA", { timeZone: timezone }).format(new Date());
+}
+
 type ThresholdRow = typeof athleteThreshold.$inferSelect;
+type ConstraintRow = typeof athleteConstraint.$inferSelect;
 type GoalRow = typeof goal.$inferSelect;
 type AdaptationLogRow = typeof adaptationLog.$inferSelect;
 type PlanRow = typeof trainingPlan.$inferSelect;
@@ -97,6 +107,22 @@ function toGoal(row: GoalRow): Goal {
     status: row.status,
     intervalsEventId: row.intervalsEventId
   };
+}
+
+/**
+ * Constraint row → compact model: null columns are dropped (see `AthleteConstraint`), and
+ * `start_time` loses its seconds (`07:00:00` → `07:00`).
+ */
+function toAthleteConstraint(row: ConstraintRow): AthleteConstraint {
+  const constraint: AthleteConstraint = { id: row.id, kind: row.kind };
+  if (row.weekday !== null) constraint.weekday = row.weekday;
+  if (row.startDate !== null) constraint.startDate = toDateString(row.startDate);
+  if (row.endDate !== null) constraint.endDate = toDateString(row.endDate);
+  if (row.activity !== null) constraint.activity = row.activity;
+  if (row.startTime !== null) constraint.startTime = row.startTime.slice(0, 5);
+  if (row.durationMin !== null) constraint.durationMin = row.durationMin;
+  if (row.note !== null) constraint.note = row.note;
+  return constraint;
 }
 
 /** Adaptation-log row → journal model. Drops athleteId and the plan/proposition/event FKs. */
@@ -178,7 +204,8 @@ export function createAthleteDataRepository(db: Db) {
               weightTargetKg: athleteProfile.weightTargetKg,
               restingHr: athleteProfile.restingHr,
               maxHr: athleteProfile.maxHr,
-              constraints: athleteProfile.constraints,
+              weeklyHours: athleteProfile.weeklyHours,
+              equipment: athleteProfile.equipment,
               constraintsNotes: athleteProfile.constraintsNotes,
               healthNotes: athleteProfile.healthNotes,
               coachingTargets: athleteProfile.coachingTargets,
@@ -197,7 +224,8 @@ export function createAthleteDataRepository(db: Db) {
                 weightTargetKg: profileRow.weightTargetKg,
                 restingHr: profileRow.restingHr,
                 maxHr: profileRow.maxHr,
-                constraints: profileRow.constraints,
+                weeklyHours: profileRow.weeklyHours,
+                equipment: profileRow.equipment,
                 constraintsNotes: profileRow.constraintsNotes,
                 healthNotes: profileRow.healthNotes,
                 coachingTargets: profileRow.coachingTargets
@@ -209,8 +237,29 @@ export function createAthleteDataRepository(db: Db) {
             timezone: identity.timezone,
             locale: identity.locale ?? "fr",
             status: identity.status,
-            profile
+            profile,
+            constraints: await this.getActiveConstraints(todayIn(identity.timezone))
           };
+        },
+
+        /**
+         * Constraints that still matter for planning: every recurring one, plus dated ones
+         * ending on or after `today`. Past dated rows stay in the table (history) but never
+         * reach the agent, so the list stays bounded. Recurring first by weekday, then dated
+         * by start date.
+         */
+        async getActiveConstraints(today: string): Promise<AthleteConstraint[]> {
+          const rows = await db
+            .select()
+            .from(athleteConstraint)
+            .where(
+              and(
+                eq(athleteConstraint.athleteId, athleteId),
+                or(isNotNull(athleteConstraint.weekday), gte(athleteConstraint.endDate, today))
+              )
+            )
+            .orderBy(asc(athleteConstraint.weekday), asc(athleteConstraint.startDate));
+          return rows.map(toAthleteConstraint);
         },
 
         /** Current thresholds = the latest row per sport (optionally filtered to one sport). */
@@ -329,6 +378,46 @@ export function createAthleteDataRepository(db: Db) {
             .returning();
           const row = rows[0];
           return row ? toGoal(row) : null;
+        },
+
+        /**
+         * Create a constraint, or replace an existing one whole (see `ConstraintInput`). On
+         * replace the `id` is matched together with `athleteId`: returns null if the id is
+         * unknown or not owned. The DB CHECKs reject an incoherent rule.
+         */
+        async upsertConstraint(input: ConstraintInput): Promise<AthleteConstraint | null> {
+          const { id, ...rule } = input;
+          const values = {
+            kind: rule.kind,
+            weekday: rule.weekday ?? null,
+            startDate: rule.startDate ?? null,
+            endDate: rule.endDate ?? null,
+            activity: rule.activity ?? null,
+            startTime: rule.startTime ?? null,
+            durationMin: rule.durationMin ?? null,
+            note: rule.note ?? null
+          };
+          const rows = id
+            ? await db
+                .update(athleteConstraint)
+                .set(values)
+                .where(and(eq(athleteConstraint.id, id), eq(athleteConstraint.athleteId, athleteId)))
+                .returning()
+            : await db
+                .insert(athleteConstraint)
+                .values({ athleteId, ...values })
+                .returning();
+          const row = rows[0];
+          return row ? toAthleteConstraint(row) : null;
+        },
+
+        /** Delete one of the athlete's constraints. False if the id is unknown or not owned. */
+        async deleteConstraint(id: string): Promise<boolean> {
+          const rows = await db
+            .delete(athleteConstraint)
+            .where(and(eq(athleteConstraint.id, id), eq(athleteConstraint.athleteId, athleteId)))
+            .returning({ id: athleteConstraint.id });
+          return rows.length > 0;
         },
 
         /**

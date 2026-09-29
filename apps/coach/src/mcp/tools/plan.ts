@@ -20,7 +20,7 @@ export function registerPlanTools(server: McpServer, store: AthleteDataRepositor
 }
 
 /** A plain YYYY-MM-DD date (no time component — Postgres `date`). */
-const dateString = z
+export const dateString = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be a plain calendar date, YYYY-MM-DD (no time).");
 

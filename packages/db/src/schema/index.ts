@@ -1,6 +1,6 @@
 /**
  * V0 schema barrel. The tables owned by Neon: the athlete core (identity/routing,
- * agent sessions, secret, profile, historised thresholds, goals) and the coaching output
+ * agent sessions, secret, profile, historised thresholds, goals, schedule constraints) and the coaching output
  * (macro-plan, blocks, weekly propositions, adaptation journal).
  *
  * Deliberately NOT here (owned by Intervals.icu, never duplicated): activities,
@@ -13,6 +13,7 @@ export { athleteCredential } from "./credential";
 export { athleteProfile } from "./profile";
 export { athleteThreshold } from "./threshold";
 export { goal } from "./goal";
+export { athleteConstraint } from "./constraint";
 export { trainingPlan, planBlock } from "./plan";
 export { weeklyProposition } from "./proposition";
 export { adaptationLog } from "./adaptationLog";

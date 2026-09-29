@@ -3,6 +3,7 @@ import type { AthleteDataRepository } from "../repository/athleteDataRepository"
 import { registerProfileReadTools, registerProfileWriteTools } from "./profile";
 import { registerThresholdTools } from "./thresholds";
 import { registerGoalReadTools, registerGoalWriteTools } from "./goals";
+import { registerConstraintWriteTools } from "./constraints";
 import { registerPlanTools, registerPlanWriteTools } from "./plan";
 import { registerAdaptationLogReadTools, registerAdaptationLogWriteTools } from "./adaptationLog";
 
@@ -22,6 +23,7 @@ export function registerAthleteDataTools(server: McpServer, store: AthleteDataRe
 
   registerProfileWriteTools(server, store);
   registerGoalWriteTools(server, store);
+  registerConstraintWriteTools(server, store);
   registerAdaptationLogWriteTools(server, store);
   registerPlanWriteTools(server, store);
 }
