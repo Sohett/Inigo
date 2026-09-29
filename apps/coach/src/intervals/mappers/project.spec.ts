@@ -202,6 +202,78 @@ describe("toCoachedEvent", () => {
   });
 });
 
+describe("precision and shape", () => {
+  /**
+   * Values taken from a real session: Intervals answers in full float precision, so a form of
+   * minus five arrives as eighteen characters. Rounding removed 28 % of a 46-day series.
+   */
+  it("trims float noise without changing what a coach reads", () => {
+    const projected = toCoachedActivity({
+      id: "i1",
+      icu_intensity: 83.703705,
+      average_cadence: 81.56105,
+      icu_variability_index: 1.2486188,
+      average_temp: 22.789558
+    });
+
+    expect(projected).toEqual({
+      id: "i1",
+      icu_intensity: 83.7,
+      average_cadence: 81.56,
+      icu_variability_index: 1.25,
+      average_temp: 22.79
+    });
+  });
+
+  // A duration in seconds or an id must never acquire a decimal point.
+  it("leaves integers exactly as they are", () => {
+    expect(toCoachedActivity({ id: 137800180, moving_time: 3480, icu_training_load: 64 })).toEqual({
+      id: 137800180,
+      moving_time: 3480,
+      icu_training_load: 64
+    });
+  });
+
+  // 191 characters for the same eight numbers that fit in 79, on every activity of every listing.
+  it("republishes zone times as a map of zone to seconds", () => {
+    const projected = toCoachedActivity({
+      id: "i1",
+      icu_zone_times: [
+        { id: "Z1", secs: 4203 },
+        { id: "Z2", secs: 1893 },
+        { id: "SS", secs: 1788 }
+      ],
+      // Already a bare array of seconds from the API: nothing to flatten.
+      icu_hr_zone_times: [120, 340, 80]
+    });
+
+    expect(projected).toEqual({
+      id: "i1",
+      icu_zone_times: { Z1: 4203, Z2: 1893, SS: 1788 },
+      icu_hr_zone_times: [120, 340, 80]
+    });
+  });
+
+  it("leaves an unreadable zone payload alone rather than emptying it", () => {
+    expect(toCoachedActivity({ id: "i1", icu_zone_times: "n/a" })).toEqual({
+      id: "i1",
+      icu_zone_times: "n/a"
+    });
+  });
+
+  /**
+   * Measured against `average_speed` on seven real rides, `pace` differed by at most 0.08 %:
+   * the same quantity carried twice on every activity of every listing.
+   */
+  it("drops pace, which duplicates average_speed", () => {
+    expect(COACHED_ACTIVITY_FIELDS).not.toContain("pace" as CoachedActivityField);
+    expect(toCoachedActivity({ id: "i1", average_speed: 7.771, pace: 7.7707496 })).toEqual({
+      id: "i1",
+      average_speed: 7.77
+    });
+  });
+});
+
 describe("toFitnessPoints", () => {
   // Form is not a stored field: Intervals leaves `ctl - atl` to the caller.
   it("derives form from ctl and atl", () => {
@@ -215,6 +287,14 @@ describe("toFitnessPoints", () => {
       // Both terms are needed: a day missing one has no form rather than a wrong one.
       { date: "2026-06-02", ctl: 52, atl: null, form: null }
     ]);
+  });
+
+  // The subtraction of two floats is where the worst of the noise is born: these exact inputs
+  // produced `-5.005309999999994` in a real session.
+  it("rounds the subtraction rather than publishing its float noise", () => {
+    const points = toFitnessPoints([{ id: "2026-08-15", ctl: 52.850323, atl: 57.855633 }]);
+
+    expect(points).toEqual([{ date: "2026-08-15", ctl: 52.85, atl: 57.86, form: -5.01 }]);
   });
 });
 

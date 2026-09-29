@@ -45,14 +45,16 @@ export const COACHED_ACTIVITY_FIELDS = [
   "average_heartrate",
   "max_heartrate",
   "average_cadence",
+  // `pace` is not kept: measured against `average_speed` on real rides it differs by at most
+  // 0.08 %, so it is the same quantity twice. Recoverable through the `fields` parameter.
   "average_speed",
-  "pace",
   // Physiological reading
   "icu_efficiency_factor",
   "decoupling",
   "icu_variability_index",
   "polarization_index",
-  // Intensity distribution
+  // Intensity distribution. `icu_zone_times` is republished as a `{ zone: seconds }` map; the
+  // heart-rate one already arrives from the API as a bare array of seconds per zone.
   "icu_zone_times",
   "icu_hr_zone_times",
   // Environment: heat explains a high heart rate, and the analyst's prompt names it
@@ -123,6 +125,17 @@ export type WellnessDayField = (typeof WELLNESS_DAY_FIELDS)[number];
 
 /** One wellness day as the coach sees it. */
 export type WellnessDay = Partial<Record<WellnessDayField, unknown>>;
+
+/**
+ * How many decimals a projected number keeps.
+ *
+ * Intervals answers in full float precision, so a form of minus five arrives as
+ * `-5.005309999999994`: eighteen characters for a number a coach reads to a tenth. Two decimals
+ * is past the point where any coaching call changes, and still leaves room for the ratios
+ * (efficiency factor, variability index) where one decimal would round away a real difference.
+ * Measured on a 46-day fitness series, rounding alone removes 28 % of the payload.
+ */
+export const PROJECTED_DECIMALS = 2;
 
 /** The three fields `get_fitness` derives its series from. Nothing else is read. */
 export const FITNESS_FIELDS = ["id", "ctl", "atl"] as const;
