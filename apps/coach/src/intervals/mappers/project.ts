@@ -10,6 +10,7 @@ import {
   COACHED_INTERVAL_FIELDS,
   COACHED_INTERVAL_GROUP_FIELDS,
   EVENT_SUMMARY_FIELDS,
+  PROJECTED_DECIMALS,
   WELLNESS_DAY_FIELDS,
   type CoachedActivity,
   type CoachedActivityField,
@@ -23,7 +24,27 @@ import {
 } from "../../domain/training";
 
 /**
- * Keep only `fields`, and drop keys Intervals left null or absent.
+ * Trim a number to the precision a coach reads, recursing into arrays and objects.
+ *
+ * Intervals answers in full float precision: a form of minus five arrives as
+ * `-5.005309999999994`, eighteen characters carrying two of information. Integers are left
+ * exactly as they are, so a duration in seconds or an id never acquires a decimal point.
+ */
+function rounded(value: unknown): unknown {
+  if (typeof value === "number") {
+    return Number.isInteger(value) ? value : Number(value.toFixed(PROJECTED_DECIMALS));
+  }
+  if (Array.isArray(value)) return value.map(rounded);
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, item]) => [key, rounded(item)])
+    );
+  }
+  return value;
+}
+
+/**
+ * Keep only `fields`, drop keys Intervals left null or absent, and round what stays.
  *
  * Dropping empties is not cosmetic: `"average_temp": null` costs tokens on every activity of
  * every listing, and says nothing a missing key does not.
@@ -35,9 +56,27 @@ function pick<T extends string>(
   const projected: Partial<Record<T, unknown>> = {};
   for (const field of fields) {
     const value = source[field];
-    if (value !== undefined && value !== null) projected[field] = value;
+    if (value !== undefined && value !== null) projected[field] = rounded(value);
   }
   return projected;
+}
+
+/**
+ * Zone times, from Intervals' array of objects to a map of zone to seconds.
+ *
+ * `[{"id":"Z1","secs":4203},…]` costs 191 characters where `{"Z1":4203,…}` costs 79, for the
+ * same eight numbers, on every activity of every listing. `icu_hr_zone_times` needs none of
+ * this: the API already sends it as a bare array of seconds per zone.
+ */
+function toZoneTimes(value: unknown): unknown {
+  if (!Array.isArray(value)) return value;
+  const times: Record<string, number> = {};
+  for (const entry of value) {
+    if (entry === null || typeof entry !== "object") continue;
+    const zone = entry as { id?: unknown; secs?: unknown };
+    if (typeof zone.id === "string" && typeof zone.secs === "number") times[zone.id] = zone.secs;
+  }
+  return times;
 }
 
 /**
@@ -52,6 +91,9 @@ export function toCoachedActivity(
   fields: readonly string[] = COACHED_ACTIVITY_FIELDS
 ): CoachedActivity {
   const projected = pick(raw, fields) as Partial<Record<CoachedActivityField, unknown>>;
+  if (projected.icu_zone_times !== undefined) {
+    projected.icu_zone_times = toZoneTimes(projected.icu_zone_times);
+  }
   const id = raw["id"];
   // Intervals omits `id` when the caller's `fields` did not name it; do not invent one.
   return id === undefined || id === null
@@ -101,11 +143,12 @@ export function toFitnessPoints(raw: Record<string, unknown>[]): FitnessPoint[] 
   return raw.map((record) => {
     const ctl = nullableNumber(record["ctl"]);
     const atl = nullableNumber(record["atl"]);
+    // Rounded here too: `ctl - atl` on two floats is where the worst of the noise is born.
     return {
       date: nullableString(record["id"]) ?? "",
-      ctl,
-      atl,
-      form: ctl !== null && atl !== null ? ctl - atl : null
+      ctl: ctl === null ? null : (rounded(ctl) as number),
+      atl: atl === null ? null : (rounded(atl) as number),
+      form: ctl !== null && atl !== null ? (rounded(ctl - atl) as number) : null
     };
   });
 }
@@ -127,7 +170,9 @@ export function toWellnessDays(raw: Record<string, unknown>[]): WellnessDay[] {
  * well-formed and plausible while being wrong.
  */
 function numbers(value: unknown): (number | null)[] {
-  return Array.isArray(value) ? value.map((item) => (typeof item === "number" ? item : null)) : [];
+  return Array.isArray(value)
+    ? value.map((item) => (typeof item === "number" ? (rounded(item) as number) : null))
+    : [];
 }
 
 function nullableNumber(value: unknown): number | null {
