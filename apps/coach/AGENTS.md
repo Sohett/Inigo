@@ -128,7 +128,7 @@ Un serveur MCP hébergé **dans coach** (choix assumé : pas d'app séparée) do
 | `get_thresholds` | read | dernier `athlete_threshold` par sport (FTP, HR, zones…). Filtre `sport?`. |
 | `get_goals` | read | `goal` filtrés (`status?`, défaut active). |
 | `get_training_plan` | read | plan courant + `plan_block` ordonnés (weekly targets). |
-| `get_adaptation_log` | read | journal (`limit?` 20, `since?`), plus récent d'abord. |
+| `get_adaptation_log` | read | journal (`limit?` défaut 5, max 30, `since?`), plus récent d'abord. |
 | `update_profile` | write | upsert notes/prefs (`weightTargetKg`, `constraints`, `constraintsNotes`, `healthNotes`, `coachingTargets`). |
 | `log_adaptation` | write | append au journal (`summary` requis). |
 | `upsert_goal` | write | create/update d'un `goal` (update scopé par athleteId). |

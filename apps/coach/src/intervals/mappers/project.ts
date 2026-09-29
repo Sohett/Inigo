@@ -7,10 +7,15 @@
  */
 import {
   COACHED_ACTIVITY_FIELDS,
+  COACHED_INTERVAL_FIELDS,
+  COACHED_INTERVAL_GROUP_FIELDS,
   EVENT_SUMMARY_FIELDS,
   WELLNESS_DAY_FIELDS,
   type CoachedActivity,
+  type CoachedActivityField,
+  type CoachedActivityIntervals,
   type CoachedEvent,
+  type CurveAxis,
   type CurveSeries,
   type EventField,
   type WellnessDay
@@ -34,15 +39,54 @@ function pick<T extends string>(
   return projected;
 }
 
-/** One activity, reduced to the fields a coach reasons about. */
-export function toCoachedActivity(raw: Record<string, unknown>): CoachedActivity {
-  const projected = pick(raw, COACHED_ACTIVITY_FIELDS);
-  // `id` is the one field Intervals always returns and the one a follow-up call needs.
-  return { ...projected, id: raw["id"] as string | number };
+/**
+ * One activity, reduced to the fields asked for.
+ *
+ * The list is a parameter, not a constant, so that a caller naming its own `fields` gets them
+ * back. Projecting on the default set regardless would fetch a field over the wire and then
+ * throw it away, which is the silent loss this whole file exists to remove.
+ */
+export function toCoachedActivity(
+  raw: Record<string, unknown>,
+  fields: readonly string[] = COACHED_ACTIVITY_FIELDS
+): CoachedActivity {
+  const projected = pick(raw, fields) as Partial<Record<CoachedActivityField, unknown>>;
+  const id = raw["id"];
+  // Intervals omits `id` when the caller's `fields` did not name it; do not invent one.
+  return id === undefined || id === null
+    ? (projected as CoachedActivity)
+    : { ...projected, id: id as string | number };
 }
 
-export function toCoachedActivities(raw: Record<string, unknown>[]): CoachedActivity[] {
-  return raw.map(toCoachedActivity);
+export function toCoachedActivities(
+  raw: Record<string, unknown>[],
+  fields: readonly string[] = COACHED_ACTIVITY_FIELDS
+): CoachedActivity[] {
+  return raw.map((activity) => toCoachedActivity(activity, fields));
+}
+
+/** Every readable object of a raw array, ignoring the rest rather than throwing on it. */
+function objects(value: unknown): Record<string, unknown>[] {
+  return Array.isArray(value)
+    ? value.filter(
+        (entry): entry is Record<string, unknown> => entry !== null && typeof entry === "object"
+      )
+    : [];
+}
+
+/**
+ * The interval breakdown of a session, reduced to what a coach reads off a repetition.
+ *
+ * Both halves are kept: `icu_groups` says whether the block was held overall, `icu_intervals`
+ * says which repetition faded. Dropping either would answer only half of "was this session
+ * executed as planned", which is the analyst's first job.
+ */
+export function toCoachedActivityIntervals(raw: unknown): CoachedActivityIntervals {
+  const source = (raw ?? {}) as { icu_intervals?: unknown; icu_groups?: unknown };
+  return {
+    intervals: objects(source.icu_intervals).map((entry) => pick(entry, COACHED_INTERVAL_FIELDS)),
+    groups: objects(source.icu_groups).map((entry) => pick(entry, COACHED_INTERVAL_GROUP_FIELDS))
+  };
 }
 
 /** One wellness day, reduced to the fields a coach reasons about. */
@@ -54,8 +98,15 @@ export function toWellnessDays(raw: Record<string, unknown>[]): WellnessDay[] {
   return raw.map(toWellnessDay);
 }
 
-function numbers(value: unknown): number[] {
-  return Array.isArray(value) ? value.filter((item): item is number => typeof item === "number") : [];
+/**
+ * Read a positional array of numbers, keeping every slot.
+ *
+ * Never filtered: `secs[i]` pairs with `values[i]` pairs with `wattsPerKg[i]`. Dropping one
+ * non-number would shift every later value onto the wrong duration, and the result would stay
+ * well-formed and plausible while being wrong.
+ */
+function numbers(value: unknown): (number | null)[] {
+  return Array.isArray(value) ? value.map((item) => (typeof item === "number" ? item : null)) : [];
 }
 
 function nullableNumber(value: unknown): number | null {
@@ -67,24 +118,28 @@ function nullableString(value: unknown): string | null {
 }
 
 /**
- * One curve, reduced to the durations and the values held over them.
+ * One curve, reduced to its axis and the values held over it.
  *
  * Everything else goes: `submax_*` are 2D matrices, `powerModels`, `ranks` and `mapPlot` are
  * Intervals' own analysis, and `start_index` / `end_index` / `activity_id` point into data the
  * agent does not have.
+ *
+ * The axis is told by the caller, never guessed from whichever array happens to be populated:
+ * `DataCurve` declares both `secs` and `distance`, and only the endpoint that was called knows
+ * which one carries the x values.
  */
-export function toCurveSeries(raw: Record<string, unknown>): CurveSeries {
+export function toCurveSeries(raw: Record<string, unknown>, axis: CurveAxis): CurveSeries {
   const wattsPerKg = numbers(raw["watts_per_kg"]);
-  return {
+  const base = {
     label: nullableString(raw["label"]),
     startDateLocal: nullableString(raw["start_date_local"]),
     endDateLocal: nullableString(raw["end_date_local"]),
     days: nullableNumber(raw["days"]),
-    // A pace curve carries `distance` where the others carry `secs`.
-    secs: numbers(raw["secs"]).length > 0 ? numbers(raw["secs"]) : numbers(raw["distance"]),
     values: numbers(raw["values"]),
     ...(wattsPerKg.length > 0 ? { wattsPerKg } : {})
   };
+  const x = numbers(raw[axis]);
+  return axis === "secs" ? { ...base, secs: x } : { ...base, distance: x };
 }
 
 /**
@@ -95,13 +150,9 @@ export function toCurveSeries(raw: Record<string, unknown>): CurveSeries {
  * year references dozens of them. There is no query parameter to exclude it, so it is dropped
  * here, and it is the single biggest saving of this whole projection.
  */
-export function toCurveSeriesList(raw: unknown): CurveSeries[] {
+export function toCurveSeriesList(raw: unknown, axis: CurveAxis): CurveSeries[] {
   if (raw === null || typeof raw !== "object") return [];
-  const list = (raw as { list?: unknown }).list;
-  if (!Array.isArray(list)) return [];
-  return list
-    .filter((entry): entry is Record<string, unknown> => entry !== null && typeof entry === "object")
-    .map(toCurveSeries);
+  return objects((raw as { list?: unknown }).list).map((entry) => toCurveSeries(entry, axis));
 }
 
 /** One event, reduced to the fields a coach reasons about. `fields` picks listing or detail. */

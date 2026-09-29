@@ -145,34 +145,71 @@ export interface FitnessPoint {
  */
 export interface StreamSeries {
   type: string;
-  /** One value per second of the window, aligned with every other series in the window. */
+  /** One value per sample of the window, aligned with every other series in the window. */
   data: unknown[];
 }
 
-/** The slice of an activity's streams a caller asked for. */
+/**
+ * The slice of an activity's streams a caller asked for.
+ *
+ * Bounds are **sample indices**, not seconds. Intervals.icu publishes no time base on a stream,
+ * and auto-pause, smart recording and imported files all break the one-sample-per-second
+ * assumption. Naming them indices is also what matches the workflow: an agent finds an effort
+ * with `get_activity_intervals`, whose intervals carry `start_index` and `end_index`.
+ */
 export interface StreamWindow {
   activityId: string;
-  /** Inclusive start offset in seconds from the activity start. */
-  startSeconds: number;
-  /** Exclusive end offset in seconds. */
-  endSeconds: number;
+  /** Inclusive start, as a sample index. */
+  startIndex: number;
+  /**
+   * Exclusive end, as a sample index. **The end actually returned**, which is smaller than the
+   * one requested when the window ran past the end of the recording. Never assume it matches
+   * what was asked for.
+   */
+  endIndex: number;
   series: StreamSeries[];
+  /**
+   * Series that were asked for and came back absent or empty, named rather than dropped: an
+   * agent can only re-plan if it knows which sensor it is missing.
+   */
+  missingTypes?: string[];
 }
 
-/** One best-effort curve: the durations and the values held over them. */
-export interface CurveSeries {
+/**
+ * What a curve's x axis measures.
+ *
+ * Not inferable from the payload: `DataCurve` declares both `secs` and `distance`, and only the
+ * endpoint that was called says which one is populated. Power and heart rate are indexed by
+ * effort duration, pace by distance.
+ */
+export type CurveAxis = "secs" | "distance";
+
+/** The part of a curve that does not depend on its axis. */
+interface CurveSeriesBase {
   /** Intervals' own label for the period, e.g. "Last 1y". */
   label: string | null;
   startDateLocal: string | null;
   endDateLocal: string | null;
   days: number | null;
-  /** Effort durations in seconds, or distances in metres for a pace curve. */
-  secs: number[];
-  /** The value held over each corresponding duration. */
-  values: number[];
+  /**
+   * The best value held over each corresponding x. Positional: `values[i]` pairs with the x at
+   * index `i`, so a missing entry is `null` rather than removed.
+   */
+  values: (number | null)[];
   /** Power curves only: the same values per kilogram. */
-  wattsPerKg?: number[];
+  wattsPerKg?: (number | null)[];
 }
+
+/**
+ * One best-effort curve: the x axis and the values held over it.
+ *
+ * The axis is carried by the **key name**, so the payload says what it means without a second
+ * field: a pace curve's metres never arrive under `secs`, where an agent would read them as
+ * seconds and conclude the athlete held that pace for a quarter of an hour.
+ */
+export type CurveSeries =
+  | (CurveSeriesBase & { secs: (number | null)[] })
+  | (CurveSeriesBase & { distance: (number | null)[] });
 
 /**
  * The event fields a coach reasons about, out of the 60 Intervals returns.
@@ -229,5 +266,101 @@ export const DEFAULT_READ_BOUNDS = {
   /** Days of wellness returned when no range is given. */
   wellnessDays: 30,
   /** Events returned when no `limit` is given. The API already defaults to a 7-day window. */
-  eventLimit: 30
+  eventLimit: 30,
+  /** Days of activities returned when no range is given. */
+  activityDays: 30
 } as const;
+
+/**
+ * The interval fields a coach reasons about, out of the 75 Intervals returns.
+ *
+ * This is where a structured session is judged against its plan: a 30/15 block comes back as
+ * thirty-odd intervals, so 75 fields each is the largest single read left on this server once
+ * the streams are bounded. Laboratory sensors (SmO2, THb, DFA a1, lactate), weather, the W'bal
+ * model and Intervals' own percentiles all go; what stays is what a coach reads off a rep.
+ */
+export const COACHED_INTERVAL_FIELDS = [
+  // Placement in the session
+  "id",
+  "type",
+  "group_id",
+  "label",
+  "start_index",
+  "end_index",
+  "start_time",
+  "end_time",
+  "elapsed_time",
+  "moving_time",
+  "distance",
+  // Power
+  "average_watts",
+  "weighted_average_watts",
+  "max_watts",
+  "average_watts_kg",
+  "intensity",
+  "zone",
+  // Heart rate, cadence, pace
+  "average_heartrate",
+  "max_heartrate",
+  "average_cadence",
+  "average_speed",
+  "gap",
+  // Physiological reading
+  "decoupling",
+  "w5s_variability",
+  "training_load",
+  // Context
+  "total_elevation_gain",
+  "average_gradient",
+  "average_temp"
+] as const;
+
+export type CoachedIntervalField = (typeof COACHED_INTERVAL_FIELDS)[number];
+
+/** One interval as the coach reads it. */
+export type CoachedInterval = Partial<Record<CoachedIntervalField, unknown>>;
+
+/** What only describes a single repetition, so a group aggregate never carries it. */
+const INTERVAL_ONLY_FIELDS = [
+  "type",
+  "group_id",
+  "label",
+  "end_index",
+  "start_time",
+  "end_time"
+] as const;
+
+/** The per-interval fields that also make sense once summed over a group. */
+type SharedIntervalField = Exclude<CoachedIntervalField, (typeof INTERVAL_ONLY_FIELDS)[number]>;
+
+export type CoachedIntervalGroupField = SharedIntervalField | "count";
+
+/**
+ * The aggregate over a group of repeated intervals, derived from the per-interval list.
+ *
+ * `icu_groups` is what answers "was the 8x3min held", in one object instead of eight, so it is
+ * the cheaper read of the two and must not be dropped. Deriving it from the interval list keeps
+ * one source of truth: a field added for a repetition is available on the group that sums them.
+ * `count` is the one addition, and it is the whole point of a group.
+ */
+export const COACHED_INTERVAL_GROUP_FIELDS: readonly CoachedIntervalGroupField[] = [
+  ...COACHED_INTERVAL_FIELDS.filter(
+    (field): field is SharedIntervalField =>
+      !(INTERVAL_ONLY_FIELDS as readonly string[]).includes(field)
+  ),
+  "count"
+];
+
+/** One group of repeated intervals as the coach reads it. */
+export type CoachedIntervalGroup = Partial<Record<CoachedIntervalGroupField, unknown>>;
+
+/**
+ * The interval breakdown of one session: each repetition, and the aggregate per group.
+ *
+ * Both are kept because they answer different questions. The groups say whether a block was
+ * held overall, the intervals say which repetition faded.
+ */
+export interface CoachedActivityIntervals {
+  intervals: CoachedInterval[];
+  groups: CoachedIntervalGroup[];
+}

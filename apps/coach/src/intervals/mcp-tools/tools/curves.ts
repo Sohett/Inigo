@@ -32,7 +32,8 @@ export function registerCurveTools(server: McpServer, resolve: ResolveClient): v
     (args) =>
       runAthleteTool(resolve, args.athleteId, async (client) =>
         toCurveSeriesList(
-          await client.getPowerCurve({ type: args.type, newest: args.newest, curves: args.curves })
+          await client.getPowerCurve({ type: args.type, newest: args.newest, curves: args.curves }),
+          "secs"
         )
       )
   );
@@ -49,7 +50,8 @@ export function registerCurveTools(server: McpServer, resolve: ResolveClient): v
     (args) =>
       runAthleteTool(resolve, args.athleteId, async (client) =>
         toCurveSeriesList(
-          await client.getHrCurve({ type: args.type, newest: args.newest, curves: args.curves })
+          await client.getHrCurve({ type: args.type, newest: args.newest, curves: args.curves }),
+          "secs"
         )
       )
   );
@@ -66,7 +68,10 @@ export function registerCurveTools(server: McpServer, resolve: ResolveClient): v
     (args) =>
       runAthleteTool(resolve, args.athleteId, async (client) =>
         toCurveSeriesList(
-          await client.getPaceCurve({ type: args.type, newest: args.newest, curves: args.curves })
+          // A pace curve is indexed by distance in metres, not by duration: `PaceCurve` carries
+          // `distance` where `PowerCurve` and `HRCurve` carry `secs`.
+          await client.getPaceCurve({ type: args.type, newest: args.newest, curves: args.curves }),
+          "distance"
         )
       )
   );

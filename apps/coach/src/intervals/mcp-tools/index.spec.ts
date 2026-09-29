@@ -6,6 +6,7 @@ import type { IntervalsIcuClient } from "../client";
 import { registerIntervalsIcuTools } from "./index";
 import { createReadActivityStreams } from "../../use-cases/readActivityStreams";
 import type { ResolveClient } from "./result";
+import { DEFAULT_READ_BOUNDS } from "../../domain/training";
 
 const ATHLETE_ID = "550e8400-e29b-41d4-a716-446655440000";
 
@@ -169,7 +170,7 @@ describe("what the Intervals tools actually return", () => {
     const mock = {
       getActivities: async (options: unknown) => {
         calls["getActivities"] = options;
-        return [{ id: "i1", name: "Sortie", strava_id: 42, average_wind_speed: 12 }];
+        return [{ id: "i1", name: "Sortie", strava_id: 42, average_wind_speed: 12, hr_load: 88 }];
       },
       getWellness: async (options: unknown) => {
         calls["getWellness"] = options;
@@ -180,6 +181,14 @@ describe("what the Intervals tools actually return", () => {
         return [{ id: 1, name: "VO2", workout_doc: { steps: ["…"] }, push_errors: [] }];
       },
       getEvent: async () => ({ id: 1, name: "VO2", workout_doc: { steps: ["…"] }, uid: "x" }),
+      getActivityIntervals: async () => ({
+        id: "i1",
+        icu_intervals: [
+          { id: 0, type: "WORK", label: "1", average_watts: 300, average_dfa_a1: 0.7, wbal_start: 20 }
+        ],
+        icu_groups: [{ id: "G1", count: 8, average_watts: 295, average_lactate: 3.2 }],
+        analyzed: "2026-09-21T10:00:00Z"
+      }),
       ...overrides
     };
     return { client: mock as unknown as IntervalsIcuClient, calls };
@@ -216,6 +225,58 @@ describe("what the Intervals tools actually return", () => {
     });
 
     expect(parse(result)).toEqual([{ id: "i1", name: "Sortie" }]);
+  });
+
+  /**
+   * The escape hatch of the whole projection: a field outside the default set must come back
+   * when it is asked for. It used to be fetched and then dropped by a projection that ignored
+   * the request, so `fields: ["hr_load"]` answered `[{}]` and the loss was invisible.
+   */
+  it("serves the fields a caller names, instead of the default set", async () => {
+    const { mcpClient, calls } = await connectRecording();
+
+    const result = await mcpClient.callTool({
+      name: "get_activities",
+      arguments: { athleteId: ATHLETE_ID, fields: ["hr_load"] }
+    });
+
+    expect((calls["getActivities"] as { fields: string[] }).fields).toEqual(["hr_load"]);
+    expect(parse(result)).toEqual([{ id: "i1", hr_load: 88 }]);
+  });
+
+  // The default window is a coaching choice and lives in the domain, not in the adapter.
+  it("looks back the number of days the domain declares", async () => {
+    const { mcpClient, calls } = await connectRecording();
+
+    await mcpClient.callTool({ name: "get_activities", arguments: { athleteId: ATHLETE_ID } });
+
+    const expected = new Date();
+    expected.setUTCDate(expected.getUTCDate() - DEFAULT_READ_BOUNDS.activityDays);
+    expect((calls["getActivities"] as { oldest: string }).oldest).toBe(
+      expected.toISOString().slice(0, 10)
+    );
+  });
+
+  /**
+   * The largest unprojected read that was left, and the one the streams description now sends
+   * agents to: thirty-odd intervals at 75 fields each for a structured session.
+   */
+  it("projects both halves of the interval breakdown", async () => {
+    const { mcpClient } = await connectRecording();
+
+    const result = await mcpClient.callTool({
+      name: "get_activity_intervals",
+      arguments: { athleteId: ATHLETE_ID, activityId: "i1" }
+    });
+
+    expect(parse(result)).toEqual({
+      intervals: [{ id: 0, type: "WORK", label: "1", average_watts: 300 }],
+      // `count` is the whole point of a group: how many repetitions it sums.
+      groups: [{ id: "G1", count: 8, average_watts: 295 }]
+    });
+    // Laboratory sensors and the W'bal model are not what a coach reads off a repetition.
+    expect(JSON.stringify(parse(result))).not.toContain("average_dfa_a1");
+    expect(JSON.stringify(parse(result))).not.toContain("average_lactate");
   });
 
   it("defaults the wellness range instead of reading all of history", async () => {

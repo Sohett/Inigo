@@ -1,12 +1,19 @@
 import { describe, it, expect } from "vitest";
 import {
   COACHED_ACTIVITY_FIELDS,
+  COACHED_INTERVAL_FIELDS,
+  COACHED_INTERVAL_GROUP_FIELDS,
+  EVENT_DETAIL_FIELDS,
+  EVENT_SUMMARY_FIELDS,
   WELLNESS_DAY_FIELDS,
   type CoachedActivityField
 } from "../../domain/training";
 import {
   toCoachedActivities,
   toCoachedActivity,
+  toCoachedActivityIntervals,
+  toCoachedEvent,
+  toCoachedEvents,
   toCurveSeriesList,
   toWellnessDay
 } from "./project";
@@ -14,9 +21,22 @@ import {
 describe("field lists", () => {
   it.each([
     ["activity", COACHED_ACTIVITY_FIELDS],
-    ["wellness", WELLNESS_DAY_FIELDS]
+    ["wellness", WELLNESS_DAY_FIELDS],
+    ["interval", COACHED_INTERVAL_FIELDS],
+    ["interval group", COACHED_INTERVAL_GROUP_FIELDS],
+    ["event", EVENT_DETAIL_FIELDS]
   ])("declares each %s field once", (_label, fields) => {
     expect(new Set(fields).size).toBe(fields.length);
+  });
+
+  // The group list is derived from the interval list so the two cannot drift: a field added for
+  // a repetition is available on the group that sums them, without a second edit.
+  it("derives the group fields from the interval fields, plus count", () => {
+    const perRepetitionOnly = ["type", "group_id", "label", "end_index", "start_time", "end_time"];
+
+    expect([...COACHED_INTERVAL_GROUP_FIELDS].sort()).toEqual(
+      [...COACHED_INTERVAL_FIELDS.filter((f) => !perRepetitionOnly.includes(f)), "count"].sort()
+    );
   });
 
   // The six fields the enumeration rescued. Each one carries a coaching capability that a
@@ -67,6 +87,118 @@ describe("toCoachedActivity", () => {
       { id: "b" }
     ]);
   });
+
+  /**
+   * The escape hatch. Projecting on the default set regardless would fetch a named field over
+   * the wire and then throw it away, so the caller would see `{}` and never know why.
+   */
+  it("projects on the fields it is given, not on the default set", () => {
+    expect(toCoachedActivity({ id: "i1", hr_load: 88, name: "Sortie" }, ["hr_load"])).toEqual({
+      id: "i1",
+      hr_load: 88
+    });
+  });
+
+  // Intervals omits `id` when the caller's `fields` did not name it. Inventing one would hand
+  // back an identifier that resolves to nothing.
+  it("omits the id when Intervals did not send one", () => {
+    expect(toCoachedActivity({ hr_load: 88 }, ["hr_load"])).toEqual({ hr_load: 88 });
+  });
+});
+
+describe("toCoachedActivityIntervals", () => {
+  it("keeps both the repetitions and the group aggregates", () => {
+    const projected = toCoachedActivityIntervals({
+      id: "i1",
+      icu_intervals: [
+        { id: 0, type: "WORK", label: "1", average_watts: 300, start_index: 60, end_index: 90 },
+        { id: 1, type: "RECOVERY", label: "1", average_watts: 150 }
+      ],
+      icu_groups: [{ id: "G1", count: 8, average_watts: 295 }],
+      analyzed: "2026-09-21T10:00:00Z"
+    });
+
+    expect(projected).toEqual({
+      intervals: [
+        { id: 0, type: "WORK", label: "1", average_watts: 300, start_index: 60, end_index: 90 },
+        { id: 1, type: "RECOVERY", label: "1", average_watts: 150 }
+      ],
+      groups: [{ id: "G1", count: 8, average_watts: 295 }]
+    });
+  });
+
+  // Laboratory sensors, the W`bal model and Intervals own percentiles are not what a coach
+  // reads off a repetition, and there are 47 of them per interval.
+  it("drops the laboratory and modelling fields", () => {
+    const projected = toCoachedActivityIntervals({
+      icu_intervals: [
+        {
+          id: 0,
+          average_watts: 300,
+          average_dfa_a1: 0.7,
+          average_smo2: 62,
+          average_lactate: 3.2,
+          wbal_start: 20_000,
+          average_wind_speed: 12,
+          segment_effort_ids: [1, 2]
+        }
+      ]
+    });
+
+    expect(projected.intervals).toEqual([{ id: 0, average_watts: 300 }]);
+  });
+
+  it("returns both halves empty for an unreadable payload rather than throwing", () => {
+    expect(toCoachedActivityIntervals(null)).toEqual({ intervals: [], groups: [] });
+    expect(toCoachedActivityIntervals({ icu_intervals: "nope" })).toEqual({
+      intervals: [],
+      groups: []
+    });
+  });
+});
+
+describe("toCoachedEvent", () => {
+  const planned = {
+    id: 42,
+    start_date_local: "2026-09-24T00:00:00",
+    name: "VO2 8x3",
+    icu_training_load: 95,
+    workout_doc: { steps: ["warmup", "8x3min"] },
+    // Intervals plumbing: sync state, push errors, colours.
+    uid: "x",
+    push_errors: [],
+    color: "#fff",
+    athlete_id: "i1"
+  };
+
+  /**
+   * A week is five to seven sessions. `workout_doc` carries the whole step-by-step structure of
+   * each one: useful when the athlete asks what a session is, wasteful seven times over when the
+   * question is what the week looks like.
+   */
+  it("leaves the session structure out of a listing", () => {
+    const projected = toCoachedEvents([planned]);
+
+    expect(projected).toEqual([
+      {
+        id: 42,
+        start_date_local: "2026-09-24T00:00:00",
+        name: "VO2 8x3",
+        icu_training_load: 95
+      }
+    ]);
+  });
+
+  it("serves the session structure on a single read", () => {
+    const projected = toCoachedEvent(planned, EVENT_DETAIL_FIELDS);
+
+    expect(projected).toMatchObject({ id: 42, workout_doc: { steps: ["warmup", "8x3min"] } });
+    expect(projected).not.toHaveProperty("push_errors");
+  });
+
+  it("always carries the id, which a follow-up call needs", () => {
+    expect(toCoachedEvent({ id: 7 }, EVENT_SUMMARY_FIELDS)).toEqual({ id: 7 });
+  });
 });
 
 describe("toWellnessDay", () => {
@@ -93,38 +225,44 @@ describe("toCurveSeriesList", () => {
    * query parameter to exclude it.
    */
   it("drops the activities map entirely", () => {
-    const projected = toCurveSeriesList({
-      list: [{ label: "Last 1y", secs: [5, 60], values: [900, 420] }],
-      activities: {
-        i1: { id: "i1", name: "…", average_wind_speed: 12, skyline_chart_bytes: "…" },
-        i2: { id: "i2" }
-      }
-    });
+    const projected = toCurveSeriesList(
+      {
+        list: [{ label: "Last 1y", secs: [5, 60], values: [900, 420] }],
+        activities: {
+          i1: { id: "i1", name: "…", average_wind_speed: 12, skyline_chart_bytes: "…" },
+          i2: { id: "i2" }
+        }
+      },
+      "secs"
+    );
 
     expect(JSON.stringify(projected)).not.toContain("skyline_chart_bytes");
     expect(JSON.stringify(projected)).not.toContain("i2");
   });
 
   it("keeps the durations and the values held over them", () => {
-    const projected = toCurveSeriesList({
-      list: [
-        {
-          label: "Last 1y",
-          start_date_local: "2025-09-23",
-          end_date_local: "2026-09-23",
-          days: 365,
-          secs: [5, 60, 300],
-          values: [900, 420, 330],
-          watts_per_kg: [12.5, 5.8, 4.6],
-          // Intervals' own analysis, and pointers into data the agent does not have.
-          submax_values: [[1, 2]],
-          start_index: 10,
-          activity_id: "i1",
-          powerModels: {},
-          ranks: []
-        }
-      ]
-    });
+    const projected = toCurveSeriesList(
+      {
+        list: [
+          {
+            label: "Last 1y",
+            start_date_local: "2025-09-23",
+            end_date_local: "2026-09-23",
+            days: 365,
+            secs: [5, 60, 300],
+            values: [900, 420, 330],
+            watts_per_kg: [12.5, 5.8, 4.6],
+            // Intervals' own analysis, and pointers into data the agent does not have.
+            submax_values: [[1, 2]],
+            start_index: 10,
+            activity_id: "i1",
+            powerModels: {},
+            ranks: []
+          }
+        ]
+      },
+      "secs"
+    );
 
     expect(projected).toEqual([
       {
@@ -139,15 +277,54 @@ describe("toCurveSeriesList", () => {
     ]);
   });
 
-  it("reads a pace curve, whose durations come as distances", () => {
-    const projected = toCurveSeriesList({ list: [{ label: "5k", distance: [1000, 5000], values: [3.9, 3.4] }] });
+  /**
+   * `DataCurve` declares both `secs` and `distance`, so the axis cannot be inferred from the
+   * payload. Under a key named `secs`, an agent would read 1000 metres as a quarter of an hour.
+   */
+  it("publishes a pace curve under `distance`, never under `secs`", () => {
+    const projected = toCurveSeriesList(
+      { list: [{ label: "5k", distance: [1000, 5000], values: [3.9, 3.4] }] },
+      "distance"
+    );
 
-    expect(projected[0]?.secs).toEqual([1000, 5000]);
+    expect(projected[0]).toEqual({
+      label: "5k",
+      startDateLocal: null,
+      endDateLocal: null,
+      days: null,
+      distance: [1000, 5000],
+      values: [3.9, 3.4]
+    });
+    expect(projected[0]).not.toHaveProperty("secs");
     expect(projected[0]).not.toHaveProperty("wattsPerKg");
   });
 
+  /**
+   * The same payload read on the other axis must not silently borrow the populated array: a
+   * power curve whose `secs` is absent has no x axis, and saying so beats inventing one.
+   */
+  it("reads only the axis it was told, on a curve carrying both", () => {
+    const both = { list: [{ label: "Last 1y", secs: [5, 60], distance: [1000, 5000], values: [900, 420] }] };
+
+    expect(toCurveSeriesList(both, "secs")[0]).toMatchObject({ secs: [5, 60] });
+    expect(toCurveSeriesList(both, "secs")[0]).not.toHaveProperty("distance");
+    expect(toCurveSeriesList(both, "distance")[0]).toMatchObject({ distance: [1000, 5000] });
+    expect(toCurveSeriesList(both, "distance")[0]).not.toHaveProperty("secs");
+  });
+
+  // Positional arrays: `secs[i]` pairs with `values[i]`. Dropping a non-number would shift every
+  // later value onto the wrong duration, staying well-formed and plausible while being wrong.
+  it("holds a gap in place rather than shifting the axis", () => {
+    const projected = toCurveSeriesList(
+      { list: [{ label: "Last 1y", secs: [5, null, 300], values: [900, 420, "n/a"] }] },
+      "secs"
+    );
+
+    expect(projected[0]).toMatchObject({ secs: [5, null, 300], values: [900, 420, null] });
+  });
+
   it("returns nothing for an unreadable payload rather than throwing", () => {
-    expect(toCurveSeriesList(null)).toEqual([]);
-    expect(toCurveSeriesList({ nope: true })).toEqual([]);
+    expect(toCurveSeriesList(null, "secs")).toEqual([]);
+    expect(toCurveSeriesList({ nope: true }, "secs")).toEqual([]);
   });
 });
