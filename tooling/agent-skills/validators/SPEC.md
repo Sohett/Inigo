@@ -56,9 +56,11 @@ Racine :
   - `fixed_session` — le jour doit porter `activity` (`strength` : `intensity: strength`,
     `strength_present` ou `label` contenant « renfo » ; `bike` : sport `*Ride` ; `run` :
     `Run`/`TrailRun`/`VirtualRun` ; `swim` : `Swim`) ;
-  - `unavailable` — le jour doit être au repos (`tss` 0, `blocks` vide) ;
-  - `limited` — non vérifiable par machine (lu par l'agent via `note`), mais comme toute
-    contrainte datée il suspend les créneaux fixes récurrents des jours qu'il couvre.
+  - `unavailable` — le jour doit être au repos (`tss` 0, `blocks` vide, `duration_min` 0) ;
+  - `limited` — non vérifiable par machine (lu par l'agent via `note`).
+
+  Une contrainte datée `unavailable` ou `limited` suspend les créneaux fixes **récurrents** des
+  jours qu'elle couvre ; un `fixed_session` daté est toujours exigé.
 - `days` — **exactement 7 entrées**.
 
 Par jour (`days[]`) :
@@ -106,7 +108,7 @@ exception est compté **fail** (jamais un faux pass).
 | `intensity_dist` | minutes Z4+ (`pct_ftp ≥ 100`) / minutes totales | ≤ `max_z4plus_pct` |
 | `hard_day_spacing` | écart entre jours durs (`vo2`/`threshold`/`anaerobic`) | ≥ 48 h, sauf `intended_back_to_back` |
 | `power_target_sanity` | chaque `pct_ftp` dans `[30, 160]` ; une séance `vo2` a ≥ 1 bloc ≥ 100 % | bornes FTP |
-| `fixed_slots` | lit `constraints` : chaque `fixed_session` a son activité sur son jour (sauf jour couvert par une contrainte datée ou `is_vacation_block`) ; jour `unavailable` = repos ; pas d'`indoor` si `is_vacation_block` ; `constraints` absent = fail | contraintes du profil |
+| `fixed_slots` | lit `constraints` : chaque `fixed_session` a son activité sur son jour (un récurrent est suspendu par une contrainte datée non `fixed_session` ou `is_vacation_block`) ; jour `unavailable` = repos ; pas d'`indoor` si `is_vacation_block` ; `constraints` absent = fail | contraintes du profil |
 | `health` | pas de `Run`/`TrailRun`/`VirtualRun` si `health_flags.run_paused` | état santé |
 
 Le calcul de `ramp_rate` applique, pour chaque jour, `ctl += (tss - ctl) / 42` puis compare

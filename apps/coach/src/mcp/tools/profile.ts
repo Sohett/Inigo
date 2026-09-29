@@ -45,7 +45,7 @@ export function registerProfileWriteTools(server: McpServer, store: AthleteDataR
       inputSchema: {
         ...athleteIdShape,
         weightTargetKg: z.number().positive().optional().describe("Target weight in kg."),
-        weeklyHours: z.number().positive().optional().describe("Usual weekly training time, hours."),
+        weeklyHours: z.number().positive().max(99.9).optional().describe("Usual weekly training time, hours."),
         equipment: z.array(z.string()).optional().describe("Equipment at hand (replaces the list)."),
         constraintsNotes: z.string().optional().describe("Narrative availability context (prose)."),
         healthNotes: z

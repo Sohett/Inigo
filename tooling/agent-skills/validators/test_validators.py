@@ -117,6 +117,15 @@ def test_dated_exception_suspends_recurring_fixed_slot():
     print("OK  exception datée -> créneau récurrent suspendu")
 
 
+def test_dated_fixed_session_is_enforced():
+    # un créneau fixe daté (ex. séance avec le coach ce lundi précis) est exigé, jamais suspendu
+    w = load("sample-week-good.json")
+    w["constraints"] = [{"id": "c-once", "kind": "fixed_session", "startDate": "2026-06-29",
+                         "endDate": "2026-06-29", "activity": "strength"}]
+    assert "fixed_slots" in validate(w)["blocking_failures"], "créneau fixe daté absent -> fail"
+    print("OK  créneau fixe daté absent -> fail")
+
+
 def test_missing_constraints_fails():
     # sans `constraints`, le gate ne peut pas vérifier : fail explicite, jamais un faux pass
     w = load("sample-week-good.json")
@@ -135,6 +144,7 @@ if __name__ == "__main__":
                test_fixed_slot_missing_on_its_weekday_fails,
                test_session_on_unavailable_day_fails_and_rest_passes,
                test_dated_exception_suspends_recurring_fixed_slot,
+               test_dated_fixed_session_is_enforced,
                test_missing_constraints_fails]:
         try:
             fn()

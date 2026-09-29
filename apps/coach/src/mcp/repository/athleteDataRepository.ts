@@ -69,8 +69,16 @@ function toIsoString(value: Date | string): string {
 
 /** Today's calendar date (`YYYY-MM-DD`) in the athlete's IANA timezone, not the server's. */
 function todayIn(timezone: string): string {
-  // en-CA formats as YYYY-MM-DD.
-  return new Intl.DateTimeFormat("en-CA", { timeZone: timezone }).format(new Date());
+  // formatToParts, like `formatDateDuJour`: no reliance on a locale's output ordering.
+  const parts = new Intl.DateTimeFormat("en", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(new Date());
+  const part = (type: Intl.DateTimeFormatPartTypes): string =>
+    parts.find((p) => p.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
 }
 
 type ThresholdRow = typeof athleteThreshold.$inferSelect;

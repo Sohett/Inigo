@@ -125,6 +125,15 @@ describe.skipIf(!databaseUrl)("athleteDataRepository (integration)", () => {
     expect(ids).not.toContain(past!.id);
   });
 
+  it("keeps a dated constraint through its last day (athlete timezone)", async () => {
+    const store = createAthleteDataRepository(db).forAthlete(athleteId);
+    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Brussels" }).format(new Date());
+    const endsToday = await store.upsertConstraint({ kind: "unavailable", startDate: "2000-01-01", endDate: today });
+    const ids = (await store.getProfile())!.constraints.map((c) => c.id);
+    expect(ids).toContain(endsToday!.id);
+    await store.deleteConstraint(endsToday!.id);
+  });
+
   it("replaces a constraint whole: omitted fields are cleared", async () => {
     const store = createAthleteDataRepository(db).forAthlete(athleteId);
     const created = await store.upsertConstraint({ kind: "limited", weekday: 5, note: "short" });

@@ -131,14 +131,16 @@ def check_fixed_slots(week):
         label = f"{WEEKDAYS_FR[day.weekday()]} {d['date']}"
         applicable = [c for c in constraints if _applies(c, day)]
         if any(c["kind"] == "unavailable" for c in applicable):
-            if d.get("tss", 0) > 0 or d.get("blocks"):
+            if d.get("tss", 0) > 0 or d.get("blocks") or d.get("duration_min", 0) > 0:
                 return ("fixed_slots", "fail", f"{label} : séance posée un jour indisponible")
             continue
         # Une exception datée (vacances, déplacement) ou un bloc vacances suspend la routine
-        # hebdo : le créneau fixe récurrent n'est alors pas exigé.
-        suspended = d.get("is_vacation_block") or any(c.get("weekday") is None for c in applicable)
+        # hebdo : le créneau fixe *récurrent* n'est alors pas exigé. Un créneau fixe daté,
+        # lui, est toujours exigé (c'est l'exception elle-même).
+        suspended = d.get("is_vacation_block") or any(
+            c.get("weekday") is None and c["kind"] != "fixed_session" for c in applicable)
         for c in applicable:
-            if c["kind"] != "fixed_session" or suspended:
+            if c["kind"] != "fixed_session" or (suspended and c.get("weekday") is not None):
                 continue
             present = ACTIVITY_PRESENT.get(c["activity"])
             if present is None or not present(d):
