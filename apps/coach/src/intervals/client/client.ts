@@ -12,7 +12,6 @@ import {
   sportSettingsSchema,
   streamListSchema,
   wellnessListSchema,
-  type FitnessPoint,
   type IntervalsEvent,
   type SportSettings
 } from "./schemas";
@@ -133,10 +132,17 @@ export class IntervalsIcuClient {
   // ----- Activities -----
 
   getActivities(
-    range: DateRange & { limit?: number } = {}
+    range: DateRange & { limit?: number; fields?: readonly string[] } = {}
   ): Promise<z.infer<typeof activityListSchema>> {
     return this.requestJson(`/athlete/${this.athleteId}/activities`, activityListSchema, {
-      query: { oldest: range.oldest, newest: range.newest, limit: range.limit }
+      query: {
+        oldest: range.oldest,
+        newest: range.newest,
+        limit: range.limit,
+        // Comma separated, as the API documents it. It also excludes null values, so asking
+        // for fewer fields shrinks the payload twice over.
+        fields: range.fields ? range.fields.join(",") : undefined
+      }
     });
   }
 
@@ -159,20 +165,15 @@ export class IntervalsIcuClient {
 
   // ----- Wellness & fitness -----
 
-  getWellness(range: DateRange = {}): Promise<z.infer<typeof wellnessListSchema>> {
+  getWellness(
+    range: DateRange & { fields?: readonly string[] } = {}
+  ): Promise<z.infer<typeof wellnessListSchema>> {
     return this.requestJson(`/athlete/${this.athleteId}/wellness`, wellnessListSchema, {
-      query: { oldest: range.oldest, newest: range.newest }
-    });
-  }
-
-  /** CTL/ATL/TSB series derived from wellness records (form = ctl - atl). */
-  async getFitness(range: DateRange = {}): Promise<FitnessPoint[]> {
-    const wellness = await this.getWellness(range);
-    return wellness.map((record) => {
-      const ctl = record.ctl ?? null;
-      const atl = record.atl ?? null;
-      const form = ctl !== null && atl !== null ? ctl - atl : null;
-      return { date: record.id ?? "", ctl, atl, form };
+      query: {
+        oldest: range.oldest,
+        newest: range.newest,
+        fields: range.fields ? range.fields.join(",") : undefined
+      }
     });
   }
 
@@ -199,10 +200,16 @@ export class IntervalsIcuClient {
   // ----- Events -----
 
   getEvents(
-    range: DateRange & { category?: string[] } = {}
+    range: DateRange & { category?: string[]; limit?: number } = {}
   ): Promise<z.infer<typeof eventListSchema>> {
     return this.requestJson(`/athlete/${this.athleteId}/events`, eventListSchema, {
-      query: { oldest: range.oldest, newest: range.newest, category: range.category }
+      // `ext` is deliberately never passed: it appends the workout file as base64 to every event.
+      query: {
+        oldest: range.oldest,
+        newest: range.newest,
+        category: range.category,
+        limit: range.limit
+      }
     });
   }
 
@@ -357,4 +364,4 @@ export class IntervalsIcuClient {
   }
 }
 
-export type { IntervalsEvent, FitnessPoint };
+export type { IntervalsEvent };

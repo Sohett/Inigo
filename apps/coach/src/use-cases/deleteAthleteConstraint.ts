@@ -1,3 +1,5 @@
+import { UUID_PATTERN } from "../mcp/athleteId";
+
 /** The slice of the athlete-data repository this use-case needs (scoped per athlete). */
 export interface ConstraintDeleterRepository {
   forAthlete(athleteId: string): { deleteConstraint(id: string): Promise<boolean> };
@@ -18,6 +20,8 @@ export function createDeleteAthleteConstraint(deps: {
 }): DeleteAthleteConstraint {
   return {
     async execute(athleteId: string, constraintId: string): Promise<DeleteConstraintOutcome> {
+      // A malformed id can't be one of this athlete's rows: not_found, not a Postgres error.
+      if (!UUID_PATTERN.test(constraintId)) return { status: "not_found" };
       const deleted = await deps.repo.forAthlete(athleteId).deleteConstraint(constraintId);
       return deleted ? { status: "deleted" } : { status: "not_found" };
     }

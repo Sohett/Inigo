@@ -1,6 +1,8 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { athleteIdShape, dateRangeShape, runAthleteTool, type ResolveClient } from "../result";
+import { DEFAULT_READ_BOUNDS, EVENT_DETAIL_FIELDS } from "../../../domain/training";
+import { toCoachedEvent, toCoachedEvents } from "../../mappers/project";
 
 const dateOnly = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -18,19 +20,34 @@ export function registerEventReadTools(server: McpServer, resolve: ResolveClient
     {
       title: "List events",
       description:
-        "List calendar events (planned workouts, races, notes) over a date range, optionally filtered by category.",
+        "List calendar events (planned workouts, races, notes) over a date range, defaulting to " +
+        "the coming week. Returns what each session is and what it targets, without its " +
+        "step-by-step structure: read one event with get_event for that.",
       inputSchema: {
         ...athleteIdShape,
         ...dateRangeShape,
         category: z
           .array(z.string())
           .optional()
-          .describe('Filter to these categories, e.g. ["WORKOUT", "RACE_A"].')
+          .describe('Filter to these categories, e.g. ["WORKOUT", "RACE_A"].'),
+        limit: z
+          .number()
+          .int()
+          .positive()
+          .optional()
+          .describe(`Maximum number of events (default ${String(DEFAULT_READ_BOUNDS.eventLimit)}).`)
       }
     },
     (args) =>
-      runAthleteTool(resolve, args.athleteId, (client) =>
-        client.getEvents({ oldest: args.oldest, newest: args.newest, category: args.category })
+      runAthleteTool(resolve, args.athleteId, async (client) =>
+        toCoachedEvents(
+          await client.getEvents({
+            oldest: args.oldest,
+            newest: args.newest,
+            category: args.category,
+            limit: args.limit ?? DEFAULT_READ_BOUNDS.eventLimit
+          })
+        )
       )
   );
 
@@ -44,7 +61,10 @@ export function registerEventReadTools(server: McpServer, resolve: ResolveClient
         eventId: z.string().describe("Event id.")
       }
     },
-    (args) => runAthleteTool(resolve, args.athleteId, (client) => client.getEvent(args.eventId))
+    (args) =>
+      runAthleteTool(resolve, args.athleteId, async (client) =>
+        toCoachedEvent(await client.getEvent(args.eventId), EVENT_DETAIL_FIELDS)
+      )
   );
 }
 

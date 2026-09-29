@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AthleteDataRepository } from "../repository/athleteDataRepository";
 import type { GoalInput } from "../../domain/coaching";
-import { athleteIdShape, runTool } from "./result";
+import { athleteIdShape, runAthleteTool } from "./result";
 
 export function registerGoalReadTools(server: McpServer, store: AthleteDataRepository): void {
   server.registerTool(
@@ -20,7 +20,7 @@ export function registerGoalReadTools(server: McpServer, store: AthleteDataRepos
           .describe("Filter by status. Defaults to active.")
       }
     },
-    (args) => runTool(() => store.forAthlete(args.athleteId).getGoals(args.status))
+    (args) => runAthleteTool(store, args.athleteId, (scoped) => scoped.getGoals(args.status))
   );
 }
 
@@ -46,7 +46,7 @@ export function registerGoalWriteTools(server: McpServer, store: AthleteDataRepo
       }
     },
     (args) =>
-      runTool(async () => {
+      runAthleteTool(store, args.athleteId, async (scoped) => {
         const input: GoalInput = {};
         if (args.id !== undefined) input.id = args.id;
         if (args.title !== undefined) input.title = args.title;
@@ -63,7 +63,7 @@ export function registerGoalWriteTools(server: McpServer, store: AthleteDataRepo
         if (input.id && Object.keys(input).filter((key) => key !== "id").length === 0) {
           throw new Error("upsert_goal with an id requires at least one field to update.");
         }
-        const result = await store.forAthlete(args.athleteId).upsertGoal(input);
+        const result = await scoped.upsertGoal(input);
         if (input.id && result === null) {
           throw new Error(`Goal ${input.id} not found for this athlete.`);
         }

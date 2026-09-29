@@ -70,4 +70,11 @@ describe("saveAthleteConstraint", () => {
     });
     expect(outcome).toEqual({ status: "not_found" });
   });
+
+  it("treats a malformed id as not_found without touching the store", async () => {
+    const { useCase, stored } = setup();
+    const outcome = await useCase.execute(ATHLETE_ID, { id: "not-a-uuid", kind: "unavailable", weekday: 7 });
+    expect(outcome).toEqual({ status: "not_found" });
+    expect(stored).not.toHaveBeenCalled();
+  });
 });

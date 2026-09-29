@@ -1,4 +1,5 @@
 import type { AthleteConstraint, ConstraintInput } from "../domain/coaching";
+import { UUID_PATTERN } from "../mcp/athleteId";
 
 /** The slice of the athlete-data repository this use-case needs (scoped per athlete). */
 export interface ConstraintWriterRepository {
@@ -52,6 +53,8 @@ export function createSaveAthleteConstraint(deps: {
 }): SaveAthleteConstraint {
   return {
     async execute(athleteId: string, input: ConstraintInput): Promise<SaveConstraintOutcome> {
+      // A malformed id can't be one of this athlete's rows: not_found, not a Postgres error.
+      if (input.id !== undefined && !UUID_PATTERN.test(input.id)) return { status: "not_found" };
       const problem = findRuleProblem(input);
       if (problem) return { status: "invalid", reason: problem };
       const constraint = await deps.repo.forAthlete(athleteId).upsertConstraint(input);
