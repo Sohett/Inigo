@@ -15,6 +15,7 @@ import {
   toCoachedEvent,
   toCoachedEvents,
   toCurveSeriesList,
+  toFitnessPoints,
   toWellnessDay
 } from "./project";
 
@@ -198,6 +199,22 @@ describe("toCoachedEvent", () => {
 
   it("always carries the id, which a follow-up call needs", () => {
     expect(toCoachedEvent({ id: 7 }, EVENT_SUMMARY_FIELDS)).toEqual({ id: 7 });
+  });
+});
+
+describe("toFitnessPoints", () => {
+  // Form is not a stored field: Intervals leaves `ctl - atl` to the caller.
+  it("derives form from ctl and atl", () => {
+    const points = toFitnessPoints([
+      { id: "2026-06-01", ctl: 50, atl: 40 },
+      { id: "2026-06-02", ctl: 52 }
+    ]);
+
+    expect(points).toEqual([
+      { date: "2026-06-01", ctl: 50, atl: 40, form: 10 },
+      // Both terms are needed: a day missing one has no form rather than a wrong one.
+      { date: "2026-06-02", ctl: 52, atl: null, form: null }
+    ]);
   });
 });
 

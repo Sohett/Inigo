@@ -250,11 +250,35 @@ describe("readActivityStreams", () => {
         endIndex: samples
       });
 
+      // The suggestion must be a width that would actually be accepted. Suggesting 6000 samples
+      // for a two-values-per-sample stream costs a round-trip to refuse the same request again.
       expect(outcome).toEqual({
         status: "failed",
         reason: ReadStreamsFailure.WindowTooLarge,
-        suggestedSamples: MAX_STREAM_VALUES
+        suggestedSamples: MAX_STREAM_VALUES / 2
       });
+    });
+
+    it("suggests a width the very next call accepts", async () => {
+      const samples = MAX_STREAM_VALUES / 2 + 1;
+      const data = Array.from({ length: samples }, () => [1, 2]);
+      const { readStreams } = build([series("latlng", data, { valueTypeIsArray: true })]);
+      const refused = await readStreams.execute({
+        ...window,
+        types: ["latlng"],
+        startIndex: 0,
+        endIndex: samples
+      });
+
+      const suggested = (refused as { suggestedSamples: number }).suggestedSamples;
+      const retried = await readStreams.execute({
+        ...window,
+        types: ["latlng"],
+        startIndex: 0,
+        endIndex: suggested
+      });
+
+      expect(retried.status).toBe("read");
     });
 
     it("reports when the activity has nothing for those series", async () => {

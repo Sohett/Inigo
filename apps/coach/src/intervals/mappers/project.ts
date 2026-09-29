@@ -18,6 +18,7 @@ import {
   type CurveAxis,
   type CurveSeries,
   type EventField,
+  type FitnessPoint,
   type WellnessDay
 } from "../../domain/training";
 
@@ -89,6 +90,26 @@ export function toCoachedActivityIntervals(raw: unknown): CoachedActivityInterva
   };
 }
 
+/**
+ * The CTL/ATL/form series, derived from wellness records.
+ *
+ * Form is not a stored field: Intervals leaves `ctl - atl` to the caller, and computing it here
+ * rather than in the agent's head is what makes the tool answer "how fresh am I" directly. Both
+ * terms are needed, so a day missing either has no form rather than a wrong one.
+ */
+export function toFitnessPoints(raw: Record<string, unknown>[]): FitnessPoint[] {
+  return raw.map((record) => {
+    const ctl = nullableNumber(record["ctl"]);
+    const atl = nullableNumber(record["atl"]);
+    return {
+      date: nullableString(record["id"]) ?? "",
+      ctl,
+      atl,
+      form: ctl !== null && atl !== null ? ctl - atl : null
+    };
+  });
+}
+
 /** One wellness day, reduced to the fields a coach reasons about. */
 export function toWellnessDay(raw: Record<string, unknown>): WellnessDay {
   return pick(raw, WELLNESS_DAY_FIELDS);
@@ -155,13 +176,22 @@ export function toCurveSeriesList(raw: unknown, axis: CurveAxis): CurveSeries[] 
   return objects((raw as { list?: unknown }).list).map((entry) => toCurveSeries(entry, axis));
 }
 
-/** One event, reduced to the fields a coach reasons about. `fields` picks listing or detail. */
+/**
+ * One event, reduced to the fields a coach reasons about. `fields` picks listing or detail.
+ *
+ * `id` is re-added when Intervals sent one, since every field list names it and a follow-up
+ * call needs it, but never invented: `"id": null` would be an identifier that resolves to
+ * nothing, which is the same choice made for an activity.
+ */
 export function toCoachedEvent(
   raw: Record<string, unknown>,
   fields: readonly EventField[]
 ): CoachedEvent {
   const projected = pick(raw, fields);
-  return { ...projected, id: raw["id"] as string | number };
+  const id = raw["id"];
+  return id === undefined || id === null
+    ? (projected as CoachedEvent)
+    : { ...projected, id: id as string | number };
 }
 
 /** The week's calendar: no `workout_doc`, which `get_event` serves for one session. */

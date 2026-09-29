@@ -1,5 +1,4 @@
 import type { z } from "zod";
-import { FITNESS_FIELDS } from "../../domain/training";
 import { IntervalsIcuApiError } from "./errors";
 import {
   activityListSchema,
@@ -13,7 +12,6 @@ import {
   sportSettingsSchema,
   streamListSchema,
   wellnessListSchema,
-  type FitnessPoint,
   type IntervalsEvent,
   type SportSettings
 } from "./schemas";
@@ -176,22 +174,6 @@ export class IntervalsIcuClient {
         newest: range.newest,
         fields: range.fields ? range.fields.join(",") : undefined
       }
-    });
-  }
-
-  /**
-   * CTL/ATL/TSB series derived from wellness records (form = ctl - atl).
-   *
-   * Asks Intervals for the three fields it reads and nothing else. A wellness record carries 46
-   * of them, and this is the tool four of the five agents call.
-   */
-  async getFitness(range: DateRange = {}): Promise<FitnessPoint[]> {
-    const wellness = await this.getWellness({ ...range, fields: FITNESS_FIELDS });
-    return wellness.map((record) => {
-      const ctl = record.ctl ?? null;
-      const atl = record.atl ?? null;
-      const form = ctl !== null && atl !== null ? ctl - atl : null;
-      return { date: record.id ?? "", ctl, atl, form };
     });
   }
 
@@ -382,4 +364,4 @@ export class IntervalsIcuClient {
   }
 }
 
-export type { IntervalsEvent, FitnessPoint };
+export type { IntervalsEvent };

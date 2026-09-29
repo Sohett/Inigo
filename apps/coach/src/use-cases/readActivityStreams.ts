@@ -98,10 +98,13 @@ export function createReadActivityStreams(deps: ReadActivityStreamsDeps): ReadAc
       }
 
       // Cheap pre-flight on the requested shape, so an obviously oversized window never reaches
-      // the API. The binding check is the one below, on what actually came back.
-      const suggestedSamples = Math.floor(MAX_STREAM_VALUES / types.length);
+      // the API. It assumes one value per sample; the binding check below measures the truth.
       if ((endIndex - startIndex) * types.length > MAX_STREAM_VALUES) {
-        return { status: "failed", reason: ReadStreamsFailure.WindowTooLarge, suggestedSamples };
+        return {
+          status: "failed",
+          reason: ReadStreamsFailure.WindowTooLarge,
+          suggestedSamples: Math.floor(MAX_STREAM_VALUES / types.length)
+        };
       }
 
       const client = await deps.resolveClient(input.athleteId);
@@ -127,9 +130,18 @@ export function createReadActivityStreams(deps: ReadActivityStreamsDeps): ReadAc
       // The binding cap, measured on what would actually be returned rather than on what was
       // asked for. Refused, not truncated: a truncation is the silent partial this use-case
       // exists to make impossible.
+      const samples = resolvedEnd - startIndex;
       const returned = series.reduce((total, stream) => total + countValues(stream.data), 0);
       if (returned > MAX_STREAM_VALUES) {
-        return { status: "failed", reason: ReadStreamsFailure.WindowTooLarge, suggestedSamples };
+        // Suggest from the density actually observed, not from one value per sample. An
+        // array-valued stream carries several values per sample, so the naive figure would be
+        // refused again on the retry and cost another round-trip to say the same thing.
+        const perSample = returned / samples;
+        return {
+          status: "failed",
+          reason: ReadStreamsFailure.WindowTooLarge,
+          suggestedSamples: Math.floor(MAX_STREAM_VALUES / perSample)
+        };
       }
 
       // A sensor that was asked for and is not in the answer is named, never dropped: an agent

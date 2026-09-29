@@ -1,4 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { FITNESS_FIELDS } from "../../domain/training";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { IntervalsIcuClient } from "./client";
@@ -72,7 +73,7 @@ describe("IntervalsIcuClient", () => {
 
   // The tool four of the five agents call. It reads three fields out of the 46 a wellness
   // record carries, so it asks for three.
-  it("asks wellness for only the three fields getFitness reads", async () => {
+  it("forwards a caller's wellness field list as a comma separated query param", async () => {
     let url: URL | null = null;
     server.use(
       http.get(`${BASE_URL}/athlete/${ATHLETE}/wellness`, ({ request }) => {
@@ -81,7 +82,7 @@ describe("IntervalsIcuClient", () => {
       })
     );
 
-    await makeClient().getFitness({ oldest: "2026-01-01" });
+    await makeClient().getWellness({ oldest: "2026-01-01", fields: FITNESS_FIELDS });
 
     expect(url!.searchParams.get("fields")).toBe("id,ctl,atl");
   });
@@ -112,21 +113,6 @@ describe("IntervalsIcuClient", () => {
     const activity = await makeClient().getActivity("abc");
     expect(activity.name).toBe("Morning Run");
     expect(activity.distance).toBe(10000);
-  });
-
-  it("derives fitness (form = ctl - atl) from wellness records", async () => {
-    server.use(
-      http.get(`${BASE_URL}/athlete/${ATHLETE}/wellness`, () =>
-        HttpResponse.json([
-          { id: "2026-06-01", ctl: 50, atl: 40 },
-          { id: "2026-06-02", ctl: 52 }
-        ])
-      )
-    );
-
-    const fitness = await makeClient().getFitness();
-    expect(fitness[0]).toEqual({ date: "2026-06-01", ctl: 50, atl: 40, form: 10 });
-    expect(fitness[1]).toEqual({ date: "2026-06-02", ctl: 52, atl: null, form: null });
   });
 
   it("throws a typed error with status on 404", async () => {

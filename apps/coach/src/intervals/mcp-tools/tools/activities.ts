@@ -14,18 +14,12 @@ import {
   runTool,
   type ResolveClient
 } from "../result";
+import { isoDaysAgo } from "./dateRange";
 import {
   ReadStreamsFailure,
   type ReadActivityStreams,
   type ReadStreamsOutcome
 } from "../../../use-cases/readActivityStreams";
-
-/** ISO date (YYYY-MM-DD) for `days` ago, used as a default range start. */
-export function isoDaysAgo(days: number): string {
-  const date = new Date();
-  date.setUTCDate(date.getUTCDate() - days);
-  return date.toISOString().slice(0, 10);
-}
 
 export function registerActivityTools(
   server: McpServer,

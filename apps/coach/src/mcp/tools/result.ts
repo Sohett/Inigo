@@ -1,5 +1,5 @@
-import { z } from "zod";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import { assertAthleteId, athleteIdShape } from "../athleteId";
 import type {
   AthleteDataRepository,
   ScopedAthleteDataRepository
@@ -7,36 +7,6 @@ import type {
 
 /** Result type returned by every athlete-data tool. */
 export type ToolResult = CallToolResult;
-
-/**
- * Shared input field carried by every tool: the athlete to act on. The endpoint is a
- * single static `/api/coaching-data/mcp` shared by all athletes (a Managed Agent configures one
- * fixed MCP server URL), so the athlete is identified per call — not by the URL. The agent gets
- * this value from the `inigo_athlete_id` line of the incoming message envelope.
- *
- * Declared as a plain string on purpose. `z.uuid()` emits a 166-character regex into the JSON
- * Schema of every tool, which the model re-reads on every request for no benefit: it copies the
- * id we handed it. The format is still enforced, server-side, by `runAthleteTool`.
- */
-export const athleteIdShape = {
-  athleteId: z
-    .string()
-    .describe("The Inigo athlete id — the `inigo_athlete_id` from the incoming message envelope.")
-} as const;
-
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-/**
- * Enforce the athlete id format here rather than in the tool's JSON Schema, so the regex stays
- * out of every request's context. A malformed id is a clean tool error, not a database error.
- */
-export function assertAthleteId(athleteId: string): void {
-  if (!UUID_PATTERN.test(athleteId)) {
-    throw new Error(
-      "Invalid athleteId: expected the `inigo_athlete_id` value from the message envelope."
-    );
-  }
-}
 
 /**
  * Wrap arbitrary data as a JSON text result.
@@ -78,3 +48,6 @@ export function runAthleteTool(
     return fn(store.forAthlete(athleteId));
   });
 }
+
+// Re-exported so a tool module keeps importing everything it needs from one place.
+export { assertAthleteId, athleteIdShape };

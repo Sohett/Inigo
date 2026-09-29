@@ -170,7 +170,23 @@ describe("what the Intervals tools actually return", () => {
     const mock = {
       getActivities: async (options: unknown) => {
         calls["getActivities"] = options;
-        return [{ id: "i1", name: "Sortie", strava_id: 42, average_wind_speed: 12, hr_load: 88 }];
+        const all: Record<string, unknown> = {
+          id: "i1",
+          name: "Sortie",
+          strava_id: 42,
+          average_wind_speed: 12,
+          hr_load: 88
+        };
+        // Intervals honours `fields` literally: it returns ONLY the named fields, so an object
+        // can come back with no `id` at all. Mocking a fixed shape would hide that.
+        const fields = (options as { fields?: readonly string[] }).fields;
+        return [
+          fields === undefined
+            ? all
+            : Object.fromEntries(
+                fields.filter((field) => field in all).map((field) => [field, all[field]])
+              )
+        ];
       },
       getWellness: async (options: unknown) => {
         calls["getWellness"] = options;
@@ -186,7 +202,17 @@ describe("what the Intervals tools actually return", () => {
         icu_intervals: [
           { id: 0, type: "WORK", label: "1", average_watts: 300, average_dfa_a1: 0.7, wbal_start: 20 }
         ],
-        icu_groups: [{ id: "G1", count: 8, average_watts: 295, average_lactate: 3.2 }],
+        icu_groups: [
+          {
+            id: "G1",
+            count: 8,
+            average_watts: 295,
+            average_lactate: 3.2,
+            // Per-repetition fields an aggregate has no business carrying.
+            label: "1",
+            end_index: 90
+          }
+        ],
         analyzed: "2026-09-21T10:00:00Z"
       }),
       ...overrides
@@ -241,7 +267,9 @@ describe("what the Intervals tools actually return", () => {
     });
 
     expect((calls["getActivities"] as { fields: string[] }).fields).toEqual(["hr_load"]);
-    expect(parse(result)).toEqual([{ id: "i1", hr_load: 88 }]);
+    // No `id`: Intervals was not asked for one, and inventing one would hand back an
+    // identifier that resolves to nothing.
+    expect(parse(result)).toEqual([{ hr_load: 88 }]);
   });
 
   // The default window is a coaching choice and lives in the domain, not in the adapter.

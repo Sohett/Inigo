@@ -268,7 +268,13 @@ export const DEFAULT_READ_BOUNDS = {
   /** Events returned when no `limit` is given. The API already defaults to a 7-day window. */
   eventLimit: 30,
   /** Days of activities returned when no range is given. */
-  activityDays: 30
+  activityDays: 30,
+  /**
+   * Days of fitness returned when no range is given. Longer than the other windows because the
+   * point of the series is the trend: a CTL ramp over three months is what says whether the
+   * build is working, where thirty days only shows the current block.
+   */
+  fitnessDays: 90
 } as const;
 
 /**
@@ -328,7 +334,7 @@ const INTERVAL_ONLY_FIELDS = [
   "end_index",
   "start_time",
   "end_time"
-] as const;
+] as const satisfies readonly CoachedIntervalField[];
 
 /** The per-interval fields that also make sense once summed over a group. */
 type SharedIntervalField = Exclude<CoachedIntervalField, (typeof INTERVAL_ONLY_FIELDS)[number]>;

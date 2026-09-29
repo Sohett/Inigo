@@ -2,7 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { athleteIdShape, dateRangeShape, runAthleteTool, type ResolveClient } from "../result";
 import { DEFAULT_READ_BOUNDS, WELLNESS_DAY_FIELDS } from "../../../domain/training";
 import { toWellnessDays } from "../../mappers/project";
-import { isoDaysAgo } from "./activities";
+import { isoDaysAgo } from "./dateRange";
 
 export function registerWellnessTools(server: McpServer, resolve: ResolveClient): void {
   server.registerTool(
