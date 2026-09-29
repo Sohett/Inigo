@@ -18,6 +18,10 @@ remplace l'ancienne référence `01-INTERFACE-CONTRACT.md §5`.
     "ctl_weekly_ramp_max": 5.0
   },
   "health_flags": { "run_paused": true },
+  "constraints": [
+    { "id": "…", "kind": "fixed_session", "weekday": 2, "activity": "strength", "startTime": "07:00" },
+    { "id": "…", "kind": "unavailable", "startDate": "2026-07-03", "endDate": "2026-07-03", "note": "déplacement" }
+  ],
   "days": [
     {
       "date": "2026-06-30",
@@ -45,19 +49,29 @@ Racine :
 - `phase_targets` — **requis** : `weekly_tss` (`[lo, hi]`), `max_z4plus_pct` (nombre),
   `ctl_weekly_ramp_max` (nombre). Ce sont les seuils de la phase (issus de la Knowledge Base).
 - `health_flags` — optionnel : `run_paused` (bool).
+- `constraints` — **requis** : la liste `constraints` renvoyée par `get_profile`, **recopiée telle
+  quelle** (liste vide `[]` si l'athlète n'en a aucune ; clé absente = `fixed_slots` en échec).
+  Chaque contrainte est récurrente (`weekday`, ISO : 1 = lundi … 7 = dimanche) **ou** datée
+  (`startDate`..`endDate` inclus), de `kind` :
+  - `fixed_session` — le jour doit porter `activity` (`strength` : `intensity: strength`,
+    `strength_present` ou `label` contenant « renfo » ; `bike` : sport `*Ride` ; `run` :
+    `Run`/`TrailRun`/`VirtualRun` ; `swim` : `Swim`) ;
+  - `unavailable` — le jour doit être au repos (`tss` 0, `blocks` vide) ;
+  - `limited` — non vérifiable par machine (lu par l'agent via `note`), mais comme toute
+    contrainte datée il suspend les créneaux fixes récurrents des jours qu'il couvre.
 - `days` — **exactement 7 entrées**.
 
 Par jour (`days[]`) :
 - **Requis** : `date` (ISO `YYYY-MM-DD`), `sport`, `intensity`, `tss` (nombre), `blocks` (liste).
 - `intensity` ∈ libre, mais les valeurs `vo2` / `threshold` / `anaerobic` marquent un **jour dur**
-  (contrainte d'espacement). `strength` marque une séance de renfo (créneau jeudi).
+  (contrainte d'espacement). `strength` marque une séance de renfo.
 - `blocks[]` : `{ "pct_ftp": <nombre>, "minutes": <nombre>, "cadence"?: <nombre> }`. Un bloc
   `pct_ftp >= 100` compte comme **Z4+** (distribution d'intensité).
 - Optionnels influençant les checks :
   - `intended_back_to_back` (bool) — exempte le jour de la contrainte d'espacement.
   - `indoor` (bool) — interdit en semaine de vacances.
-  - `is_vacation_block` (bool) — semaine de vacances (assouplit le créneau jeudi, interdit l'indoor).
-  - `strength_present` (bool) — atteste la présence de renfo le jeudi.
+  - `is_vacation_block` (bool) — semaine de vacances (suspend les créneaux fixes, interdit l'indoor).
+  - `strength_present` (bool) — atteste la présence de renfo sur le jour.
 - `duration_min`, `label` — indicatifs (le gate raisonne sur `blocks` et `tss`).
 
 ## Sortie — `validation-report.json`
@@ -92,7 +106,7 @@ exception est compté **fail** (jamais un faux pass).
 | `intensity_dist` | minutes Z4+ (`pct_ftp ≥ 100`) / minutes totales | ≤ `max_z4plus_pct` |
 | `hard_day_spacing` | écart entre jours durs (`vo2`/`threshold`/`anaerobic`) | ≥ 48 h, sauf `intended_back_to_back` |
 | `power_target_sanity` | chaque `pct_ftp` dans `[30, 160]` ; une séance `vo2` a ≥ 1 bloc ≥ 100 % | bornes FTP |
-| `fixed_slots` | jeudi = renfo (`intensity: strength`, `label` contient « renfo », ou `strength_present`) ; pas d'`indoor` si `is_vacation_block` | créneaux |
+| `fixed_slots` | lit `constraints` : chaque `fixed_session` a son activité sur son jour (sauf jour couvert par une contrainte datée ou `is_vacation_block`) ; jour `unavailable` = repos ; pas d'`indoor` si `is_vacation_block` ; `constraints` absent = fail | contraintes du profil |
 | `health` | pas de `Run`/`TrailRun`/`VirtualRun` si `health_flags.run_paused` | état santé |
 
 Le calcul de `ramp_rate` applique, pour chaque jour, `ctl += (tss - ctl) / 42` puis compare

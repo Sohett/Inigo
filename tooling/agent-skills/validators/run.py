@@ -100,21 +100,52 @@ def check_power_target_sanity(week):
     return ("power_target_sanity", "pass", "cibles cohérentes vs FTP")
 
 
+WEEKDAYS_FR = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
+
+# Comment reconnaître, sur un jour proposé, l'activité qu'un créneau fixe impose.
+ACTIVITY_PRESENT = {
+    "strength": lambda d: d.get("intensity") == "strength" or bool(d.get("strength_present"))
+    or "renfo" in d.get("label", "").lower(),
+    "bike": lambda d: "Ride" in d.get("sport", ""),
+    "run": lambda d: d.get("sport") in ("Run", "TrailRun", "VirtualRun"),
+    "swim": lambda d: d.get("sport") == "Swim",
+}
+
+
+def _applies(constraint, day):
+    """Vrai si la contrainte (récurrente ou datée) couvre ce jour."""
+    if constraint.get("weekday") is not None:
+        return day.isoweekday() == constraint["weekday"]
+    return constraint["startDate"] <= day.isoformat() <= constraint["endDate"]
+
+
 def check_fixed_slots(week):
+    # `constraints` = get_profile.constraints recopié tel quel. Absent = fail explicite :
+    # sans lui le gate ne peut rien vérifier, et un pass serait un faux pass.
+    if "constraints" not in week:
+        return ("fixed_slots", "fail",
+                "`constraints` absent : recopie get_profile.constraints (liste vide si aucune)")
+    constraints = week["constraints"]
     for d in week["days"]:
-        wd = date.fromisoformat(d["date"]).weekday()  # 0=lundi ... 3=jeudi
-        if wd == 3 and d.get("is_vacation_block"):
+        day = date.fromisoformat(d["date"])
+        label = f"{WEEKDAYS_FR[day.weekday()]} {d['date']}"
+        applicable = [c for c in constraints if _applies(c, day)]
+        if any(c["kind"] == "unavailable" for c in applicable):
+            if d.get("tss", 0) > 0 or d.get("blocks"):
+                return ("fixed_slots", "fail", f"{label} : séance posée un jour indisponible")
             continue
-        if wd == 3 and "renfo" not in d.get("label", "").lower() \
-                and d.get("intensity") not in ("strength",):
-            # tolérant : on signale seulement si le créneau jeudi ne contient pas de renfo
-            if not d.get("strength_present"):
-                return ("fixed_slots", "fail",
-                        f"jeudi {d['date']}: renfo coach absent")
+        # Une exception datée (vacances, déplacement) ou un bloc vacances suspend la routine
+        # hebdo : le créneau fixe récurrent n'est alors pas exigé.
+        suspended = d.get("is_vacation_block") or any(c.get("weekday") is None for c in applicable)
+        for c in applicable:
+            if c["kind"] != "fixed_session" or suspended:
+                continue
+            present = ACTIVITY_PRESENT.get(c["activity"])
+            if present is None or not present(d):
+                return ("fixed_slots", "fail", f"{label} : créneau fixe {c['activity']} absent")
         if d.get("is_vacation_block") and d.get("indoor"):
-            return ("fixed_slots", "fail",
-                    f"{d['date']}: séance indoor en semaine de vacances")
-    return ("fixed_slots", "pass", "créneaux fixes respectés")
+            return ("fixed_slots", "fail", f"{label} : séance indoor en semaine de vacances")
+    return ("fixed_slots", "pass", f"créneaux fixes respectés ({len(constraints)} contrainte(s))")
 
 
 def check_health(week):
@@ -137,7 +168,7 @@ ADVICE = {
     "intensity_dist": "Trop d'intensité : convertis une séance qualité en endurance.",
     "hard_day_spacing": "Espace les jours durs d'au moins 48h, ou marque intended_back_to_back si voulu.",
     "power_target_sanity": "Corrige les cibles de puissance incohérentes vs FTP.",
-    "fixed_slots": "Préserve le renfo du jeudi ; pas d'indoor en semaine de vacances.",
+    "fixed_slots": "Respecte les contraintes du profil : créneaux fixes tenus, aucun entraînement un jour indisponible, pas d'indoor en semaine de vacances.",
     "health": "Retire la séance interdite par l'état santé (course en pause).",
     "schema": "Corrige la structure : 7 jours, champs requis présents.",
 }
