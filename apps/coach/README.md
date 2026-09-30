@@ -62,6 +62,8 @@ Validées au boot par `src/config/config.ts`. Copie `.env.example` → `.env` **
 | `OPENWA_API_KEY` | Clé API OpenWA (rôle OPERATOR), server-side |
 | `ADMIN_USER` | Identifiant HTTP Basic de l'admin (`/admin`, `/api/admin/*`), min 3 car. |
 | `ADMIN_PASSWORD` | Mot de passe HTTP Basic de l'admin, min 16 car., server-side |
+| `SLACK_ALERT_WEBHOOK_URL` | Optionnel : Incoming Webhook Slack des alertes de session WhatsApp (absente → log seul) |
+| `CRON_SECRET` | Secret du cron watchdog (`/api/cron/whatsapp-watchdog`) ; Vercel l'envoie en Bearer. Absente → le watchdog refuse de tourner |
 
 Les deux variables d'admin ne sont **pas** dans le schéma zod de `config.ts` : ce schéma est
 validé à chaque requête, donc une valeur d'admin absente **ou trop courte** ferait tomber le
@@ -185,6 +187,11 @@ Elles sont hors du schéma zod partagé, donc leur absence ne casse que `/api/wh
 le déploiement passe et rien ne le signale au boot. La **session** de la passerelle, elle,
 n'est pas une variable d'env : elle vit en base et se règle depuis `/admin`, parce qu'elle
 change à chaque ré-appairage WhatsApp.
+
+Surveillance de la session WhatsApp (INI-40) : poser `CRON_SECRET` et `SLACK_ALERT_WEBHOOK_URL`,
+puis, côté OpenWA, abonner le webhook du coach à `session.status`, `session.disconnected` et
+`session.reconnect_loop` (en plus de `message.received`). Le cron quotidien est déclaré dans
+`vercel.json` ; pour le tester à la main : `vercel crons run /api/cron/whatsapp-watchdog`.
 
 Pour utiliser l'admin, poser `ADMIN_USER` (min 3 car.) et `ADMIN_PASSWORD` (min 16 car.).
 Absentes ou trop courtes, seul l'admin est indisponible (503, avec un log qui dit quoi
