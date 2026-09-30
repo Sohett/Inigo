@@ -104,3 +104,48 @@ export function senderLid(message: InboundMessage): string | null {
   const id = (jid.split("@", 1)[0] ?? "").split(":", 1)[0] ?? "";
   return id.length > 0 ? `${id}@lid` : null;
 }
+
+/**
+ * The gateway session lifecycle events the coach watches (INI-40). OpenWA wraps each in its
+ * standard envelope (`{ event, timestamp, sessionId, idempotencyKey, deliveryId, data }`); only
+ * `event` and `data` are read. `status` stays a plain string so a status added by a newer
+ * gateway build is tolerated rather than rejected.
+ */
+export const gatewaySessionEventSchema = z.discriminatedUnion("event", [
+  z
+    .object({
+      event: z.literal("session.status"),
+      data: z.object({ sessionId: z.string(), status: z.string() }).passthrough()
+    })
+    .passthrough(),
+  z
+    .object({
+      event: z.literal("session.disconnected"),
+      data: z.object({ sessionId: z.string(), reason: z.string().optional() }).passthrough()
+    })
+    .passthrough(),
+  z
+    .object({
+      event: z.literal("session.reconnect_loop"),
+      data: z
+        .object({
+          sessionId: z.string(),
+          attempts: z.number(),
+          nextDelayMs: z.number().optional()
+        })
+        .passthrough()
+    })
+    .passthrough()
+]);
+
+export type GatewaySessionEvent = z.infer<typeof gatewaySessionEventSchema>;
+
+/**
+ * Whether a parsed webhook body is a gateway session event (`session.*`) rather than a message.
+ * Decides which use-case a delivery goes to; the use-case then validates the full shape.
+ */
+export function isGatewaySessionEvent(payload: unknown): boolean {
+  if (typeof payload !== "object" || payload === null) return false;
+  const event = (payload as { event?: unknown }).event;
+  return typeof event === "string" && event.startsWith("session.");
+}

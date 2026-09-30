@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, vi } from "vitest";
 
 /**
  * The WhatsApp webhook is the critical path: if it stops answering 200, athletes'
@@ -17,6 +17,7 @@ beforeAll(() => {
   process.env["ADMIN_USER"] = "x";
   process.env["ADMIN_PASSWORD"] = "short";
   delete process.env["WHATSAPP_WEBHOOK_SECRET"];
+  delete process.env["SLACK_ALERT_WEBHOOK_URL"];
 });
 
 function post(body: string): Request {
@@ -44,5 +45,29 @@ describe("POST /api/webhooks/whatsapp", () => {
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toMatchObject({ error: "invalid_json" });
+  });
+});
+
+describe("POST /api/webhooks/whatsapp, session events (INI-40)", () => {
+  it("answers 200 to a session event without reaching the message routing", async () => {
+    const { POST } = await import("./route");
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.spyOn(console, "info").mockImplementation(() => undefined);
+
+    const response = await POST(
+      post(
+        JSON.stringify({
+          event: "session.disconnected",
+          sessionId: "gateway-session",
+          data: { sessionId: "gateway-session", reason: "conflict" }
+        })
+      )
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ ok: true });
+    // The alert went out as a structured log line (no Slack URL configured in this spec).
+    expect(log.mock.calls.some((call) => String(call[0]).startsWith("[coach][alert] "))).toBe(true);
+    vi.restoreAllMocks();
   });
 });

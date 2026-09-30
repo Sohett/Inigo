@@ -1,6 +1,8 @@
 import { getDeps } from "../../../../src/deps";
 import { verifyWebhookSignature, OPENWA_SIGNATURE_HEADER } from "../../../../src/auth";
 import { createRouteInboundMessage } from "../../../../src/use-cases/routeInboundMessage";
+import { createHandleGatewaySessionEvent } from "../../../../src/use-cases/handleGatewaySessionEvent";
+import { isGatewaySessionEvent } from "../../../../src/mappers/whatsappPayload";
 
 // Webhook deliveries are dynamic and must never be cached.
 export const dynamic = "force-dynamic";
@@ -31,6 +33,14 @@ export async function POST(request: Request): Promise<Response> {
     payload = rawBody.length > 0 ? JSON.parse(rawBody) : null;
   } catch {
     return json({ ok: false, error: "invalid_json" }, 400);
+  }
+
+  // Session lifecycle events (INI-40) raise an alert and never fail: the alerter swallows its
+  // own errors, so a Slack outage cannot make BullMQ replay the event into a second alert.
+  if (isGatewaySessionEvent(payload)) {
+    const outcome = await createHandleGatewaySessionEvent({ alerter: deps.alerter }).execute(payload);
+    console.info(`[coach] session event: ${JSON.stringify(outcome)}`);
+    return json({ ok: true }, 200);
   }
 
   try {
