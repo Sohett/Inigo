@@ -5,7 +5,8 @@ import {
   messageText,
   replyChatId,
   senderPhone,
-  senderLid
+  senderLid,
+  isGatewaySessionEvent
 } from "./whatsappPayload";
 
 function normalise(payload: unknown) {
@@ -93,5 +94,23 @@ describe("whatsappPayload", () => {
       expect(senderLid({ from: "120363000000000000@g.us" })).toBeNull();
       expect(senderLid({ body: "hi" })).toBeNull();
     });
+  });
+});
+
+describe("isGatewaySessionEvent", () => {
+  it.each(["session.status", "session.disconnected", "session.reconnect_loop", "session.qr"])(
+    "is true for %s",
+    (event) => {
+      expect(isGatewaySessionEvent({ event, data: {} })).toBe(true);
+    }
+  );
+
+  it.each([
+    ["a message event", { event: "message.received", data: {} }],
+    ["a bare message", { from: "32475123456@c.us", body: "salut" }],
+    ["null", null],
+    ["a non-string event", { event: 42 }]
+  ])("is false for %s", (_label, payload) => {
+    expect(isGatewaySessionEvent(payload)).toBe(false);
   });
 });

@@ -27,7 +27,8 @@ aura besoin de compute persistant (queue, batch long) — pas avant.
 ```
 proxy.ts                                # HTTP Basic sur /admin + /api/admin/* (Next 16 ; runtime Node imposé)
 app/
-  api/webhooks/whatsapp/route.ts        # entrée HTTP fine : (verif HMAC optionnelle) → parse → use-case → 200
+  api/webhooks/whatsapp/route.ts        # entrée HTTP fine : (verif HMAC optionnelle) → parse → use-case → 200 (session.* → alerte, sinon routing)
+  api/cron/whatsapp-watchdog/route.ts   # GET appelé par le cron Vercel (vercel.json), Bearer CRON_SECRET → checkGatewaySession
   api/coaching-data/[transport]/route.ts # endpoint MCP coaching-data statique (/api/coaching-data/mcp), bearer requis
   api/intervals/[transport]/route.ts    # endpoint MCP Intervals.icu statique (/api/intervals/mcp), bearer requis
   api/whatsapp/[transport]/route.ts     # endpoint MCP WhatsApp statique (/api/whatsapp/mcp), bearer requis
@@ -42,6 +43,7 @@ src/
   components/ui/*                  # composants shadcn (button, card, table, badge, input, label)
   domain/
     athlete.ts                     # modèle métier Athlete + enum AthleteStatus (routing ; indépendants de @inigo/db)
+    whatsappGateway.ts             # GatewaySession + GatewayAlert (santé de la passerelle, indépendants d'OpenWA)
     brain.ts                       # SessionElements / RunningSession / BrainInventory (indépendants du SDK)
     coaching.ts                    # modèles métier de la donnée coaching (contrat de sortie des tools MCP) + inputs
   repositories/
@@ -53,6 +55,12 @@ src/
     loadAdminOverview.ts           # use-case admin (lecture) : athlètes + sessions live + historique + inventaire
     sendAthleteMessage.ts          # use-case : la seule façon de parler à l'athlète (chat + session de passerelle)
     readActivityStreams.ts         # use-case : fenêtre obligatoire + refus au-delà du plafond, jamais de troncature
+    handleGatewaySessionEvent.ts   # use-case : webhook session.* OpenWA → alerte « down » / « recovered »
+    checkGatewaySession.ts         # use-case watchdog : session enregistrée en Neon → GET OpenWA → alerte si pas ready
+  alerts/
+    gatewayAlerter.ts              # PORT GatewayAlerter (notify ne throw jamais)
+    logAndSlackAlerter.ts          # ADAPTER : log structuré [coach][alert] + Slack si SLACK_ALERT_WEBHOOK_URL
+    slack.ts                       # POST Incoming Webhook (timeout 5s), l'URL n'apparaît jamais dans une erreur
   repositories/whatsappGatewayRepository.ts  # PORT : la session de passerelle (en base, pas en env)
   mappers/
     whatsappPayload.ts             # schémas zod + normalisation du payload OpenWA + senderPhone
@@ -61,7 +69,7 @@ src/
     repository/athleteDataRepository.ts  # accès Neon scopé par athlete (createDb → forAthlete(id)), mappe rows→modèles (domain/coaching) ; seul autre layer @inigo/db-aware
     tools/{index,result,profile,thresholds,goals,plan,adaptationLog}.ts  # tools MCP fins (reads + writes gated)
   whatsapp/
-    client/                        # client REST OpenWA typé (POST send-text ; zéro retry, un envoi n'est pas idempotent)
+    client/                        # client REST OpenWA typé (POST send-text ; zéro retry, un envoi n'est pas idempotent ; GET session pour le watchdog)
     credentials.ts                 # lit OPENWA_BASE_URL/API_KEY dans l'env — JAMAIS dans configSchema (cf. §Admin)
     resolveClient.ts               # createOpenWaResolver() : résout le client à l'appel, pas au boot
     mcp-tools/{index,result}.ts    # un seul tool : send_whatsapp_message(athleteId, text) — mapping pur, zéro décision
@@ -243,6 +251,47 @@ Tout ce qui entre dans le contexte d'un thread est payé **une fois à l'écritu
 Règle de partage quand tu ajoutes un tool : **choix produit → use-case**, **transformation sans
 décision → mapper**, **forme à nommer → interface de domaine**. Jamais une liste de champs métier
 ni un plafond en dur dans un adaptateur MCP.
+
+## Surveillance de la session WhatsApp — INI-40
+
+Une session OpenWA qui tombe, c'est un athlète qui écrit dans le vide. Deux détections, une
+seule sortie (`GatewayAlerter`) :
+
+- **Temps réel : webhooks `session.*`** (même URL que les messages, abonnement à poser côté
+  OpenWA). La route les envoie à `handleGatewaySessionEvent` :
+  - alerte `down` : `session.disconnected` (avec la raison), `session.reconnect_loop` (toutes les
+    5 tentatives), `session.status` ∈ `qr_ready`, `action_required` ou `failed` ;
+  - `recovered` : `session.status` = `ready` ;
+  - silence : les statuts transitoires, et `disconnected` (déjà couvert par `session.disconnected` :
+    alerter sur les deux doublerait chaque coupure ; seul, c'est un stop volontaire par l'API).
+  - **filtré par la session enregistrée en Neon** : les événements d'une autre session (l'ancienne,
+    après un ré-appairage) sont ignorés ; mais une autre session qui passe `ready` est une alerte
+    `unrecorded_session_ready` (le coach envoie encore par l'ancienne : il faut mettre à jour
+    l'admin). Neon illisible → l'événement compte comme celui de la session enregistrée (on
+    alerte plutôt que se taire).
+- **Watchdog : cron Vercel** (`vercel.json`, `0 7 * * *` : le plan Hobby limite à un run par jour,
+  à resserrer après upgrade). Couvre la panne que les webhooks ne peuvent pas signaler : une
+  passerelle trop morte pour appeler qui que ce soit. `checkGatewaySession` alerte si aucune
+  session n'est enregistrée, si OpenWA ne la connaît plus, si elle n'est pas `ready`, ou si OpenWA
+  est injoignable / non configuré. Il ne throw pas sur la panne qu'il surveille.
+- **Relance automatique (watchdog seulement)** : une session `disconnected` ou `failed` (appareil
+  toujours lié, moteur à l'arrêt ; OpenWA ne relance jamais un `failed` de lui-même) reçoit **un**
+  `POST /api/sessions/:id/start` par run, avec une alerte `session_restarted`. Le résultat arrive en
+  temps réel par les webhooks (`ready` → rétablissement, `failed` → alerte). `qr_ready` et
+  `action_required` restent des alertes : il faut relier WhatsApp, une relance ne ferait qu'un QR.
+  **Jamais depuis le webhook** : un start qui échoue aussitôt ferait une boucle start → failed →
+  start ; le planning du cron sert de limite de débit.
+
+Règles :
+- **L'alerter ne throw jamais.** Un échec Slack est loggé, jamais propagé : sinon le webhook
+  répondrait une erreur, BullMQ rejouerait l'événement et on alerterait en boucle.
+- **Secrets lus là où ils servent**, jamais dans `configSchema` (même raison qu'`openWaCredentials`) :
+  `SLACK_ALERT_WEBHOOK_URL` (absente → log seul), `CRON_SECRET` (absente → la route refuse, 503 ;
+  mauvais bearer → 401). Vercel envoie lui-même `Authorization: Bearer $CRON_SECRET` à ses crons.
+- **Texte des alertes** : pas de tiret (`-`, `—`) dans ce que lit l'humain.
+
+Hors scope (à reprendre si besoin) : réconciliation des messages après un unlink (OpenWA stocke
+l'historique rapatrié sans webhook), déduplication par `waMessageId`.
 
 ## Admin (`/admin`) — ouvrir une session
 

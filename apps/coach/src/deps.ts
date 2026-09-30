@@ -15,6 +15,8 @@ import type { ResolveClient } from "./intervals/mcp-tools/result";
 import { createOpenWaResolver, type ResolveOpenWaClient } from "./whatsapp/resolveClient";
 import { createDrizzleWhatsappGatewayRepository } from "./repositories/drizzleWhatsappGatewayRepository";
 import type { WhatsappGatewayRepository } from "./repositories/whatsappGatewayRepository";
+import type { GatewayAlerter } from "./alerts/gatewayAlerter";
+import { createLogAndSlackAlerter, slackWebhookUrlFromEnv } from "./alerts/logAndSlackAlerter";
 
 export interface Deps {
   config: Config;
@@ -32,6 +34,8 @@ export interface Deps {
   whatsapp: ResolveOpenWaClient;
   /** Reads and writes the WhatsApp gateway session recorded in Neon. */
   whatsappGateway: WhatsappGatewayRepository;
+  /** Tells a human the WhatsApp gateway session is down or back (log, plus Slack when set). */
+  alerter: GatewayAlerter;
 }
 
 let cached: Deps | null = null;
@@ -60,7 +64,8 @@ export function getDeps(): Deps {
         config.INTERVALS_BASE_URL
       ),
       whatsapp: createOpenWaResolver(),
-      whatsappGateway: createDrizzleWhatsappGatewayRepository(db)
+      whatsappGateway: createDrizzleWhatsappGatewayRepository(db),
+      alerter: createLogAndSlackAlerter({ slackWebhookUrl: slackWebhookUrlFromEnv() })
     };
   }
   return cached;

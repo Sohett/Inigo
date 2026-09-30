@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { GatewaySession } from "../../domain/whatsappGateway";
 import { OpenWaApiError } from "./errors";
 
 export interface OpenWaClientOptions {
@@ -8,6 +9,8 @@ export interface OpenWaClientOptions {
   apiKey: string;
   /** Per-request timeout in milliseconds. Default 15000. */
   timeoutMs?: number;
+  /** Timeout of a session start, which waits for the engine to initialize. Default 25000. */
+  startTimeoutMs?: number;
   /** Injectable fetch, primarily for testing. Defaults to global fetch. */
   fetchImpl?: typeof fetch;
 }
@@ -24,7 +27,22 @@ const sendResponseSchema = z.object({
 });
 
 /**
- * Minimal client for the OpenWA gateway, used by the `/api/whatsapp/mcp` server.
+ * `GET /api/sessions/:sessionId`. Only what the watchdog reads is typed; `status` stays a plain
+ * string so a status added by a newer gateway build does not fail the parse.
+ */
+const sessionResponseSchema = z
+  .object({
+    id: z.string(),
+    status: z.string(),
+    // Only ever shown to a human: tolerate any shape rather than fail the whole read on it.
+    lastError: z.unknown()
+  })
+  .passthrough();
+
+
+/**
+ * Minimal client for the OpenWA gateway, used by the `/api/whatsapp/mcp` server (sends) and the
+ * session watchdog (reads, restarts).
  *
  * Deliberately **no retry**. A send is not idempotent: a second attempt after a timeout is a
  * duplicate message for the athlete, which is worse than a reported failure. The messages
@@ -34,12 +52,14 @@ export class OpenWaClient {
   private readonly baseUrl: string;
   private readonly apiKey: string;
   private readonly timeoutMs: number;
+  private readonly startTimeoutMs: number;
   private readonly fetchImpl: typeof fetch;
 
   constructor(options: OpenWaClientOptions) {
     this.baseUrl = options.baseUrl.replace(/\/+$/, "");
     this.apiKey = options.apiKey;
     this.timeoutMs = options.timeoutMs ?? 15_000;
+    this.startTimeoutMs = options.startTimeoutMs ?? 25_000;
     this.fetchImpl = options.fetchImpl ?? fetch;
   }
 
@@ -95,6 +115,95 @@ export class OpenWaClient {
         { status: response.status }
       );
     }
+  }
+
+  /**
+   * Read a gateway session's current state. Resolves null when the gateway does not know the
+   * session (404); throws when it does not answer, refuses, or answers something unreadable.
+   * A read is idempotent, but the watchdog has nothing to gain from a retry either: one failed
+   * check is itself the signal.
+   */
+  async getSession(sessionId: string): Promise<GatewaySession | null> {
+    const endpoint = `${this.baseUrl}/api/sessions/${encodeURIComponent(sessionId)}`;
+
+    let response: Response;
+    try {
+      response = await this.fetchImpl(endpoint, {
+        method: "GET",
+        headers: { "x-api-key": this.apiKey },
+        signal: AbortSignal.timeout(this.timeoutMs)
+      });
+    } catch (cause) {
+      throw new OpenWaApiError(
+        `WhatsApp gateway did not answer (${this.redact(errorText(cause), sessionId)}).`,
+        { status: null }
+      );
+    }
+
+    if (response.status === 404) return null;
+    const body = await readBody(response);
+    if (!response.ok) {
+      const reason = sendResponseSchema.safeParse(body).data?.message || `HTTP ${response.status}`;
+      throw new OpenWaApiError(
+        `WhatsApp gateway did not return the session: ${this.redact(reason, sessionId)}`,
+        { status: response.status }
+      );
+    }
+
+    const parsed = sessionResponseSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new OpenWaApiError("WhatsApp gateway returned an unreadable session.", {
+        status: response.status
+      });
+    }
+    const { lastError } = parsed.data;
+    return {
+      id: parsed.data.id,
+      status: parsed.data.status,
+      lastError:
+        lastError === null || lastError === undefined
+          ? null
+          : typeof lastError === "string"
+            ? lastError
+            : JSON.stringify(lastError)
+    };
+  }
+
+  /**
+   * Ask the gateway to (re)start a session: `POST /api/sessions/:sessionId/start`, which answers
+   * once the engine is initializing. Resolves `already_starting` on the gateway's `400` (already
+   * started or starting): someone got there first, which is what we wanted. Throws on anything
+   * else, a timeout included.
+   *
+   * Safe to call without a retry policy: a start the gateway already received answers `400` on a
+   * second call, so repeating one never runs a second engine. The watchdog still calls it at most
+   * once per run.
+   */
+  async startSession(sessionId: string): Promise<"started" | "already_starting"> {
+    const endpoint = `${this.baseUrl}/api/sessions/${encodeURIComponent(sessionId)}/start`;
+
+    let response: Response;
+    try {
+      response = await this.fetchImpl(endpoint, {
+        method: "POST",
+        headers: { "x-api-key": this.apiKey },
+        signal: AbortSignal.timeout(this.startTimeoutMs)
+      });
+    } catch (cause) {
+      throw new OpenWaApiError(
+        `WhatsApp gateway did not answer the restart (${this.redact(errorText(cause), sessionId)}).`,
+        { status: null }
+      );
+    }
+
+    if (response.ok) return "started";
+    if (response.status === 400) return "already_starting";
+    const body = await readBody(response);
+    const reason = sendResponseSchema.safeParse(body).data?.message || `HTTP ${response.status}`;
+    throw new OpenWaApiError(
+      `WhatsApp gateway did not restart the session: ${this.redact(reason, sessionId)}`,
+      { status: response.status }
+    );
   }
 
   /**
