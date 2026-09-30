@@ -6,18 +6,20 @@ import type { WhatsappGatewayRepository } from "../repositories/whatsappGatewayR
 /**
  * Session statuses that need a human. `qr_ready` and `action_required` mean WhatsApp wants the
  * device linked again (QR or code); `failed` is terminal on OpenWA, nothing retries it.
- *
- * `disconnected` is deliberately absent: an engine or WhatsApp side drop already raises its own
- * `session.disconnected` event (alerted, with the reason), and alerting on the status too would
- * send every drop twice. The status alone, without that event, is an API initiated stop: an
- * operator did it on purpose.
  */
 const STATUSES_NEEDING_A_HUMAN: ReadonlySet<string> = new Set(["qr_ready", "action_required", "failed"]);
 
 export type GatewaySessionEventOutcome =
-  | { status: "alerted"; code: string }
-  | { status: "recovered" }
-  | { status: "ignored"; reason: "malformed_payload" | "transitional_status" | "other_session" };
+  | { status: "alerted"; event: string; code: string }
+  | { status: "recovered"; event: string }
+  | {
+      status: "ignored";
+      /** Absent only when the payload could not be read at all. */
+      event?: string;
+      /** The session status, for `session.status`: what makes a silence explainable in the logs. */
+      sessionStatus?: string;
+      reason: "malformed_payload" | "transitional_status" | "other_session" | "covered_by_status";
+    };
 
 export interface HandleGatewaySessionEventDeps {
   alerter: GatewayAlerter;
@@ -52,20 +54,30 @@ export function createHandleGatewaySessionEvent(
       if (!parsed.success) return { status: "ignored", reason: "malformed_payload" };
 
       const event = parsed.data;
+      const name = event.event;
+      const sessionStatus = event.event === "session.status" ? event.data.status : undefined;
       if (!(await isRecordedSession(deps.gateway, event.data.sessionId))) {
-        if (event.event !== "session.status" || event.data.status !== "ready") {
-          return { status: "ignored", reason: "other_session" };
-        }
+        if (sessionStatus !== "ready") return { status: "ignored", event: name, sessionStatus, reason: "other_session" };
         const alert = unrecordedSessionReady(event.data.sessionId);
         await deps.alerter.notify(alert);
-        return { status: "alerted", code: alert.code };
+        return { status: "alerted", event: name, code: alert.code };
+      }
+
+      // Every disconnection, a drop or a stop, ends in `session.status = disconnected`, which is
+      // the one that alerts. A drop also sends `session.disconnected`: alerting on both would
+      // double every drop, so its reason only goes to the logs.
+      if (event.event === "session.disconnected") {
+        console.info(`[coach] session disconnected reason=${event.data.reason ?? "unknown"}`);
+        return { status: "ignored", event: name, reason: "covered_by_status" };
       }
 
       const alert = alertFor(event);
-      if (!alert) return { status: "ignored", reason: "transitional_status" };
+      if (!alert) return { status: "ignored", event: name, sessionStatus, reason: "transitional_status" };
 
       await deps.alerter.notify(alert);
-      return alert.severity === "recovered" ? { status: "recovered" } : { status: "alerted", code: alert.code };
+      return alert.severity === "recovered"
+        ? { status: "recovered", event: name }
+        : { status: "alerted", event: name, code: alert.code };
     }
   };
 }
@@ -96,15 +108,7 @@ function alertFor(event: GatewaySessionEvent): GatewayAlert | null {
   const sessionId = event.data.sessionId;
   switch (event.event) {
     case "session.disconnected":
-      return {
-        severity: "down",
-        source: "webhook",
-        code: "session_disconnected",
-        message:
-          `La session WhatsApp s'est déconnectée (${event.data.reason ?? "raison inconnue"}). ` +
-          "OpenWA tente de se reconnecter : si elle ne revient pas, vérifie le dashboard OpenWA.",
-        sessionId
-      };
+      return null; // handled before: covered by `session.status = disconnected`
     case "session.reconnect_loop":
       return {
         severity: "down",
@@ -122,6 +126,18 @@ function alertFor(event: GatewaySessionEvent): GatewayAlert | null {
           source: "webhook",
           code: "session_ready",
           message: "La session est connectée, les messages arrivent de nouveau.",
+          sessionId
+        };
+      }
+      if (event.data.status === "disconnected") {
+        return {
+          severity: "down",
+          source: "webhook",
+          code: "session_disconnected",
+          message:
+            "La session WhatsApp est déconnectée. Après une coupure, OpenWA tente de se reconnecter ; " +
+            "après un arrêt, le watchdog la relancera à son prochain passage. " +
+            "Un message suivra dès qu'elle repasse en ready.",
           sessionId
         };
       }

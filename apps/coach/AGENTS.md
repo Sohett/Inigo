@@ -259,11 +259,15 @@ seule sortie (`GatewayAlerter`) :
 
 - **Temps réel : webhooks `session.*`** (même URL que les messages, abonnement à poser côté
   OpenWA). La route les envoie à `handleGatewaySessionEvent` :
-  - alerte `down` : `session.disconnected` (avec la raison), `session.reconnect_loop` (toutes les
-    5 tentatives), `session.status` ∈ `qr_ready`, `action_required` ou `failed` ;
+  - alerte `down` : `session.status` ∈ `disconnected`, `qr_ready`, `action_required` ou `failed`,
+    et `session.reconnect_loop` (toutes les 5 tentatives) ;
   - `recovered` : `session.status` = `ready` ;
-  - silence : les statuts transitoires, et `disconnected` (déjà couvert par `session.disconnected` :
-    alerter sur les deux doublerait chaque coupure ; seul, c'est un stop volontaire par l'API).
+  - log seul : `session.disconnected` (sa raison). **Toute** déconnexion finit en
+    `session.status = disconnected`, alors qu'un stop depuis OpenWA n'envoie **que** ce statut (pas
+    de `session.disconnected`) : c'est donc le statut qui alerte, une fois par coupure. Alerter
+    aussi sur `session.disconnected` doublerait chaque coupure ;
+  - silence : les statuts transitoires (`created`, `initializing`, `authenticating`, inconnus), avec
+    le statut dans le log pour qu'un silence reste explicable ;
   - **filtré par la session enregistrée en Neon** : les événements d'une autre session (l'ancienne,
     après un ré-appairage) sont ignorés ; mais une autre session qui passe `ready` est une alerte
     `unrecorded_session_ready` (le coach envoie encore par l'ancienne : il faut mettre à jour

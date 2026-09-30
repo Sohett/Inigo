@@ -53,7 +53,7 @@ describe("POST /api/webhooks/whatsapp, session events (INI-40)", () => {
     vi.restoreAllMocks();
   });
 
-  it("answers 200 to a session event without reaching the message routing", async () => {
+  it("alerts on a session stop and answers 200 without reaching the message routing", async () => {
     const { POST } = await import("./route");
     const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
     vi.spyOn(console, "info").mockImplementation(() => undefined);
@@ -61,9 +61,10 @@ describe("POST /api/webhooks/whatsapp, session events (INI-40)", () => {
     const response = await POST(
       post(
         JSON.stringify({
-          event: "session.disconnected",
+          // What a stop from the OpenWA dashboard sends, and nothing else (the INI-40 miss).
+          event: "session.status",
           sessionId: "gateway-session",
-          data: { sessionId: "gateway-session", reason: "conflict" }
+          data: { sessionId: "gateway-session", status: "disconnected" }
         })
       )
     );
