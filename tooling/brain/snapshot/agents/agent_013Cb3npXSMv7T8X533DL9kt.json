@@ -33,12 +33,12 @@
       {
         "id": "agent_01Sp4ghn8GHc5Lbd9JJptEzR",
         "type": "agent",
-        "version": 8
+        "version": 9
       },
       {
         "id": "agent_01CTK33Z2CLPwtDyq9vKDsVG",
         "type": "agent",
-        "version": 12
+        "version": 13
       },
       {
         "id": "agent_01Dbg6WeAF41xSs8bTfiE8XD",
@@ -48,7 +48,7 @@
       {
         "id": "agent_012ethnUdHzvRW9iPxdzzbTx",
         "type": "agent",
-        "version": 11
+        "version": 12
       }
     ],
     "type": "coordinator"
@@ -188,6 +188,6 @@
     }
   ],
   "type": "agent",
-  "updated_at": "2026-09-22T16:53:04.562473Z",
-  "version": 19
+  "updated_at": "2026-09-30T07:56:39.730377Z",
+  "version": 20
 }
