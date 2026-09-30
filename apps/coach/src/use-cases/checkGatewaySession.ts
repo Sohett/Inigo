@@ -1,6 +1,6 @@
-import type { GatewayAlert, GatewayAlerter } from "../alerts/gatewayAlerter";
+import type { GatewayAlerter } from "../alerts/gatewayAlerter";
+import type { GatewayAlert, GatewaySession } from "../domain/whatsappGateway";
 import type { WhatsappGatewayRepository } from "../repositories/whatsappGatewayRepository";
-import type { GatewaySession } from "../whatsapp/client";
 import type { ResolveOpenWaClient } from "../whatsapp/resolveClient";
 
 /** Why the watchdog found the gateway unable to deliver athletes' messages. */

@@ -15,11 +15,8 @@ import type { ResolveClient } from "./intervals/mcp-tools/result";
 import { createOpenWaResolver, type ResolveOpenWaClient } from "./whatsapp/resolveClient";
 import { createDrizzleWhatsappGatewayRepository } from "./repositories/drizzleWhatsappGatewayRepository";
 import type { WhatsappGatewayRepository } from "./repositories/whatsappGatewayRepository";
-import {
-  createGatewayAlerter,
-  slackWebhookUrlFromEnv,
-  type GatewayAlerter
-} from "./alerts/gatewayAlerter";
+import type { GatewayAlerter } from "./alerts/gatewayAlerter";
+import { createLogAndSlackAlerter, slackWebhookUrlFromEnv } from "./alerts/logAndSlackAlerter";
 
 export interface Deps {
   config: Config;
@@ -68,7 +65,7 @@ export function getDeps(): Deps {
       ),
       whatsapp: createOpenWaResolver(),
       whatsappGateway: createDrizzleWhatsappGatewayRepository(db),
-      alerter: createGatewayAlerter({ slackWebhookUrl: slackWebhookUrlFromEnv() })
+      alerter: createLogAndSlackAlerter({ slackWebhookUrl: slackWebhookUrlFromEnv() })
     };
   }
   return cached;

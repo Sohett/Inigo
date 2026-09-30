@@ -1,2 +1,2 @@
-export { OpenWaClient, type OpenWaClientOptions, type GatewaySession } from "./client";
+export { OpenWaClient, type OpenWaClientOptions } from "./client";
 export { OpenWaApiError } from "./errors";

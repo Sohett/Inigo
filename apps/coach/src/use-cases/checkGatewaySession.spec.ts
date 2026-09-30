@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import type { GatewayAlert } from "../alerts/gatewayAlerter";
-import { OpenWaApiError, type GatewaySession } from "../whatsapp/client";
+import type { GatewayAlert, GatewaySession } from "../domain/whatsappGateway";
+import { OpenWaApiError } from "../whatsapp/client";
 import { createCheckGatewaySession, GatewayCheckFailure } from "./checkGatewaySession";
 
 const SESSION = "gateway-session";

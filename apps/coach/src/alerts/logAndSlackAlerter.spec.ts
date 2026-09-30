@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from "vitest";
-import { createGatewayAlerter, slackWebhookUrlFromEnv, type GatewayAlert } from "./gatewayAlerter";
+import type { GatewayAlert } from "../domain/whatsappGateway";
+import { createLogAndSlackAlerter, slackWebhookUrlFromEnv } from "./logAndSlackAlerter";
 
 const SLACK_URL = "https://hooks.slack.com/services/T000/B000/secret-token";
 
@@ -23,9 +24,9 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("createGatewayAlerter", () => {
+describe("createLogAndSlackAlerter", () => {
   it("logs a down alert as one structured error line", async () => {
-    await createGatewayAlerter().notify(DOWN);
+    await createLogAndSlackAlerter().notify(DOWN);
 
     expect(errorLog).toHaveBeenCalledTimes(1);
     const line = String(errorLog.mock.calls[0]?.[0]);
@@ -37,7 +38,7 @@ describe("createGatewayAlerter", () => {
   });
 
   it("logs a recovery as info, not as an error", async () => {
-    await createGatewayAlerter().notify({ ...DOWN, severity: "recovered", code: "session_ready" });
+    await createLogAndSlackAlerter().notify({ ...DOWN, severity: "recovered", code: "session_ready" });
 
     expect(infoLog).toHaveBeenCalledTimes(1);
     expect(errorLog).not.toHaveBeenCalled();
@@ -45,7 +46,7 @@ describe("createGatewayAlerter", () => {
 
   it("posts the alert to Slack when a webhook URL is configured", async () => {
     const fetchImpl = vi.fn(async () => new Response("ok", { status: 200 }));
-    await createGatewayAlerter({ slackWebhookUrl: SLACK_URL, fetchImpl }).notify(DOWN);
+    await createLogAndSlackAlerter({ slackWebhookUrl: SLACK_URL, fetchImpl }).notify(DOWN);
 
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
@@ -59,7 +60,7 @@ describe("createGatewayAlerter", () => {
 
   it("does not call Slack without a webhook URL", async () => {
     const fetchImpl = vi.fn(async () => new Response("ok"));
-    await createGatewayAlerter({ fetchImpl }).notify(DOWN);
+    await createLogAndSlackAlerter({ fetchImpl }).notify(DOWN);
 
     expect(fetchImpl).not.toHaveBeenCalled();
   });
@@ -77,7 +78,7 @@ describe("createGatewayAlerter", () => {
   ])("never throws when Slack %s, and never logs the URL", async (_label, impl) => {
     const fetchImpl = vi.fn(impl);
     await expect(
-      createGatewayAlerter({ slackWebhookUrl: SLACK_URL, fetchImpl }).notify(DOWN)
+      createLogAndSlackAlerter({ slackWebhookUrl: SLACK_URL, fetchImpl }).notify(DOWN)
     ).resolves.toBeUndefined();
 
     const logged = errorLog.mock.calls.map((call) => String(call[0])).join("\n");

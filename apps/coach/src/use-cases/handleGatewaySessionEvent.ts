@@ -1,4 +1,5 @@
-import type { GatewayAlert, GatewayAlerter } from "../alerts/gatewayAlerter";
+import type { GatewayAlerter } from "../alerts/gatewayAlerter";
+import type { GatewayAlert } from "../domain/whatsappGateway";
 import { gatewaySessionEventSchema, type GatewaySessionEvent } from "../mappers/whatsappPayload";
 import type { WhatsappGatewayRepository } from "../repositories/whatsappGatewayRepository";
 

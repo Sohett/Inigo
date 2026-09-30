@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { GatewaySession } from "../../domain/whatsappGateway";
 import { OpenWaApiError } from "./errors";
 
 export interface OpenWaClientOptions {
@@ -36,13 +37,6 @@ const sessionResponseSchema = z
   })
   .passthrough();
 
-/** A gateway session as the watchdog sees it. */
-export interface GatewaySession {
-  id: string;
-  /** OpenWA `SessionStatus`: `ready` is the only state in which messages flow. */
-  status: string;
-  lastError: string | null;
-}
 
 /**
  * Minimal client for the OpenWA gateway, used by the `/api/whatsapp/mcp` server (sends) and the

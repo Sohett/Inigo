@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import type { GatewayAlert } from "../alerts/gatewayAlerter";
+import type { GatewayAlert } from "../domain/whatsappGateway";
 import { createHandleGatewaySessionEvent } from "./handleGatewaySessionEvent";
 
 const SESSION = "gateway-session";

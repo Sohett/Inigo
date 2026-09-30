@@ -43,6 +43,7 @@ src/
   components/ui/*                  # composants shadcn (button, card, table, badge, input, label)
   domain/
     athlete.ts                     # modèle métier Athlete + enum AthleteStatus (routing ; indépendants de @inigo/db)
+    whatsappGateway.ts             # GatewaySession + GatewayAlert (santé de la passerelle, indépendants d'OpenWA)
     brain.ts                       # SessionElements / RunningSession / BrainInventory (indépendants du SDK)
     coaching.ts                    # modèles métier de la donnée coaching (contrat de sortie des tools MCP) + inputs
   repositories/
@@ -57,7 +58,8 @@ src/
     handleGatewaySessionEvent.ts   # use-case : webhook session.* OpenWA → alerte « down » / « recovered »
     checkGatewaySession.ts         # use-case watchdog : session enregistrée en Neon → GET OpenWA → alerte si pas ready
   alerts/
-    gatewayAlerter.ts              # PORT GatewayAlerter + adaptateur : log structuré [coach][alert] + Slack si SLACK_ALERT_WEBHOOK_URL ; ne throw jamais
+    gatewayAlerter.ts              # PORT GatewayAlerter (notify ne throw jamais)
+    logAndSlackAlerter.ts          # ADAPTER : log structuré [coach][alert] + Slack si SLACK_ALERT_WEBHOOK_URL
     slack.ts                       # POST Incoming Webhook (timeout 5s), l'URL n'apparaît jamais dans une erreur
   repositories/whatsappGatewayRepository.ts  # PORT : la session de passerelle (en base, pas en env)
   mappers/
