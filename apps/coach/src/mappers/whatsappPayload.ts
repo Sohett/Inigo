@@ -106,39 +106,39 @@ export function senderLid(message: InboundMessage): string | null {
 }
 
 /**
- * The gateway session lifecycle events the coach watches (INI-40). OpenWA wraps each in its
- * standard envelope (`{ event, timestamp, sessionId, idempotencyKey, deliveryId, data }`); only
- * `event` and `data` are read. `status` stays a plain string so a status added by a newer
- * gateway build is tolerated rather than rejected.
+ * The gateway session webhooks the coach subscribes to (INI-40), in OpenWA's standard envelope
+ * (`{ event, timestamp, sessionId, idempotencyKey, deliveryId, data }`); only `event` and `data`
+ * are read. `status` stays a plain string: the use-case maps it onto the enum, so a status a newer
+ * gateway build introduced is logged rather than rejected as a malformed payload.
  */
 export const gatewaySessionEventSchema = z.discriminatedUnion("event", [
-  z
-    .object({
-      event: z.literal("session.status"),
-      data: z.object({ sessionId: z.string(), status: z.string() }).passthrough()
-    })
-    .passthrough(),
-  z
-    .object({
-      event: z.literal("session.disconnected"),
-      data: z.object({ sessionId: z.string(), reason: z.string().optional() }).passthrough()
-    })
-    .passthrough(),
-  z
-    .object({
-      event: z.literal("session.reconnect_loop"),
-      data: z
-        .object({
-          sessionId: z.string(),
-          attempts: z.number(),
-          nextDelayMs: z.number().optional()
-        })
-        .passthrough()
-    })
-    .passthrough()
+  z.object({
+    event: z.literal("session.status"),
+    data: z.object({ sessionId: z.string(), status: z.string() }).passthrough()
+  }),
+  z.object({
+    event: z.literal("session.disconnected"),
+    data: z.object({ sessionId: z.string(), reason: z.string().optional() }).passthrough()
+  }),
+  z.object({
+    event: z.literal("session.reconnect_loop"),
+    data: z.object({ sessionId: z.string(), attempts: z.number() }).passthrough()
+  }),
+  z.object({
+    event: z.literal("session.restriction"),
+    data: z
+      .object({
+        sessionId: z.string(),
+        active: z.boolean(),
+        kind: z.string().optional(),
+        code: z.string().optional(),
+        expiresAt: z.string().nullable().optional()
+      })
+      .passthrough()
+  })
 ]);
 
-export type GatewaySessionEvent = z.infer<typeof gatewaySessionEventSchema>;
+export type GatewaySessionEventPayload = z.infer<typeof gatewaySessionEventSchema>;
 
 /**
  * Whether a parsed webhook body is a gateway session event (`session.*`) rather than a message.

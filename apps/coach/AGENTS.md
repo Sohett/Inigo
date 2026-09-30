@@ -255,36 +255,50 @@ ni un plafond en dur dans un adaptateur MCP.
 ## Surveillance de la session WhatsApp — INI-40
 
 Une session OpenWA qui tombe, c'est un athlète qui écrit dans le vide. Deux détections, une
-seule sortie (`GatewayAlerter`) :
+seule sortie (`GatewayAlerter`, Slack + log). **La logique produit se lit dans les `switch`** :
+enums dans `domain/whatsappGateway.ts` (`GatewaySessionStatus`, `GatewaySessionEvent`,
+`GatewayAlertSeverity`), une fonction `decide…` par table, `return` précoces, pas de `if` imbriqué.
+Un nouveau statut OpenWA ajouté à l'enum casse la compilation tant qu'il n'a pas sa ligne.
 
-- **Temps réel : webhooks `session.*`** (même URL que les messages, abonnement à poser côté
-  OpenWA). La route les envoie à `handleGatewaySessionEvent` :
-  - alerte `down` : `session.status` ∈ `disconnected`, `qr_ready`, `action_required` ou `failed`,
-    et `session.reconnect_loop` (toutes les 5 tentatives) ;
-  - `recovered` : `session.status` = `ready` ;
-  - log seul : `session.disconnected` (sa raison). **Toute** déconnexion finit en
-    `session.status = disconnected`, alors qu'un stop depuis OpenWA n'envoie **que** ce statut (pas
-    de `session.disconnected`) : c'est donc le statut qui alerte, une fois par coupure. Alerter
-    aussi sur `session.disconnected` doublerait chaque coupure ;
-  - silence : les statuts transitoires (`created`, `initializing`, `authenticating`, inconnus), avec
-    le statut dans le log pour qu'un silence reste explicable ;
-  - **filtré par la session enregistrée en Neon** : les événements d'une autre session (l'ancienne,
-    après un ré-appairage) sont ignorés ; mais une autre session qui passe `ready` est une alerte
-    `unrecorded_session_ready` (le coach envoie encore par l'ancienne : il faut mettre à jour
-    l'admin). Neon illisible → l'événement compte comme celui de la session enregistrée (on
-    alerte plutôt que se taire).
-- **Watchdog : cron Vercel** (`vercel.json`, `0 7 * * *` : le plan Hobby limite à un run par jour,
-  à resserrer après upgrade). Couvre la panne que les webhooks ne peuvent pas signaler : une
-  passerelle trop morte pour appeler qui que ce soit. `checkGatewaySession` alerte si aucune
-  session n'est enregistrée, si OpenWA ne la connaît plus, si elle n'est pas `ready`, ou si OpenWA
-  est injoignable / non configuré. Il ne throw pas sur la panne qu'il surveille.
-- **Relance automatique (watchdog seulement)** : une session `disconnected` ou `failed` (appareil
-  toujours lié, moteur à l'arrêt ; OpenWA ne relance jamais un `failed` de lui-même) reçoit **un**
-  `POST /api/sessions/:id/start` par run, avec une alerte `session_restarted`. Le résultat arrive en
-  temps réel par les webhooks (`ready` → rétablissement, `failed` → alerte). `qr_ready` et
-  `action_required` restent des alertes : il faut relier WhatsApp, une relance ne ferait qu'un QR.
-  **Jamais depuis le webhook** : un start qui échoue aussitôt ferait une boucle start → failed →
-  start ; le planning du cron sert de limite de débit.
+**Abonnements du webhook côté OpenWA** : `message.received`, `session.status`,
+`session.disconnected`, `session.reconnect_loop`, `session.restriction`. Pas `session.qr` (un QR
+ne doit jamais partir dans Slack) ni `session.authenticated` (redondant avec `ready`).
+
+**Webhook (`handleGatewaySessionEvent`), session enregistrée en Neon :**
+
+| Événement / statut | Sévérité | Code |
+|---|---|---|
+| `session.status` `ready` | recovered | `session_ready` |
+| `session.status` `disconnected` (coupure **ou stop**) | down | `session_disconnected` |
+| `session.status` `failed` | down | `session_failed` |
+| `session.status` `qr_ready` | needs_human | `session_qr_ready` |
+| `session.status` `action_required` | needs_human | `session_action_required` |
+| `session.status` `created` / `initializing` / `authenticating` | ignoré (transitoire) | |
+| `session.status` inconnu | ignoré, valeur loggée | |
+| `session.disconnected` (coupure seulement, jamais un stop) | down, avec la raison | `session_dropped` |
+| `session.reconnect_loop` (toutes les 5 tentatives) | down | `session_reconnect_loop` |
+| `session.restriction` actif / levé | down / recovered | `session_restricted` / `session_restriction_lifted` |
+
+Une coupure envoie `session.disconnected` **et** `session.status disconnected` : deux messages
+(la raison, puis l'état), choix assumé. Un stop n'envoie que le statut. **Autre session** (l'ancienne
+après un ré-appairage) : tout est ignoré, sauf `ready` → needs_human `unrecorded_session_ready`
+(le coach envoie encore par l'ancienne : mettre à jour l'admin). Neon illisible → l'événement compte
+comme celui de la session enregistrée (on alerte plutôt que se taire).
+
+**Watchdog (`checkGatewaySession`, cron Vercel `0 7 * * *`, Hobby = un run par jour)** :
+`decideWatchdogAction(status)` :
+
+| Statut | Action |
+|---|---|
+| `ready` | rien |
+| `disconnected`, `failed` | **un** `POST /api/sessions/:id/start` + alerte `session_restarted` (échec → `restart_failed`) |
+| `qr_ready`, `action_required` | alerte needs_human (une relance ne ferait qu'un QR) |
+| `created`, `initializing`, `authenticating`, inconnu | alerte `session_stuck` |
+
+Plus, sans statut à lire : `no_session_recorded`, `session_not_found` (404), `gateway_unreachable`
+(injoignable ou non configuré). Le résultat d'une relance arrive en temps réel par les webhooks.
+**Jamais de relance depuis le webhook** : un start qui échoue aussitôt ferait une boucle
+start → failed → start ; le planning du cron sert de limite de débit.
 
 Règles :
 - **L'alerter ne throw jamais.** Un échec Slack est loggé, jamais propagé : sinon le webhook
@@ -292,7 +306,7 @@ Règles :
 - **Secrets lus là où ils servent**, jamais dans `configSchema` (même raison qu'`openWaCredentials`) :
   `SLACK_ALERT_WEBHOOK_URL` (absente → log seul), `CRON_SECRET` (absente → la route refuse, 503 ;
   mauvais bearer → 401). Vercel envoie lui-même `Authorization: Bearer $CRON_SECRET` à ses crons.
-- **Texte des alertes** : pas de tiret (`-`, `—`) dans ce que lit l'humain.
+- **Texte des alertes en anglais**, sans tiret (`-`, `—`) dans ce que lit l'humain.
 
 Hors scope (à reprendre si besoin) : réconciliation des messages après un unlink (OpenWA stocke
 l'historique rapatrié sans webhook), déduplication par `waMessageId`.

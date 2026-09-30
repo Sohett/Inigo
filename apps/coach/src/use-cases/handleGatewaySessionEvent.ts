@@ -1,25 +1,36 @@
 import type { GatewayAlerter } from "../alerts/gatewayAlerter";
-import type { GatewayAlert } from "../domain/whatsappGateway";
-import { gatewaySessionEventSchema, type GatewaySessionEvent } from "../mappers/whatsappPayload";
+import {
+  GatewayAlertSeverity,
+  GatewayAlertSource,
+  GatewaySessionEvent,
+  GatewaySessionStatus,
+  toGatewaySessionStatus,
+  type GatewayAlert
+} from "../domain/whatsappGateway";
+import { gatewaySessionEventSchema, type GatewaySessionEventPayload } from "../mappers/whatsappPayload";
 import type { WhatsappGatewayRepository } from "../repositories/whatsappGatewayRepository";
 
-/**
- * Session statuses that need a human. `qr_ready` and `action_required` mean WhatsApp wants the
- * device linked again (QR or code); `failed` is terminal on OpenWA, nothing retries it.
- */
-const STATUSES_NEEDING_A_HUMAN: ReadonlySet<string> = new Set(["qr_ready", "action_required", "failed"]);
+/** Why a session event raised no alert. Each is a normal outcome, logged by the route. */
+export const SessionEventIgnoreReason = {
+  MalformedPayload: "malformed_payload",
+  /** `created`, `initializing`, `authenticating`: the session is on its way somewhere. */
+  TransitionalStatus: "transitional_status",
+  /** A status a newer gateway build introduced. Logged with its value, never guessed at. */
+  UnknownStatus: "unknown_status",
+  /** An event of a session the coach does not send through (e.g. the old one after a re-pairing). */
+  OtherSession: "other_session"
+} as const;
+
+export type SessionEventIgnoreReason = (typeof SessionEventIgnoreReason)[keyof typeof SessionEventIgnoreReason];
 
 export type GatewaySessionEventOutcome =
-  | { status: "alerted"; event: string; code: string }
-  | { status: "recovered"; event: string }
-  | {
-      status: "ignored";
-      /** Absent only when the payload could not be read at all. */
-      event?: string;
-      /** The session status, for `session.status`: what makes a silence explainable in the logs. */
-      sessionStatus?: string;
-      reason: "malformed_payload" | "transitional_status" | "other_session" | "covered_by_status";
-    };
+  | { status: "notified"; event: string; code: string }
+  | { status: "ignored"; event?: string; reason: SessionEventIgnoreReason; detail?: string };
+
+/** What one event means: an alert to send, or a reason to stay quiet. */
+type Decision =
+  | { kind: "alert"; alert: GatewayAlert }
+  | { kind: "ignore"; reason: SessionEventIgnoreReason; detail?: string };
 
 export interface HandleGatewaySessionEventDeps {
   alerter: GatewayAlerter;
@@ -32,18 +43,12 @@ export interface HandleGatewaySessionEvent {
 }
 
 /**
- * React to an OpenWA session lifecycle webhook: raise an alert when the session stops being able
- * to receive athletes' messages, and say so when it is back. This is the real time half of the
- * INI-40 monitoring; the watchdog cron covers the case where the gateway is too dead to call us.
+ * React to an OpenWA session webhook (INI-40): tell a human, on Slack, when the session the coach
+ * sends through stops receiving athletes' messages, and when it is back. The product rules are the
+ * `decide…` functions below, one `switch` each.
  *
- * Events are compared with the session recorded in Neon. After a re-pairing the old session keeps
- * emitting (it fails, it disconnects): that is noise, not an outage, and is ignored. A *new*
- * session reaching `ready` while the coach still sends through the old one is the opposite: the
- * coach is mute until the admin is updated, so it is an alert, not a recovery. When Neon cannot be
- * read, every event is treated as the recorded session's: an outage must fail loud.
- *
- * Never throws for a business reason, and the alerter never throws at all, so the webhook always
- * answers 200 and BullMQ never replays a session event into a second alert.
+ * The alerter never throws, so the webhook always answers 200 and BullMQ never replays an event
+ * into a second alert.
  */
 export function createHandleGatewaySessionEvent(
   deps: HandleGatewaySessionEventDeps
@@ -51,38 +56,92 @@ export function createHandleGatewaySessionEvent(
   return {
     async execute(payload: unknown): Promise<GatewaySessionEventOutcome> {
       const parsed = gatewaySessionEventSchema.safeParse(payload);
-      if (!parsed.success) return { status: "ignored", reason: "malformed_payload" };
+      if (!parsed.success) return { status: "ignored", reason: SessionEventIgnoreReason.MalformedPayload };
 
       const event = parsed.data;
-      const name = event.event;
-      const sessionStatus = event.event === "session.status" ? event.data.status : undefined;
-      if (!(await isRecordedSession(deps.gateway, event.data.sessionId))) {
-        if (sessionStatus !== "ready") return { status: "ignored", event: name, sessionStatus, reason: "other_session" };
-        const alert = unrecordedSessionReady(event.data.sessionId);
-        await deps.alerter.notify(alert);
-        return { status: "alerted", event: name, code: alert.code };
+      const recorded = await isRecordedSession(deps.gateway, event.data.sessionId);
+      const decision = recorded ? decideForRecordedSession(event) : decideForOtherSession(event);
+      if (decision.kind === "ignore") {
+        return { status: "ignored", event: event.event, reason: decision.reason, detail: decision.detail };
       }
 
-      // Every disconnection, a drop or a stop, ends in `session.status = disconnected`, which is
-      // the one that alerts. A drop also sends `session.disconnected`: alerting on both would
-      // double every drop, so its reason only goes to the logs.
-      if (event.event === "session.disconnected") {
-        console.info(`[coach] session disconnected reason=${event.data.reason ?? "unknown"}`);
-        return { status: "ignored", event: name, reason: "covered_by_status" };
-      }
-
-      const alert = alertFor(event);
-      if (!alert) return { status: "ignored", event: name, sessionStatus, reason: "transitional_status" };
-
-      await deps.alerter.notify(alert);
-      return alert.severity === "recovered"
-        ? { status: "recovered", event: name }
-        : { status: "alerted", event: name, code: alert.code };
+      await deps.alerter.notify(decision.alert);
+      return { status: "notified", event: event.event, code: decision.alert.code };
     }
   };
 }
 
-/** Whether the event concerns the recorded session. Unknown (Neon unreadable) counts as yes. */
+/** The session the coach sends through: every event is a product decision. */
+function decideForRecordedSession(event: GatewaySessionEventPayload): Decision {
+  const sessionId = event.data.sessionId;
+  switch (event.event) {
+    case GatewaySessionEvent.Status:
+      return decideForStatus(event.data.status, sessionId);
+    case GatewaySessionEvent.Disconnected:
+      return alert(GatewayAlertSeverity.Down, "session_dropped", sessionId,
+        `The WhatsApp session dropped (reason: ${event.data.reason ?? "unknown"}). OpenWA is trying to reconnect it.`);
+    case GatewaySessionEvent.ReconnectLoop:
+      return alert(GatewayAlertSeverity.Down, "session_reconnect_loop", sessionId,
+        `OpenWA still cannot reconnect the session after ${event.data.attempts} attempts.`);
+    case GatewaySessionEvent.Restriction:
+      return decideForRestriction(event.data, sessionId);
+  }
+}
+
+/** One line per OpenWA status: this table is the product rule of INI-40. */
+function decideForStatus(rawStatus: string, sessionId: string): Decision {
+  const status = toGatewaySessionStatus(rawStatus);
+  if (!status) return ignore(SessionEventIgnoreReason.UnknownStatus, rawStatus);
+
+  switch (status) {
+    case GatewaySessionStatus.Ready:
+      return alert(GatewayAlertSeverity.Recovered, "session_ready", sessionId,
+        "The WhatsApp session is connected again: athletes' messages are coming in.");
+    case GatewaySessionStatus.Disconnected:
+      return alert(GatewayAlertSeverity.Down, "session_disconnected", sessionId,
+        "The WhatsApp session is disconnected. After a drop OpenWA reconnects it; after a stop the watchdog restarts it on its next run.");
+    case GatewaySessionStatus.Failed:
+      return alert(GatewayAlertSeverity.Down, "session_failed", sessionId,
+        "Every reconnect attempt failed and OpenWA gave up. The watchdog restarts the session on its next run.");
+    case GatewaySessionStatus.QrReady:
+      return alert(GatewayAlertSeverity.NeedsHuman, "session_qr_ready", sessionId,
+        "WhatsApp unlinked the session: scan the QR code on the OpenWA dashboard.");
+    case GatewaySessionStatus.ActionRequired:
+      return alert(GatewayAlertSeverity.NeedsHuman, "session_action_required", sessionId,
+        "WhatsApp requires an action (pairing code or similar) on the OpenWA dashboard.");
+    case GatewaySessionStatus.Created:
+    case GatewaySessionStatus.Initializing:
+    case GatewaySessionStatus.Authenticating:
+      return ignore(SessionEventIgnoreReason.TransitionalStatus, status);
+  }
+}
+
+type RestrictionData = Extract<GatewaySessionEventPayload, { event: "session.restriction" }>["data"];
+
+function decideForRestriction(data: RestrictionData, sessionId: string): Decision {
+  const what = `${data.kind ?? "unknown"}${data.code ? ` (${data.code})` : ""}`;
+  if (!data.active) {
+    return alert(GatewayAlertSeverity.Recovered, "session_restriction_lifted", sessionId,
+      `WhatsApp lifted the restriction on the account: ${what}.`);
+  }
+  const until = data.expiresAt ? ` until ${data.expiresAt}` : "";
+  return alert(GatewayAlertSeverity.Down, "session_restricted", sessionId,
+    `WhatsApp restricted the account${until}: ${what}.`);
+}
+
+/**
+ * Another session than the one the coach sends through. Its drops are noise (the old session after
+ * a re-pairing); but a new session reaching `ready` means the coach is still sending through the
+ * old one, so it stays mute until the admin is updated.
+ */
+function decideForOtherSession(event: GatewaySessionEventPayload): Decision {
+  if (event.event !== GatewaySessionEvent.Status) return ignore(SessionEventIgnoreReason.OtherSession);
+  if (event.data.status !== GatewaySessionStatus.Ready) return ignore(SessionEventIgnoreReason.OtherSession);
+  return alert(GatewayAlertSeverity.NeedsHuman, "unrecorded_session_ready", event.data.sessionId,
+    "A WhatsApp session is connected, but it is not the one the coach sends through. Update the session in the admin, or the coach cannot reply.");
+}
+
+/** Whether the event concerns the recorded session. Unknown (Neon unreadable) counts as yes: fail loud. */
 async function isRecordedSession(gateway: WhatsappGatewayRepository, sessionId: string): Promise<boolean> {
   try {
     return (await gateway.getSessionId()) === sessionId;
@@ -92,67 +151,10 @@ async function isRecordedSession(gateway: WhatsappGatewayRepository, sessionId: 
   }
 }
 
-function unrecordedSessionReady(sessionId: string): GatewayAlert {
-  return {
-    severity: "down",
-    source: "webhook",
-    code: "unrecorded_session_ready",
-    message:
-      "Une session WhatsApp est connectée, mais ce n'est pas celle par laquelle le coach envoie. " +
-      "Mets à jour la session dans l'admin, sinon le coach ne peut pas répondre.",
-    sessionId
-  };
+function alert(severity: GatewayAlertSeverity, code: string, sessionId: string, message: string): Decision {
+  return { kind: "alert", alert: { severity, source: GatewayAlertSource.Webhook, code, message, sessionId } };
 }
 
-function alertFor(event: GatewaySessionEvent): GatewayAlert | null {
-  const sessionId = event.data.sessionId;
-  switch (event.event) {
-    case "session.disconnected":
-      return null; // handled before: covered by `session.status = disconnected`
-    case "session.reconnect_loop":
-      return {
-        severity: "down",
-        source: "webhook",
-        code: "session_reconnect_loop",
-        message:
-          `OpenWA n'arrive pas à reconnecter la session (${event.data.attempts} tentatives). ` +
-          "Une intervention est probablement nécessaire.",
-        sessionId
-      };
-    case "session.status":
-      if (event.data.status === "ready") {
-        return {
-          severity: "recovered",
-          source: "webhook",
-          code: "session_ready",
-          message: "La session est connectée, les messages arrivent de nouveau.",
-          sessionId
-        };
-      }
-      if (event.data.status === "disconnected") {
-        return {
-          severity: "down",
-          source: "webhook",
-          code: "session_disconnected",
-          message:
-            "La session WhatsApp est déconnectée. Après une coupure, OpenWA tente de se reconnecter ; " +
-            "après un arrêt, le watchdog la relancera à son prochain passage. " +
-            "Un message suivra dès qu'elle repasse en ready.",
-          sessionId
-        };
-      }
-      if (STATUSES_NEEDING_A_HUMAN.has(event.data.status)) {
-        return {
-          severity: "down",
-          source: "webhook",
-          code: `session_${event.data.status}`,
-          message:
-            `La session est passée en statut \`${event.data.status}\`. ` +
-            "Intervention requise sur le dashboard OpenWA (redémarrer la session, ou relier WhatsApp par QR ou code). " +
-            "Si une nouvelle session est créée, mets la à jour dans l'admin.",
-          sessionId
-        };
-      }
-      return null;
-  }
+function ignore(reason: SessionEventIgnoreReason, detail?: string): Decision {
+  return { kind: "ignore", reason, detail };
 }

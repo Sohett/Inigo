@@ -1,4 +1,4 @@
-import type { GatewayAlert } from "../domain/whatsappGateway";
+import { GatewayAlertSeverity, type GatewayAlert } from "../domain/whatsappGateway";
 import type { GatewayAlerter } from "./gatewayAlerter";
 import { postSlackMessage } from "./slack";
 
@@ -19,8 +19,8 @@ export function createLogAndSlackAlerter(options: LogAndSlackAlerterOptions = {}
   return {
     async notify(alert: GatewayAlert): Promise<void> {
       const line = `[coach][alert] ${JSON.stringify({ scope: "whatsapp_gateway", ...alert })}`;
-      if (alert.severity === "down") console.error(line);
-      else console.info(line);
+      if (alert.severity === GatewayAlertSeverity.Recovered) console.info(line);
+      else console.error(line);
 
       if (!slackWebhookUrl) return;
       try {
@@ -41,10 +41,17 @@ export function slackWebhookUrlFromEnv(env: NodeJS.ProcessEnv = process.env): st
 }
 
 function slackText(alert: GatewayAlert): string {
-  const head =
-    alert.severity === "down"
-      ? ":rotating_light: *WhatsApp : les messages des athlètes n'arrivent peut-être plus*"
-      : ":white_check_mark: *WhatsApp : la session est de nouveau opérationnelle*";
   const session = alert.sessionId ? ` · session \`${alert.sessionId}\`` : "";
-  return `${head}\n${alert.message}\n_${alert.source} · ${alert.code}${session}_`;
+  return `${slackHeader(alert)}\n${alert.message}\n_${alert.source} · ${alert.code}${session}_`;
+}
+
+function slackHeader(alert: GatewayAlert): string {
+  switch (alert.severity) {
+    case GatewayAlertSeverity.Down:
+      return ":rotating_light: *WhatsApp: athletes' messages may not be reaching the coach*";
+    case GatewayAlertSeverity.NeedsHuman:
+      return ":sos: *WhatsApp: athletes' messages are not reaching the coach, action needed*";
+    case GatewayAlertSeverity.Recovered:
+      return ":white_check_mark: *WhatsApp: the session is back*";
+  }
 }
