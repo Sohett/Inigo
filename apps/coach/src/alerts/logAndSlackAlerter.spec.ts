@@ -98,3 +98,19 @@ describe("slackWebhookUrlFromEnv", () => {
     expect(slackWebhookUrlFromEnv(env)).toBeUndefined();
   });
 });
+
+describe("Slack header", () => {
+  it.each([
+    ["down", ":rotating_light: *WhatsApp: athletes' messages may not be reaching the coach*"],
+    ["needs_human", ":sos: *WhatsApp: athletes' messages are not reaching the coach, action needed*"],
+    ["recovered", ":white_check_mark: *WhatsApp: the session is back*"]
+  ] as const)("%s → %s", async (severity, header) => {
+    const fetchImpl = vi.fn(async () => new Response("ok", { status: 200 }));
+    await createLogAndSlackAlerter({ slackWebhookUrl: SLACK_URL, fetchImpl }).notify({ ...DOWN, severity });
+
+    const [, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    const { text } = JSON.parse(init.body as string) as { text: string };
+    expect(text.split("\n")[0]).toBe(header);
+  });
+});
+

@@ -1,7 +1,12 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import type { GatewayAlert, GatewaySession } from "../domain/whatsappGateway";
+import { GatewayAlertSeverity, type GatewayAlert, type GatewaySession } from "../domain/whatsappGateway";
 import { OpenWaApiError } from "../whatsapp/client";
-import { createCheckGatewaySession, GatewayCheckFailure } from "./checkGatewaySession";
+import {
+  createCheckGatewaySession,
+  decideWatchdogAction,
+  WatchdogAction,
+  WatchdogAlertCode
+} from "./checkGatewaySession";
 
 const SESSION = "gateway-session";
 
@@ -25,12 +30,33 @@ function build(options: {
   return { check, notify, getSession, startSession };
 }
 
+function withStatus(status: string, lastError: string | null = null) {
+  return async (): Promise<GatewaySession> => ({ id: SESSION, status, lastError });
+}
+
 afterEach(() => {
   vi.restoreAllMocks();
 });
 
+// The product table of the watchdog, one row per OpenWA status.
+describe("decideWatchdogAction", () => {
+  it.each([
+    ["ready", WatchdogAction.None],
+    ["disconnected", WatchdogAction.Restart],
+    ["failed", WatchdogAction.Restart],
+    ["qr_ready", WatchdogAction.AskHuman],
+    ["action_required", WatchdogAction.AskHuman],
+    ["created", WatchdogAction.Alert],
+    ["initializing", WatchdogAction.Alert],
+    ["authenticating", WatchdogAction.Alert],
+    ["some_future_status", WatchdogAction.Alert]
+  ])("%s → %s", (status, action) => {
+    expect(decideWatchdogAction(status)).toBe(action);
+  });
+});
+
 describe("checkGatewaySession", () => {
-  it("is healthy, and silent, when the recorded session is ready", async () => {
+  it("ready → healthy, no alert", async () => {
     vi.spyOn(console, "info").mockImplementation(() => undefined);
     const { check, notify, getSession } = build({});
 
@@ -39,131 +65,88 @@ describe("checkGatewaySession", () => {
     expect(notify).not.toHaveBeenCalled();
   });
 
-  it("alerts when no session is recorded, without calling the gateway", async () => {
-    const { check, notify, getSession } = build({ sessionId: null });
+  it.each(["disconnected", "failed"])("%s → one restart, and says so", async (status) => {
+    const { check, notify, startSession } = build({ getSession: withStatus(status, "Connection Closed") });
 
-    await expect(check.execute()).resolves.toEqual({
-      status: "unhealthy",
-      reason: GatewayCheckFailure.NoSessionRecorded
-    });
-    expect(getSession).not.toHaveBeenCalled();
+    await expect(check.execute()).resolves.toEqual({ status: "restarted", sessionId: SESSION, previousStatus: status });
+    expect(startSession).toHaveBeenCalledTimes(1);
+    expect(startSession).toHaveBeenCalledWith(SESSION);
     expect(notify).toHaveBeenCalledWith(
-      expect.objectContaining({ severity: "down", source: "watchdog", code: "no_session_recorded" })
+      expect.objectContaining({ source: "watchdog", code: WatchdogAlertCode.SessionRestarted })
     );
+    expect(notify.mock.calls[0]?.[0].message).toContain("Connection Closed");
   });
 
-  it("alerts when the gateway no longer knows the session", async () => {
-    const { check, notify } = build({ getSession: async () => null });
+  it("a start already in progress counts as restarted", async () => {
+    const { check } = build({ getSession: withStatus("failed"), startSession: async () => "already_starting" });
 
-    await expect(check.execute()).resolves.toEqual({
-      status: "unhealthy",
-      reason: GatewayCheckFailure.SessionNotFound
+    await expect(check.execute()).resolves.toMatchObject({ status: "restarted" });
+  });
+
+  it("a restart that fails → alert, without throwing", async () => {
+    const { check, notify } = build({
+      getSession: withStatus("failed"),
+      startSession: async () => {
+        throw new OpenWaApiError("WhatsApp gateway did not restart the session: HTTP 504", { status: 504 });
+      }
     });
-    expect(notify).toHaveBeenCalledWith(expect.objectContaining({ code: "session_not_found", sessionId: SESSION }));
+
+    await expect(check.execute()).resolves.toEqual({ status: "alerted", code: WatchdogAlertCode.RestartFailed });
+    expect(notify).toHaveBeenCalledTimes(1);
+    expect(notify.mock.calls[0]?.[0].message).toContain("HTTP 504");
   });
 
   // Linking again needs a human: a restart would only produce a fresh QR.
-  it.each(["qr_ready", "action_required"])("alerts, without restarting, when the session is %s", async (status) => {
-    const { check, notify, startSession } = build({
-      getSession: async () => ({ id: SESSION, status, lastError: null })
-    });
+  it.each(["qr_ready", "action_required"])("%s → needs human, no restart", async (status) => {
+    const { check, notify, startSession } = build({ getSession: withStatus(status) });
 
-    await expect(check.execute()).resolves.toEqual({
-      status: "unhealthy",
-      reason: GatewayCheckFailure.SessionNotReady
-    });
+    await expect(check.execute()).resolves.toEqual({ status: "alerted", code: WatchdogAlertCode.SessionNeedsHuman });
+    expect(startSession).not.toHaveBeenCalled();
+    expect(notify.mock.calls[0]?.[0].severity).toBe(GatewayAlertSeverity.NeedsHuman);
+  });
+
+  it.each(["initializing", "some_future_status"])("%s → stuck alert, no restart", async (status) => {
+    const { check, notify, startSession } = build({ getSession: withStatus(status, "boom") });
+
+    await expect(check.execute()).resolves.toEqual({ status: "alerted", code: WatchdogAlertCode.SessionStuck });
     expect(startSession).not.toHaveBeenCalled();
     expect(notify.mock.calls[0]?.[0].message).toContain(status);
+    expect(notify.mock.calls[0]?.[0].message).toContain("boom");
   });
 
-  it("alerts when the session is starting, with its status and last error", async () => {
-    const { check, notify } = build({
-      getSession: async () => ({ id: SESSION, status: "initializing", lastError: "Connection Closed" })
-    });
+  it("no session recorded → alert, the gateway is not called", async () => {
+    const { check, notify, getSession } = build({ sessionId: null });
 
-    await expect(check.execute()).resolves.toEqual({
-      status: "unhealthy",
-      reason: GatewayCheckFailure.SessionNotReady
-    });
-    const alert = notify.mock.calls[0]?.[0];
-    expect(alert?.message).toContain("initializing");
-    expect(alert?.message).toContain("Connection Closed");
+    await expect(check.execute()).resolves.toEqual({ status: "alerted", code: WatchdogAlertCode.NoSessionRecorded });
+    expect(getSession).not.toHaveBeenCalled();
+    expect(notify).toHaveBeenCalledTimes(1);
   });
 
-  // The outage the watchdog exists for: a gateway too dead to answer must raise an alert, not
-  // crash the check.
-  it("alerts, without throwing, when the gateway does not answer", async () => {
+  it("the gateway no longer knows the session → alert", async () => {
+    const { check } = build({ getSession: async () => null });
+
+    await expect(check.execute()).resolves.toEqual({ status: "alerted", code: WatchdogAlertCode.SessionNotFound });
+  });
+
+  // The outage the watchdog exists for: a gateway too dead to answer raises an alert, not a crash.
+  it("the gateway does not answer → alert, without throwing", async () => {
     const { check, notify } = build({
       getSession: async () => {
         throw new OpenWaApiError("WhatsApp gateway did not answer (fetch failed).", { status: null });
       }
     });
 
-    await expect(check.execute()).resolves.toEqual({
-      status: "unhealthy",
-      reason: GatewayCheckFailure.GatewayUnreachable
-    });
+    await expect(check.execute()).resolves.toEqual({ status: "alerted", code: WatchdogAlertCode.GatewayUnreachable });
     expect(notify.mock.calls[0]?.[0].message).toContain("did not answer");
   });
 
-  it("alerts, without throwing, when the gateway is not configured", async () => {
-    const { check, notify } = build({
+  it("the gateway is not configured → alert, without throwing", async () => {
+    const { check } = build({
       resolveClient: () => {
         throw new Error("WhatsApp gateway is not configured.");
       }
     });
 
-    await expect(check.execute()).resolves.toEqual({
-      status: "unhealthy",
-      reason: GatewayCheckFailure.GatewayUnreachable
-    });
-    expect(notify).toHaveBeenCalledTimes(1);
-  });
-
-  describe("automatic restart", () => {
-    // The most common outage: the device is still linked, only the engine is down.
-    it.each(["disconnected", "failed"])("restarts a %s session once, and says so", async (status) => {
-      const { check, notify, startSession } = build({
-        getSession: async () => ({ id: SESSION, status, lastError: "Connection Closed" })
-      });
-
-      await expect(check.execute()).resolves.toEqual({
-        status: "restarted",
-        sessionId: SESSION,
-        previousStatus: status
-      });
-      expect(startSession).toHaveBeenCalledTimes(1);
-      expect(startSession).toHaveBeenCalledWith(SESSION);
-      expect(notify).toHaveBeenCalledWith(
-        expect.objectContaining({ source: "watchdog", code: "session_restarted", sessionId: SESSION })
-      );
-      expect(notify.mock.calls[0]?.[0].message).toContain("Connection Closed");
-    });
-
-    it("counts a start already in progress as restarted", async () => {
-      const { check } = build({
-        getSession: async () => ({ id: SESSION, status: "failed", lastError: null }),
-        startSession: async () => "already_starting"
-      });
-
-      await expect(check.execute()).resolves.toMatchObject({ status: "restarted" });
-    });
-
-    it("alerts, without throwing, when the restart fails", async () => {
-      const { check, notify } = build({
-        getSession: async () => ({ id: SESSION, status: "failed", lastError: null }),
-        startSession: async () => {
-          throw new OpenWaApiError("WhatsApp gateway did not restart the session: HTTP 504", { status: 504 });
-        }
-      });
-
-      await expect(check.execute()).resolves.toEqual({
-        status: "unhealthy",
-        reason: GatewayCheckFailure.SessionNotReady
-      });
-      expect(notify).toHaveBeenCalledTimes(1);
-      expect(notify.mock.calls[0]?.[0].message).toContain("relance automatique a échoué");
-      expect(notify.mock.calls[0]?.[0].message).toContain("HTTP 504");
-    });
+    await expect(check.execute()).resolves.toEqual({ status: "alerted", code: WatchdogAlertCode.GatewayUnreachable });
   });
 });

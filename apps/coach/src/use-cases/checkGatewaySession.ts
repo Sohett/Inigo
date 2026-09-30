@@ -1,36 +1,52 @@
 import type { GatewayAlerter } from "../alerts/gatewayAlerter";
-import type { GatewayAlert, GatewaySession } from "../domain/whatsappGateway";
+import {
+  GatewayAlertSeverity,
+  GatewayAlertSource,
+  GatewaySessionStatus,
+  toGatewaySessionStatus,
+  type GatewaySession
+} from "../domain/whatsappGateway";
 import type { WhatsappGatewayRepository } from "../repositories/whatsappGatewayRepository";
 import type { OpenWaClient } from "../whatsapp/client";
 import type { ResolveOpenWaClient } from "../whatsapp/resolveClient";
 
-/**
- * Statuses a plain `POST /start` can fix: the device is still linked, only the engine is down
- * (a stop, an engine crash, or a reconnect chain that ran out, which OpenWA never resumes by
- * itself). `qr_ready` and `action_required` need a human to link WhatsApp again: restarting
- * would only produce a fresh QR, so those stay alerts.
- */
-const RESTARTABLE_STATUSES: ReadonlySet<string> = new Set(["disconnected", "failed"]);
-
-/** Why the watchdog found the gateway unable to deliver athletes' messages. */
-export const GatewayCheckFailure = {
-  /** No session is recorded in Neon: the coach cannot even tell which one to watch. */
-  NoSessionRecorded: "no_session_recorded",
-  /** The recorded session does not exist on the gateway (deleted, or replaced by a re-pairing). */
-  SessionNotFound: "session_not_found",
-  /** The session exists but is not `ready`. */
-  SessionNotReady: "session_not_ready",
-  /** The gateway is unconfigured, unreachable, or answered an error. */
-  GatewayUnreachable: "gateway_unreachable"
+/** What the watchdog does about the status it read. */
+export const WatchdogAction = {
+  /** `ready`: nothing to do. */
+  None: "none",
+  /** Still linked, engine stopped: one `POST /start` fixes it. */
+  Restart: "restart",
+  /** WhatsApp wants the device linked again: only a human can. */
+  AskHuman: "ask_human",
+  /** Stuck in a transitional or unknown status: alert, don't touch. */
+  Alert: "alert"
 } as const;
 
-export type GatewayCheckFailure = (typeof GatewayCheckFailure)[keyof typeof GatewayCheckFailure];
+export type WatchdogAction = (typeof WatchdogAction)[keyof typeof WatchdogAction];
 
-export type GatewayCheckOutcome =
+/** Every alert the watchdog can raise, as a stable code for log search. */
+export const WatchdogAlertCode = {
+  NoSessionRecorded: "no_session_recorded",
+  SessionNotFound: "session_not_found",
+  GatewayUnreachable: "gateway_unreachable",
+  SessionRestarted: "session_restarted",
+  RestartFailed: "restart_failed",
+  SessionNeedsHuman: "session_needs_human",
+  SessionStuck: "session_stuck"
+} as const;
+
+export type WatchdogAlertCode = (typeof WatchdogAlertCode)[keyof typeof WatchdogAlertCode];
+
+export type WatchdogOutcome =
   | { status: "healthy"; sessionId: string }
-  /** The session was down but restartable: the watchdog asked the gateway to start it. */
   | { status: "restarted"; sessionId: string; previousStatus: string }
-  | { status: "unhealthy"; reason: GatewayCheckFailure };
+  | { status: "alerted"; code: WatchdogAlertCode };
+
+/** The result of reading the recorded session from the gateway. */
+type SessionRead =
+  | { kind: "found"; client: OpenWaClient; session: GatewaySession }
+  | { kind: "not_found" }
+  | { kind: "unreachable"; error: string };
 
 export interface CheckGatewaySessionDeps {
   gateway: WhatsappGatewayRepository;
@@ -39,105 +55,121 @@ export interface CheckGatewaySessionDeps {
 }
 
 export interface CheckGatewaySession {
-  execute(): Promise<GatewayCheckOutcome>;
+  execute(): Promise<WatchdogOutcome>;
 }
 
 /**
- * The watchdog (INI-40): ask the gateway, from outside, whether the session the coach sends
- * through is `ready`, and alert when it is not. It exists for the failure the session webhooks
- * cannot report: a gateway too dead to call anyone.
+ * The watchdog (INI-40), run by the Vercel cron: read the session the coach sends through, straight
+ * from the gateway, and act on its status (`decideWatchdogAction`). It covers what the session
+ * webhooks cannot report (a gateway too dead to call anyone) and restarts a session that is merely
+ * stopped or failed.
  *
- * A session that is merely stopped or failed is restarted, once per run: no human has to open a
- * terminal for the most common outage. The outcome of that restart is reported in real time by
- * the session webhooks (`ready` → recovery, `failed` → alert), and the next run checks again.
- * Restarting only here, never from the webhook, is deliberate: a start that fails at once would
- * turn start → failed → start into a loop, where the cron's own schedule is the rate limit.
+ * Restarting only here, never from the webhook, is deliberate: a start that fails at once would turn
+ * start → failed → start into a loop, where the cron's own schedule is the rate limit.
  *
- * Every failure, the gateway breaking down included, becomes an alert and an outcome; nothing
- * throws, because a watchdog that crashes on the very outage it watches for is silent. Only the
- * Neon read may throw, and the route turns that into a 500 Vercel records.
+ * Nothing throws on the outage it watches for; only the Neon read may, and the route turns that
+ * into a 500 Vercel records.
  */
 export function createCheckGatewaySession(deps: CheckGatewaySessionDeps): CheckGatewaySession {
+  const report = async (
+    severity: GatewayAlertSeverity,
+    code: WatchdogAlertCode,
+    message: string,
+    sessionId?: string
+  ): Promise<WatchdogOutcome> => {
+    await deps.alerter.notify({ severity, source: GatewayAlertSource.Watchdog, code, message, sessionId });
+    return { status: "alerted", code };
+  };
+
   return {
-    async execute(): Promise<GatewayCheckOutcome> {
+    async execute(): Promise<WatchdogOutcome> {
       const sessionId = await deps.gateway.getSessionId();
       if (!sessionId) {
-        return unhealthy(deps.alerter, GatewayCheckFailure.NoSessionRecorded, {
-          message: "Aucune session de passerelle n'est enregistrée : renseigne la dans l'admin."
-        });
+        return report(GatewayAlertSeverity.Down, WatchdogAlertCode.NoSessionRecorded,
+          "No gateway session is recorded: set it in the admin, or the coach cannot reply.");
       }
 
-      let client: OpenWaClient;
-      let session: GatewaySession | null;
-      try {
-        client = deps.resolveClient();
-        session = await client.getSession(sessionId);
-      } catch (error) {
-        return unhealthy(deps.alerter, GatewayCheckFailure.GatewayUnreachable, {
-          message: `La passerelle OpenWA ne répond pas correctement : ${error instanceof Error ? error.message : String(error)}`,
-          sessionId
-        });
+      const read = await readSession(deps.resolveClient, sessionId);
+      switch (read.kind) {
+        case "unreachable":
+          return report(GatewayAlertSeverity.Down, WatchdogAlertCode.GatewayUnreachable,
+            `The OpenWA gateway is not answering properly: ${read.error}`, sessionId);
+        case "not_found":
+          return report(GatewayAlertSeverity.Down, WatchdogAlertCode.SessionNotFound,
+            "The recorded session no longer exists on OpenWA. Link WhatsApp again, then update the session in the admin.", sessionId);
+        case "found":
+          return act(read.client, read.session);
       }
-
-      if (!session) {
-        return unhealthy(deps.alerter, GatewayCheckFailure.SessionNotFound, {
-          message:
-            "La session enregistrée n'existe plus sur OpenWA. Relie WhatsApp puis mets à jour la session dans l'admin.",
-          sessionId
-        });
-      }
-
-      if (RESTARTABLE_STATUSES.has(session.status)) {
-        return restart(deps.alerter, client, session);
-      }
-
-      if (session.status !== "ready") {
-        const detail = session.lastError ? ` (${session.lastError})` : "";
-        return unhealthy(deps.alerter, GatewayCheckFailure.SessionNotReady, {
-          message: `La session est en statut \`${session.status}\`${detail}. Vérifie le dashboard OpenWA.`,
-          sessionId
-        });
-      }
-
-      console.info(`[coach] watchdog: gateway session ${sessionId} is ready`);
-      return { status: "healthy", sessionId };
     }
   };
-}
 
-async function restart(
-  alerter: GatewayAlerter,
-  client: OpenWaClient,
-  session: GatewaySession
-): Promise<GatewayCheckOutcome> {
-  const detail = session.lastError ? ` (${session.lastError})` : "";
-  try {
-    await client.startSession(session.id);
-  } catch (error) {
-    return unhealthy(alerter, GatewayCheckFailure.SessionNotReady, {
-      message:
-        `La session est en statut \`${session.status}\`${detail} et la relance automatique a échoué : ` +
-        `${error instanceof Error ? error.message : String(error)}. Vérifie le dashboard OpenWA.`,
+  async function act(client: OpenWaClient, session: GatewaySession): Promise<WatchdogOutcome> {
+    const detail = session.lastError ? ` (${session.lastError})` : "";
+    switch (decideWatchdogAction(session.status)) {
+      case WatchdogAction.None:
+        console.info(`[coach] watchdog: gateway session ${session.id} is ready`);
+        return { status: "healthy", sessionId: session.id };
+      case WatchdogAction.Restart:
+        return restart(client, session, detail);
+      case WatchdogAction.AskHuman:
+        return report(GatewayAlertSeverity.NeedsHuman, WatchdogAlertCode.SessionNeedsHuman,
+          `The session is \`${session.status}\`${detail}: WhatsApp must be linked again on the OpenWA dashboard.`, session.id);
+      case WatchdogAction.Alert:
+        return report(GatewayAlertSeverity.Down, WatchdogAlertCode.SessionStuck,
+          `The session is stuck in \`${session.status}\`${detail}. Check the OpenWA dashboard.`, session.id);
+    }
+  }
+
+  async function restart(client: OpenWaClient, session: GatewaySession, detail: string): Promise<WatchdogOutcome> {
+    try {
+      await client.startSession(session.id);
+    } catch (error) {
+      return report(GatewayAlertSeverity.Down, WatchdogAlertCode.RestartFailed,
+        `The session is \`${session.status}\`${detail} and the automatic restart failed: ${errorText(error)}. Check the OpenWA dashboard.`, session.id);
+    }
+    await deps.alerter.notify({
+      severity: GatewayAlertSeverity.Down,
+      source: GatewayAlertSource.Watchdog,
+      code: WatchdogAlertCode.SessionRestarted,
+      message: `The session was \`${session.status}\`${detail}; the watchdog restarted it. A recovery message follows once it is ready, another alert otherwise.`,
       sessionId: session.id
     });
+    return { status: "restarted", sessionId: session.id, previousStatus: session.status };
   }
-  await alerter.notify({
-    severity: "down",
-    source: "watchdog",
-    code: "session_restarted",
-    message:
-      `La session était en statut \`${session.status}\`${detail}, le watchdog l'a relancée. ` +
-      "Un message de rétablissement suivra si elle repasse en ready, sinon une nouvelle alerte.",
-    sessionId: session.id
-  });
-  return { status: "restarted", sessionId: session.id, previousStatus: session.status };
 }
 
-async function unhealthy(
-  alerter: GatewayAlerter,
-  reason: GatewayCheckFailure,
-  alert: Pick<GatewayAlert, "message" | "sessionId">
-): Promise<GatewayCheckOutcome> {
-  await alerter.notify({ severity: "down", source: "watchdog", code: reason, ...alert });
-  return { status: "unhealthy", reason };
+/** One line per OpenWA status: what the watchdog does about it. */
+export function decideWatchdogAction(rawStatus: string): WatchdogAction {
+  const status = toGatewaySessionStatus(rawStatus);
+  if (!status) return WatchdogAction.Alert;
+
+  switch (status) {
+    case GatewaySessionStatus.Ready:
+      return WatchdogAction.None;
+    case GatewaySessionStatus.Disconnected:
+    case GatewaySessionStatus.Failed:
+      return WatchdogAction.Restart;
+    case GatewaySessionStatus.QrReady:
+    case GatewaySessionStatus.ActionRequired:
+      return WatchdogAction.AskHuman;
+    case GatewaySessionStatus.Created:
+    case GatewaySessionStatus.Initializing:
+    case GatewaySessionStatus.Authenticating:
+      return WatchdogAction.Alert;
+  }
+}
+
+/** Read the session from the gateway; a breakdown becomes a value, never an exception. */
+async function readSession(resolveClient: ResolveOpenWaClient, sessionId: string): Promise<SessionRead> {
+  try {
+    const client = resolveClient();
+    const session = await client.getSession(sessionId);
+    return session ? { kind: "found", client, session } : { kind: "not_found" };
+  } catch (error) {
+    return { kind: "unreachable", error: errorText(error) };
+  }
+}
+
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

@@ -189,8 +189,8 @@ n'est pas une variable d'env : elle vit en base et se règle depuis `/admin`, pa
 change à chaque ré-appairage WhatsApp.
 
 Surveillance de la session WhatsApp (INI-40) : poser `CRON_SECRET` et `SLACK_ALERT_WEBHOOK_URL`,
-puis, côté OpenWA, abonner le webhook du coach à `session.status`, `session.disconnected` et
-`session.reconnect_loop` (en plus de `message.received`). Le cron quotidien est déclaré dans
+puis, côté OpenWA, abonner le webhook du coach à `session.status`, `session.disconnected`,
+`session.reconnect_loop` et `session.restriction` (en plus de `message.received`). Le cron quotidien est déclaré dans
 `vercel.json` ; pour le tester à la main : `vercel crons run /api/cron/whatsapp-watchdog`.
 
 Pour utiliser l'admin, poser `ADMIN_USER` (min 3 car.) et `ADMIN_PASSWORD` (min 16 car.).
