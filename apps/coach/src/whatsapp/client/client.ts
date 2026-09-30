@@ -31,7 +31,8 @@ const sessionResponseSchema = z
   .object({
     id: z.string(),
     status: z.string(),
-    lastError: z.string().nullable().optional()
+    // Only ever shown to a human: tolerate any shape rather than fail the whole read on it.
+    lastError: z.unknown()
   })
   .passthrough();
 
@@ -157,7 +158,17 @@ export class OpenWaClient {
         status: response.status
       });
     }
-    return { id: parsed.data.id, status: parsed.data.status, lastError: parsed.data.lastError ?? null };
+    const { lastError } = parsed.data;
+    return {
+      id: parsed.data.id,
+      status: parsed.data.status,
+      lastError:
+        lastError === null || lastError === undefined
+          ? null
+          : typeof lastError === "string"
+            ? lastError
+            : JSON.stringify(lastError)
+    };
   }
 
   /**

@@ -112,6 +112,16 @@ describe("OpenWaClient.getSession", () => {
     expect((init.headers as Record<string, string>)["x-api-key"]).toBe("owa_k1_secret");
   });
 
+  it("tolerates a lastError that is not a string", async () => {
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse({ id: SESSION, status: "failed", lastError: { code: "TOS_BLOCK" } })
+    );
+    await expect(client(fetchImpl).getSession(SESSION)).resolves.toMatchObject({
+      status: "failed",
+      lastError: '{"code":"TOS_BLOCK"}'
+    });
+  });
+
   it("resolves null when the gateway does not know the session", async () => {
     const fetchImpl = vi.fn(async () => jsonResponse({ message: "Session not found" }, 404));
     await expect(client(fetchImpl).getSession(SESSION)).resolves.toBeNull();
