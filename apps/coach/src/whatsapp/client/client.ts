@@ -9,6 +9,8 @@ export interface OpenWaClientOptions {
   apiKey: string;
   /** Per-request timeout in milliseconds. Default 15000. */
   timeoutMs?: number;
+  /** Timeout of a session start, which waits for the engine to initialize. Default 25000. */
+  startTimeoutMs?: number;
   /** Injectable fetch, primarily for testing. Defaults to global fetch. */
   fetchImpl?: typeof fetch;
 }
@@ -40,7 +42,7 @@ const sessionResponseSchema = z
 
 /**
  * Minimal client for the OpenWA gateway, used by the `/api/whatsapp/mcp` server (sends) and the
- * session watchdog (reads).
+ * session watchdog (reads, restarts).
  *
  * Deliberately **no retry**. A send is not idempotent: a second attempt after a timeout is a
  * duplicate message for the athlete, which is worse than a reported failure. The messages
@@ -50,12 +52,14 @@ export class OpenWaClient {
   private readonly baseUrl: string;
   private readonly apiKey: string;
   private readonly timeoutMs: number;
+  private readonly startTimeoutMs: number;
   private readonly fetchImpl: typeof fetch;
 
   constructor(options: OpenWaClientOptions) {
     this.baseUrl = options.baseUrl.replace(/\/+$/, "");
     this.apiKey = options.apiKey;
     this.timeoutMs = options.timeoutMs ?? 15_000;
+    this.startTimeoutMs = options.startTimeoutMs ?? 25_000;
     this.fetchImpl = options.fetchImpl ?? fetch;
   }
 
@@ -163,6 +167,43 @@ export class OpenWaClient {
             ? lastError
             : JSON.stringify(lastError)
     };
+  }
+
+  /**
+   * Ask the gateway to (re)start a session: `POST /api/sessions/:sessionId/start`, which answers
+   * once the engine is initializing. Resolves `already_starting` on the gateway's `400` (already
+   * started or starting): someone got there first, which is what we wanted. Throws on anything
+   * else, a timeout included.
+   *
+   * Safe to call without a retry policy: a start the gateway already received answers `400` on a
+   * second call, so repeating one never runs a second engine. The watchdog still calls it at most
+   * once per run.
+   */
+  async startSession(sessionId: string): Promise<"started" | "already_starting"> {
+    const endpoint = `${this.baseUrl}/api/sessions/${encodeURIComponent(sessionId)}/start`;
+
+    let response: Response;
+    try {
+      response = await this.fetchImpl(endpoint, {
+        method: "POST",
+        headers: { "x-api-key": this.apiKey },
+        signal: AbortSignal.timeout(this.startTimeoutMs)
+      });
+    } catch (cause) {
+      throw new OpenWaApiError(
+        `WhatsApp gateway did not answer the restart (${this.redact(errorText(cause), sessionId)}).`,
+        { status: null }
+      );
+    }
+
+    if (response.ok) return "started";
+    if (response.status === 400) return "already_starting";
+    const body = await readBody(response);
+    const reason = sendResponseSchema.safeParse(body).data?.message || `HTTP ${response.status}`;
+    throw new OpenWaApiError(
+      `WhatsApp gateway did not restart the session: ${this.redact(reason, sessionId)}`,
+      { status: response.status }
+    );
   }
 
   /**

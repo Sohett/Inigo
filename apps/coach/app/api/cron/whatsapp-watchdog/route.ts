@@ -4,8 +4,8 @@ import { createCheckGatewaySession } from "../../../../src/use-cases/checkGatewa
 
 // A health check must hit the gateway every time, never a cached answer.
 export const dynamic = "force-dynamic";
-// One Neon read + one gateway GET (15s client timeout) + one Slack POST (5s).
-export const maxDuration = 30;
+// One Neon read + a gateway GET (15s) + at most one restart (25s) + one Slack POST (5s).
+export const maxDuration = 60;
 
 function json(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {

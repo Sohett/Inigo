@@ -8,19 +8,21 @@ const SESSION = "gateway-session";
 function build(options: {
   sessionId?: string | null;
   getSession?: () => Promise<GatewaySession | null>;
+  startSession?: () => Promise<"started" | "already_starting">;
   resolveClient?: () => never;
 }) {
   const notify = vi.fn(async (_alert: GatewayAlert) => undefined);
   const getSession = vi.fn(options.getSession ?? (async () => ({ id: SESSION, status: "ready", lastError: null })));
+  const startSession = vi.fn(options.startSession ?? (async () => "started" as const));
   const check = createCheckGatewaySession({
     gateway: {
       getSessionId: async () => (options.sessionId === undefined ? SESSION : options.sessionId),
       setSessionId: async () => undefined
     },
-    resolveClient: options.resolveClient ?? (() => ({ getSession }) as never),
+    resolveClient: options.resolveClient ?? (() => ({ getSession, startSession }) as never),
     alerter: { notify }
   });
-  return { check, notify, getSession };
+  return { check, notify, getSession, startSession };
 }
 
 afterEach(() => {
@@ -60,9 +62,23 @@ describe("checkGatewaySession", () => {
     expect(notify).toHaveBeenCalledWith(expect.objectContaining({ code: "session_not_found", sessionId: SESSION }));
   });
 
-  it("alerts when the session is not ready, with its status and last error", async () => {
+  // Linking again needs a human: a restart would only produce a fresh QR.
+  it.each(["qr_ready", "action_required"])("alerts, without restarting, when the session is %s", async (status) => {
+    const { check, notify, startSession } = build({
+      getSession: async () => ({ id: SESSION, status, lastError: null })
+    });
+
+    await expect(check.execute()).resolves.toEqual({
+      status: "unhealthy",
+      reason: GatewayCheckFailure.SessionNotReady
+    });
+    expect(startSession).not.toHaveBeenCalled();
+    expect(notify.mock.calls[0]?.[0].message).toContain(status);
+  });
+
+  it("alerts when the session is starting, with its status and last error", async () => {
     const { check, notify } = build({
-      getSession: async () => ({ id: SESSION, status: "disconnected", lastError: "Connection Closed" })
+      getSession: async () => ({ id: SESSION, status: "initializing", lastError: "Connection Closed" })
     });
 
     await expect(check.execute()).resolves.toEqual({
@@ -70,7 +86,7 @@ describe("checkGatewaySession", () => {
       reason: GatewayCheckFailure.SessionNotReady
     });
     const alert = notify.mock.calls[0]?.[0];
-    expect(alert?.message).toContain("disconnected");
+    expect(alert?.message).toContain("initializing");
     expect(alert?.message).toContain("Connection Closed");
   });
 
@@ -102,5 +118,52 @@ describe("checkGatewaySession", () => {
       reason: GatewayCheckFailure.GatewayUnreachable
     });
     expect(notify).toHaveBeenCalledTimes(1);
+  });
+
+  describe("automatic restart", () => {
+    // The most common outage: the device is still linked, only the engine is down.
+    it.each(["disconnected", "failed"])("restarts a %s session once, and says so", async (status) => {
+      const { check, notify, startSession } = build({
+        getSession: async () => ({ id: SESSION, status, lastError: "Connection Closed" })
+      });
+
+      await expect(check.execute()).resolves.toEqual({
+        status: "restarted",
+        sessionId: SESSION,
+        previousStatus: status
+      });
+      expect(startSession).toHaveBeenCalledTimes(1);
+      expect(startSession).toHaveBeenCalledWith(SESSION);
+      expect(notify).toHaveBeenCalledWith(
+        expect.objectContaining({ source: "watchdog", code: "session_restarted", sessionId: SESSION })
+      );
+      expect(notify.mock.calls[0]?.[0].message).toContain("Connection Closed");
+    });
+
+    it("counts a start already in progress as restarted", async () => {
+      const { check } = build({
+        getSession: async () => ({ id: SESSION, status: "failed", lastError: null }),
+        startSession: async () => "already_starting"
+      });
+
+      await expect(check.execute()).resolves.toMatchObject({ status: "restarted" });
+    });
+
+    it("alerts, without throwing, when the restart fails", async () => {
+      const { check, notify } = build({
+        getSession: async () => ({ id: SESSION, status: "failed", lastError: null }),
+        startSession: async () => {
+          throw new OpenWaApiError("WhatsApp gateway did not restart the session: HTTP 504", { status: 504 });
+        }
+      });
+
+      await expect(check.execute()).resolves.toEqual({
+        status: "unhealthy",
+        reason: GatewayCheckFailure.SessionNotReady
+      });
+      expect(notify).toHaveBeenCalledTimes(1);
+      expect(notify.mock.calls[0]?.[0].message).toContain("relance automatique a échoué");
+      expect(notify.mock.calls[0]?.[0].message).toContain("HTTP 504");
+    });
   });
 });

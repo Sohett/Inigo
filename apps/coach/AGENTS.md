@@ -274,6 +274,13 @@ seule sortie (`GatewayAlerter`) :
   passerelle trop morte pour appeler qui que ce soit. `checkGatewaySession` alerte si aucune
   session n'est enregistrée, si OpenWA ne la connaît plus, si elle n'est pas `ready`, ou si OpenWA
   est injoignable / non configuré. Il ne throw pas sur la panne qu'il surveille.
+- **Relance automatique (watchdog seulement)** : une session `disconnected` ou `failed` (appareil
+  toujours lié, moteur à l'arrêt ; OpenWA ne relance jamais un `failed` de lui-même) reçoit **un**
+  `POST /api/sessions/:id/start` par run, avec une alerte `session_restarted`. Le résultat arrive en
+  temps réel par les webhooks (`ready` → rétablissement, `failed` → alerte). `qr_ready` et
+  `action_required` restent des alertes : il faut relier WhatsApp, une relance ne ferait qu'un QR.
+  **Jamais depuis le webhook** : un start qui échoue aussitôt ferait une boucle start → failed →
+  start ; le planning du cron sert de limite de débit.
 
 Règles :
 - **L'alerter ne throw jamais.** Un échec Slack est loggé, jamais propagé : sinon le webhook
@@ -284,7 +291,7 @@ Règles :
 - **Texte des alertes** : pas de tiret (`-`, `—`) dans ce que lit l'humain.
 
 Hors scope (à reprendre si besoin) : réconciliation des messages après un unlink (OpenWA stocke
-l'historique rapatrié sans webhook), déduplication par `waMessageId`, redémarrage automatique.
+l'historique rapatrié sans webhook), déduplication par `waMessageId`.
 
 ## Admin (`/admin`) — ouvrir une session
 

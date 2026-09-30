@@ -155,3 +155,43 @@ describe("OpenWaClient.getSession", () => {
     await expect(client(fetchImpl).getSession(SESSION)).rejects.toThrow(/unreadable session/);
   });
 });
+
+describe("OpenWaClient.startSession", () => {
+  it("posts to the gateway's start route with the api key header", async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse({ id: SESSION, status: "initializing" }));
+    await expect(client(fetchImpl).startSession(SESSION)).resolves.toBe("started");
+
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe(`https://gateway.example/api/sessions/${SESSION}/start`);
+    expect(init.method).toBe("POST");
+    expect((init.headers as Record<string, string>)["x-api-key"]).toBe("owa_k1_secret");
+  });
+
+  // OpenWA answers 400 when the session is already started or starting: what we wanted anyway.
+  it("resolves already_starting on a 400", async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse({ message: "Session already started" }, 400));
+    await expect(client(fetchImpl).startSession(SESSION)).resolves.toBe("already_starting");
+  });
+
+  it("throws on another non-2xx, without leaking the session id", async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse({ message: `engine timeout on ${SESSION}` }, 504));
+    const error = await client(fetchImpl)
+      .startSession(SESSION)
+      .catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(OpenWaApiError);
+    expect((error as OpenWaApiError).status).toBe(504);
+    expect((error as Error).message).not.toContain(SESSION);
+  });
+
+  it("throws with a null status when the gateway does not answer", async () => {
+    const fetchImpl = vi.fn(async () => {
+      throw new TypeError("fetch failed");
+    });
+    const error = await client(fetchImpl)
+      .startSession(SESSION)
+      .catch((caught: unknown) => caught);
+
+    expect((error as OpenWaApiError).status).toBeNull();
+  });
+});
