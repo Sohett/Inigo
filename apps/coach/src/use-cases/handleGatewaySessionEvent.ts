@@ -10,6 +10,22 @@ import {
 import { gatewaySessionEventSchema, type GatewaySessionEventPayload } from "../mappers/whatsappPayload";
 import type { WhatsappGatewayRepository } from "../repositories/whatsappGatewayRepository";
 
+/** Every alert the session webhooks can raise, as a stable code for log search. */
+export const SessionAlertCode = {
+  SessionReady: "session_ready",
+  SessionDisconnected: "session_disconnected",
+  SessionFailed: "session_failed",
+  SessionQrReady: "session_qr_ready",
+  SessionActionRequired: "session_action_required",
+  SessionDropped: "session_dropped",
+  SessionReconnectLoop: "session_reconnect_loop",
+  SessionRestricted: "session_restricted",
+  SessionRestrictionLifted: "session_restriction_lifted",
+  UnrecordedSessionReady: "unrecorded_session_ready"
+} as const;
+
+export type SessionAlertCode = (typeof SessionAlertCode)[keyof typeof SessionAlertCode];
+
 /** Why a session event raised no alert. Each is a normal outcome, logged by the route. */
 export const SessionEventIgnoreReason = {
   MalformedPayload: "malformed_payload",
@@ -24,12 +40,12 @@ export const SessionEventIgnoreReason = {
 export type SessionEventIgnoreReason = (typeof SessionEventIgnoreReason)[keyof typeof SessionEventIgnoreReason];
 
 export type GatewaySessionEventOutcome =
-  | { status: "notified"; event: string; code: string }
+  | { status: "notified"; event: string; code: SessionAlertCode }
   | { status: "ignored"; event?: string; reason: SessionEventIgnoreReason; detail?: string };
 
 /** What one event means: an alert to send, or a reason to stay quiet. */
 type Decision =
-  | { kind: "alert"; alert: GatewayAlert }
+  | { kind: "alert"; code: SessionAlertCode; alert: GatewayAlert }
   | { kind: "ignore"; reason: SessionEventIgnoreReason; detail?: string };
 
 export interface HandleGatewaySessionEventDeps {
@@ -66,7 +82,7 @@ export function createHandleGatewaySessionEvent(
       }
 
       await deps.alerter.notify(decision.alert);
-      return { status: "notified", event: event.event, code: decision.alert.code };
+      return { status: "notified", event: event.event, code: decision.code };
     }
   };
 }
@@ -78,10 +94,10 @@ function decideForRecordedSession(event: GatewaySessionEventPayload): Decision {
     case GatewaySessionEvent.Status:
       return decideForStatus(event.data.status, sessionId);
     case GatewaySessionEvent.Disconnected:
-      return alert(GatewayAlertSeverity.Down, "session_dropped", sessionId,
+      return alert(GatewayAlertSeverity.Down, SessionAlertCode.SessionDropped, sessionId,
         `The WhatsApp session dropped (reason: ${event.data.reason ?? "unknown"}). OpenWA is trying to reconnect it.`);
     case GatewaySessionEvent.ReconnectLoop:
-      return alert(GatewayAlertSeverity.Down, "session_reconnect_loop", sessionId,
+      return alert(GatewayAlertSeverity.Down, SessionAlertCode.SessionReconnectLoop, sessionId,
         `OpenWA still cannot reconnect the session after ${event.data.attempts} attempts.`);
     case GatewaySessionEvent.Restriction:
       return decideForRestriction(event.data, sessionId);
@@ -95,19 +111,19 @@ function decideForStatus(rawStatus: string, sessionId: string): Decision {
 
   switch (status) {
     case GatewaySessionStatus.Ready:
-      return alert(GatewayAlertSeverity.Recovered, "session_ready", sessionId,
+      return alert(GatewayAlertSeverity.Recovered, SessionAlertCode.SessionReady, sessionId,
         "The WhatsApp session is connected again: athletes' messages are coming in.");
     case GatewaySessionStatus.Disconnected:
-      return alert(GatewayAlertSeverity.Down, "session_disconnected", sessionId,
+      return alert(GatewayAlertSeverity.Down, SessionAlertCode.SessionDisconnected, sessionId,
         "The WhatsApp session is disconnected. After a drop OpenWA reconnects it; after a stop the watchdog restarts it on its next run.");
     case GatewaySessionStatus.Failed:
-      return alert(GatewayAlertSeverity.Down, "session_failed", sessionId,
+      return alert(GatewayAlertSeverity.Down, SessionAlertCode.SessionFailed, sessionId,
         "Every reconnect attempt failed and OpenWA gave up. The watchdog restarts the session on its next run.");
     case GatewaySessionStatus.QrReady:
-      return alert(GatewayAlertSeverity.NeedsHuman, "session_qr_ready", sessionId,
+      return alert(GatewayAlertSeverity.NeedsHuman, SessionAlertCode.SessionQrReady, sessionId,
         "WhatsApp unlinked the session: scan the QR code on the OpenWA dashboard.");
     case GatewaySessionStatus.ActionRequired:
-      return alert(GatewayAlertSeverity.NeedsHuman, "session_action_required", sessionId,
+      return alert(GatewayAlertSeverity.NeedsHuman, SessionAlertCode.SessionActionRequired, sessionId,
         "WhatsApp requires an action (pairing code or similar) on the OpenWA dashboard.");
     case GatewaySessionStatus.Created:
     case GatewaySessionStatus.Initializing:
@@ -121,11 +137,11 @@ type RestrictionData = Extract<GatewaySessionEventPayload, { event: "session.res
 function decideForRestriction(data: RestrictionData, sessionId: string): Decision {
   const what = `${data.kind ?? "unknown"}${data.code ? ` (${data.code})` : ""}`;
   if (!data.active) {
-    return alert(GatewayAlertSeverity.Recovered, "session_restriction_lifted", sessionId,
+    return alert(GatewayAlertSeverity.Recovered, SessionAlertCode.SessionRestrictionLifted, sessionId,
       `WhatsApp lifted the restriction on the account: ${what}.`);
   }
   const until = data.expiresAt ? ` until ${data.expiresAt}` : "";
-  return alert(GatewayAlertSeverity.Down, "session_restricted", sessionId,
+  return alert(GatewayAlertSeverity.Down, SessionAlertCode.SessionRestricted, sessionId,
     `WhatsApp restricted the account${until}: ${what}.`);
 }
 
@@ -137,7 +153,7 @@ function decideForRestriction(data: RestrictionData, sessionId: string): Decisio
 function decideForOtherSession(event: GatewaySessionEventPayload): Decision {
   if (event.event !== GatewaySessionEvent.Status) return ignore(SessionEventIgnoreReason.OtherSession);
   if (event.data.status !== GatewaySessionStatus.Ready) return ignore(SessionEventIgnoreReason.OtherSession);
-  return alert(GatewayAlertSeverity.NeedsHuman, "unrecorded_session_ready", event.data.sessionId,
+  return alert(GatewayAlertSeverity.NeedsHuman, SessionAlertCode.UnrecordedSessionReady, event.data.sessionId,
     "A WhatsApp session is connected, but it is not the one the coach sends through. Update the session in the admin, or the coach cannot reply.");
 }
 
@@ -151,8 +167,8 @@ async function isRecordedSession(gateway: WhatsappGatewayRepository, sessionId: 
   }
 }
 
-function alert(severity: GatewayAlertSeverity, code: string, sessionId: string, message: string): Decision {
-  return { kind: "alert", alert: { severity, source: GatewayAlertSource.Webhook, code, message, sessionId } };
+function alert(severity: GatewayAlertSeverity, code: SessionAlertCode, sessionId: string, message: string): Decision {
+  return { kind: "alert", code, alert: { severity, source: GatewayAlertSource.Webhook, code, message, sessionId } };
 }
 
 function ignore(reason: SessionEventIgnoreReason, detail?: string): Decision {

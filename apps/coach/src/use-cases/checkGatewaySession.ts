@@ -71,8 +71,12 @@ export interface CheckGatewaySession {
  * into a 500 Vercel records.
  */
 export function createCheckGatewaySession(deps: CheckGatewaySessionDeps): CheckGatewaySession {
-  const report = async (code: WatchdogAlertCode, message: string, sessionId?: string): Promise<WatchdogOutcome> => {
-    const severity = code === WatchdogAlertCode.SessionNeedsHuman ? GatewayAlertSeverity.NeedsHuman : GatewayAlertSeverity.Down;
+  const report = async (
+    severity: GatewayAlertSeverity,
+    code: WatchdogAlertCode,
+    message: string,
+    sessionId?: string
+  ): Promise<WatchdogOutcome> => {
     await deps.alerter.notify({ severity, source: GatewayAlertSource.Watchdog, code, message, sessionId });
     return { status: "alerted", code };
   };
@@ -81,17 +85,17 @@ export function createCheckGatewaySession(deps: CheckGatewaySessionDeps): CheckG
     async execute(): Promise<WatchdogOutcome> {
       const sessionId = await deps.gateway.getSessionId();
       if (!sessionId) {
-        return report(WatchdogAlertCode.NoSessionRecorded,
+        return report(GatewayAlertSeverity.Down, WatchdogAlertCode.NoSessionRecorded,
           "No gateway session is recorded: set it in the admin, or the coach cannot reply.");
       }
 
       const read = await readSession(deps.resolveClient, sessionId);
       switch (read.kind) {
         case "unreachable":
-          return report(WatchdogAlertCode.GatewayUnreachable,
+          return report(GatewayAlertSeverity.Down, WatchdogAlertCode.GatewayUnreachable,
             `The OpenWA gateway is not answering properly: ${read.error}`, sessionId);
         case "not_found":
-          return report(WatchdogAlertCode.SessionNotFound,
+          return report(GatewayAlertSeverity.Down, WatchdogAlertCode.SessionNotFound,
             "The recorded session no longer exists on OpenWA. Link WhatsApp again, then update the session in the admin.", sessionId);
         case "found":
           return act(read.client, read.session);
@@ -108,10 +112,10 @@ export function createCheckGatewaySession(deps: CheckGatewaySessionDeps): CheckG
       case WatchdogAction.Restart:
         return restart(client, session, detail);
       case WatchdogAction.AskHuman:
-        return report(WatchdogAlertCode.SessionNeedsHuman,
+        return report(GatewayAlertSeverity.NeedsHuman, WatchdogAlertCode.SessionNeedsHuman,
           `The session is \`${session.status}\`${detail}: WhatsApp must be linked again on the OpenWA dashboard.`, session.id);
       case WatchdogAction.Alert:
-        return report(WatchdogAlertCode.SessionStuck,
+        return report(GatewayAlertSeverity.Down, WatchdogAlertCode.SessionStuck,
           `The session is stuck in \`${session.status}\`${detail}. Check the OpenWA dashboard.`, session.id);
     }
   }
@@ -120,7 +124,7 @@ export function createCheckGatewaySession(deps: CheckGatewaySessionDeps): CheckG
     try {
       await client.startSession(session.id);
     } catch (error) {
-      return report(WatchdogAlertCode.RestartFailed,
+      return report(GatewayAlertSeverity.Down, WatchdogAlertCode.RestartFailed,
         `The session is \`${session.status}\`${detail} and the automatic restart failed: ${errorText(error)}. Check the OpenWA dashboard.`, session.id);
     }
     await deps.alerter.notify({
