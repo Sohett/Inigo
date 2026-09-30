@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
 
 /**
  * The WhatsApp webhook is the critical path: if it stops answering 200, athletes'
@@ -49,6 +49,10 @@ describe("POST /api/webhooks/whatsapp", () => {
 });
 
 describe("POST /api/webhooks/whatsapp, session events (INI-40)", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("answers 200 to a session event without reaching the message routing", async () => {
     const { POST } = await import("./route");
     const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
@@ -66,8 +70,8 @@ describe("POST /api/webhooks/whatsapp, session events (INI-40)", () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ ok: true });
-    // The alert went out as a structured log line (no Slack URL configured in this spec).
+    // The alert went out as a structured log line (no Slack URL configured in this spec). The
+    // fake Neon cannot be read, so the event counts as the recorded session's: fail loud.
     expect(log.mock.calls.some((call) => String(call[0]).startsWith("[coach][alert] "))).toBe(true);
-    vi.restoreAllMocks();
   });
 });

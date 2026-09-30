@@ -38,7 +38,10 @@ export async function POST(request: Request): Promise<Response> {
   // Session lifecycle events (INI-40) raise an alert and never fail: the alerter swallows its
   // own errors, so a Slack outage cannot make BullMQ replay the event into a second alert.
   if (isGatewaySessionEvent(payload)) {
-    const outcome = await createHandleGatewaySessionEvent({ alerter: deps.alerter }).execute(payload);
+    const outcome = await createHandleGatewaySessionEvent({
+      alerter: deps.alerter,
+      gateway: deps.whatsappGateway
+    }).execute(payload);
     console.info(`[coach] session event: ${JSON.stringify(outcome)}`);
     return json({ ok: true }, 200);
   }

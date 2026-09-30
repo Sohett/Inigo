@@ -262,6 +262,11 @@ seule sortie (`GatewayAlerter`) :
   - `recovered` : `session.status` = `ready` ;
   - silence : les statuts transitoires, et `disconnected` (déjà couvert par `session.disconnected` :
     alerter sur les deux doublerait chaque coupure ; seul, c'est un stop volontaire par l'API).
+  - **filtré par la session enregistrée en Neon** : les événements d'une autre session (l'ancienne,
+    après un ré-appairage) sont ignorés ; mais une autre session qui passe `ready` est une alerte
+    `unrecorded_session_ready` (le coach envoie encore par l'ancienne : il faut mettre à jour
+    l'admin). Neon illisible → l'événement compte comme celui de la session enregistrée (on
+    alerte plutôt que se taire).
 - **Watchdog : cron Vercel** (`vercel.json`, `0 7 * * *` : le plan Hobby limite à un run par jour,
   à resserrer après upgrade). Couvre la panne que les webhooks ne peuvent pas signaler : une
   passerelle trop morte pour appeler qui que ce soit. `checkGatewaySession` alerte si aucune
