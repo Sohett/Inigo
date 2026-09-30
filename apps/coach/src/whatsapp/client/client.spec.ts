@@ -94,3 +94,54 @@ describe("OpenWaClient.sendText", () => {
     expect((error as Error).message).not.toContain(secret);
   });
 });
+
+describe("OpenWaClient.getSession", () => {
+  it("reads the session with the api key header", async () => {
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse({ id: SESSION, name: "inigo", status: "ready", lastError: null, engineLoaded: true })
+    );
+    await expect(client(fetchImpl).getSession(SESSION)).resolves.toEqual({
+      id: SESSION,
+      status: "ready",
+      lastError: null
+    });
+
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe(`https://gateway.example/api/sessions/${SESSION}`);
+    expect(init.method).toBe("GET");
+    expect((init.headers as Record<string, string>)["x-api-key"]).toBe("owa_k1_secret");
+  });
+
+  it("resolves null when the gateway does not know the session", async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse({ message: "Session not found" }, 404));
+    await expect(client(fetchImpl).getSession(SESSION)).resolves.toBeNull();
+  });
+
+  it("throws on another non-2xx, without leaking the session id", async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse({ message: `boom on ${SESSION}` }, 500));
+    const error = await client(fetchImpl)
+      .getSession(SESSION)
+      .catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(OpenWaApiError);
+    expect((error as OpenWaApiError).status).toBe(500);
+    expect((error as Error).message).not.toContain(SESSION);
+  });
+
+  it("throws with a null status when the gateway does not answer", async () => {
+    const fetchImpl = vi.fn(async () => {
+      throw new TypeError("fetch failed");
+    });
+    const error = await client(fetchImpl)
+      .getSession(SESSION)
+      .catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(OpenWaApiError);
+    expect((error as OpenWaApiError).status).toBeNull();
+  });
+
+  it("throws when a 2xx body is not a session", async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse({ success: true }));
+    await expect(client(fetchImpl).getSession(SESSION)).rejects.toThrow(/unreadable session/);
+  });
+});

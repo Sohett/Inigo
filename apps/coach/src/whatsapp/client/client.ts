@@ -24,7 +24,28 @@ const sendResponseSchema = z.object({
 });
 
 /**
- * Minimal client for the OpenWA gateway, used by the `/api/whatsapp/mcp` server.
+ * `GET /api/sessions/:sessionId`. Only what the watchdog reads is typed; `status` stays a plain
+ * string so a status added by a newer gateway build does not fail the parse.
+ */
+const sessionResponseSchema = z
+  .object({
+    id: z.string(),
+    status: z.string(),
+    lastError: z.string().nullable().optional()
+  })
+  .passthrough();
+
+/** A gateway session as the watchdog sees it. */
+export interface GatewaySession {
+  id: string;
+  /** OpenWA `SessionStatus`: `ready` is the only state in which messages flow. */
+  status: string;
+  lastError: string | null;
+}
+
+/**
+ * Minimal client for the OpenWA gateway, used by the `/api/whatsapp/mcp` server (sends) and the
+ * session watchdog (reads).
  *
  * Deliberately **no retry**. A send is not idempotent: a second attempt after a timeout is a
  * duplicate message for the athlete, which is worse than a reported failure. The messages
@@ -95,6 +116,48 @@ export class OpenWaClient {
         { status: response.status }
       );
     }
+  }
+
+  /**
+   * Read a gateway session's current state. Resolves null when the gateway does not know the
+   * session (404); throws when it does not answer, refuses, or answers something unreadable.
+   * A read is idempotent, but the watchdog has nothing to gain from a retry either: one failed
+   * check is itself the signal.
+   */
+  async getSession(sessionId: string): Promise<GatewaySession | null> {
+    const endpoint = `${this.baseUrl}/api/sessions/${encodeURIComponent(sessionId)}`;
+
+    let response: Response;
+    try {
+      response = await this.fetchImpl(endpoint, {
+        method: "GET",
+        headers: { "x-api-key": this.apiKey },
+        signal: AbortSignal.timeout(this.timeoutMs)
+      });
+    } catch (cause) {
+      throw new OpenWaApiError(
+        `WhatsApp gateway did not answer (${this.redact(errorText(cause), sessionId)}).`,
+        { status: null }
+      );
+    }
+
+    if (response.status === 404) return null;
+    const body = await readBody(response);
+    if (!response.ok) {
+      const reason = sendResponseSchema.safeParse(body).data?.message || `HTTP ${response.status}`;
+      throw new OpenWaApiError(
+        `WhatsApp gateway did not return the session: ${this.redact(reason, sessionId)}`,
+        { status: response.status }
+      );
+    }
+
+    const parsed = sessionResponseSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new OpenWaApiError("WhatsApp gateway returned an unreadable session.", {
+        status: response.status
+      });
+    }
+    return { id: parsed.data.id, status: parsed.data.status, lastError: parsed.data.lastError ?? null };
   }
 
   /**
