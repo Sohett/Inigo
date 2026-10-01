@@ -34,7 +34,6 @@ describe("handleGatewaySessionEvent", () => {
   // The product table of INI-40, one row per OpenWA status of the recorded session.
   describe("session.status of the recorded session", () => {
     it.each([
-      ["ready", GatewayAlertSeverity.Recovered, "session_ready"],
       // A manual stop sends ONLY this status: it must alert (the production miss behind #41).
       ["disconnected", GatewayAlertSeverity.Down, "session_disconnected"],
       ["failed", GatewayAlertSeverity.Down, "session_failed"],
@@ -51,6 +50,18 @@ describe("handleGatewaySessionEvent", () => {
       expect(notify).toHaveBeenCalledWith(
         expect.objectContaining({ severity, code, source: "webhook", sessionId: SESSION })
       );
+    });
+
+    // INI-41: a silent OpenWA reconnect posted "the session is back" for an outage never announced.
+    it("ready → no alert, nothing to act on", async () => {
+      const { handle, notify } = build();
+
+      await expect(handle.execute(envelope("session.status", { status: "ready" }))).resolves.toEqual({
+        status: "ignored",
+        event: "session.status",
+        reason: SessionEventIgnoreReason.SessionReady
+      });
+      expect(notify).not.toHaveBeenCalled();
     });
 
     it.each(["created", "initializing", "authenticating"])("%s → no alert (transitional)", async (status) => {

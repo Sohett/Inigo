@@ -268,7 +268,7 @@ ne doit jamais partir dans Slack) ni `session.authenticated` (redondant avec `re
 
 | Événement / statut | Sévérité | Code |
 |---|---|---|
-| `session.status` `ready` | recovered | `session_ready` |
+| `session.status` `ready` | ignoré, loggé (rien à faire, INI-41) | |
 | `session.status` `disconnected` (coupure **ou stop**) | down | `session_disconnected` |
 | `session.status` `failed` | down | `session_failed` |
 | `session.status` `qr_ready` | needs_human | `session_qr_ready` |
@@ -278,6 +278,10 @@ ne doit jamais partir dans Slack) ni `session.authenticated` (redondant avec `re
 | `session.disconnected` (coupure seulement, jamais un stop) | down, avec la raison | `session_dropped` |
 | `session.reconnect_loop` (toutes les 5 tentatives) | down | `session_reconnect_loop` |
 | `session.restriction` actif / levé | down / recovered | `session_restricted` / `session_restriction_lifted` |
+
+**Slack ne porte que ce qui demande d'agir** (INI-41) : le retour en `ready` n'est jamais posté.
+Une reconnexion silencieuse d'OpenWA (`initializing` → `ready`) postait un « session is back »
+pour une panne jamais annoncée. Si la session ne revient pas, le watchdog le dit.
 
 Une coupure envoie `session.disconnected` **et** `session.status disconnected` : deux messages
 (la raison, puis l'état), choix assumé. Un stop n'envoie que le statut. **Autre session** (l'ancienne
