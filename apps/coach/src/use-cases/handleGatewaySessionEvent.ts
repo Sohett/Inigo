@@ -12,7 +12,6 @@ import type { WhatsappGatewayRepository } from "../repositories/whatsappGatewayR
 
 /** Every alert the session webhooks can raise, as a stable code for log search. */
 export const SessionAlertCode = {
-  SessionReady: "session_ready",
   SessionDisconnected: "session_disconnected",
   SessionFailed: "session_failed",
   SessionQrReady: "session_qr_ready",
@@ -31,6 +30,8 @@ export const SessionEventIgnoreReason = {
   MalformedPayload: "malformed_payload",
   /** `created`, `initializing`, `authenticating`: the session is on its way somewhere. */
   TransitionalStatus: "transitional_status",
+  /** `ready`: nothing to act on (INI-41). A real outage already alerted; a silent reconnect never did. */
+  SessionReady: "session_ready",
   /** A status a newer gateway build introduced. Logged with its value, never guessed at. */
   UnknownStatus: "unknown_status",
   /** An event of a session the coach does not send through (e.g. the old one after a re-pairing). */
@@ -60,7 +61,8 @@ export interface HandleGatewaySessionEvent {
 
 /**
  * React to an OpenWA session webhook (INI-40): tell a human, on Slack, when the session the coach
- * sends through stops receiving athletes' messages, and when it is back. The product rules are the
+ * sends through stops receiving athletes' messages. Only what needs acting on: its return to
+ * `ready` is logged, never posted (INI-41). The product rules are the
  * `decide…` functions below, one `switch` each.
  *
  * The alerter never throws, so the webhook always answers 200 and BullMQ never replays an event
@@ -111,8 +113,7 @@ function decideForStatus(rawStatus: string, sessionId: string): Decision {
 
   switch (status) {
     case GatewaySessionStatus.Ready:
-      return alert(GatewayAlertSeverity.Recovered, SessionAlertCode.SessionReady, sessionId,
-        "The WhatsApp session is connected again: athletes' messages are coming in.");
+      return ignore(SessionEventIgnoreReason.SessionReady);
     case GatewaySessionStatus.Disconnected:
       return alert(GatewayAlertSeverity.Down, SessionAlertCode.SessionDisconnected, sessionId,
         "The WhatsApp session is disconnected. After a drop OpenWA reconnects it; after a stop the watchdog restarts it on its next run.");
