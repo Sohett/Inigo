@@ -33,12 +33,12 @@
       {
         "id": "agent_01Sp4ghn8GHc5Lbd9JJptEzR",
         "type": "agent",
-        "version": 9
+        "version": 10
       },
       {
         "id": "agent_01CTK33Z2CLPwtDyq9vKDsVG",
         "type": "agent",
-        "version": 13
+        "version": 14
       },
       {
         "id": "agent_01Dbg6WeAF41xSs8bTfiE8XD",
@@ -188,6 +188,6 @@
     }
   ],
   "type": "agent",
-  "updated_at": "2026-09-30T07:56:39.730377Z",
-  "version": 20
+  "updated_at": "2026-10-01T09:18:24.344587Z",
+  "version": 22
 }
