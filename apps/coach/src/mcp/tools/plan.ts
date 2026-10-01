@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AthleteDataRepository } from "../repository/athleteDataRepository";
-import type { TrainingPlanInput } from "../../domain/coaching";
+import type { TrainingPlan, TrainingPlanInput } from "../../domain/coaching";
 import { createSaveTrainingPlan } from "../../use-cases/saveTrainingPlan";
 import { assertAthleteId, athleteIdShape, runAthleteTool, runTool } from "./result";
 
@@ -94,7 +94,7 @@ export function registerPlanWriteTools(server: McpServer, store: AthleteDataRepo
       }
     },
     (args) =>
-      runTool(async () => {
+      runTool(async (): Promise<TrainingPlan> => {
         assertAthleteId(args.athleteId);
         const input: TrainingPlanInput = {
           name: args.name,
