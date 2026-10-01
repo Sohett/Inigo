@@ -120,6 +120,7 @@ describe("registerAthleteDataTools", () => {
         startDate: "2026-07-06",
         endDate: "2026-09-20",
         status: "active",
+        goalId: null,
         blocks: [
           { name: "Base", phaseType: "base", startDate: "2026-07-06", endDate: "2026-07-12" }
         ]
@@ -149,6 +150,25 @@ describe("registerAthleteDataTools", () => {
     expect(result.isError).toBe(true);
     const content = result.content as { type: string; text: string }[];
     expect(content[0]!.text).toMatch(/not found for this athlete/i);
+  });
+
+  it("rejects a save_training_plan create that does not say which goal it serves", async () => {
+    const saveTrainingPlan = vi.fn();
+    const strictClient = await connect({ saveTrainingPlan });
+    const result = await strictClient.callTool({
+      name: "save_training_plan",
+      arguments: {
+        athleteId: ATHLETE_ID,
+        name: "Season plan",
+        startDate: "2026-07-06",
+        endDate: "2026-09-20",
+        blocks: [{ startDate: "2026-07-06", endDate: "2026-07-12" }]
+      }
+    });
+    expect(result.isError).toBe(true);
+    const content = result.content as { type: string; text: string }[];
+    expect(content[0]!.text).toMatch(/goalId is required/);
+    expect(saveTrainingPlan).not.toHaveBeenCalled();
   });
 
   it("rejects save_training_plan when a date is not a plain YYYY-MM-DD", async () => {

@@ -2,7 +2,8 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AthleteDataRepository } from "../repository/athleteDataRepository";
 import type { TrainingPlanInput } from "../../domain/coaching";
-import { athleteIdShape, runAthleteTool } from "./result";
+import { createSaveTrainingPlan } from "../../use-cases/saveTrainingPlan";
+import { assertAthleteId, athleteIdShape, runAthleteTool, runTool } from "./result";
 
 export function registerPlanTools(server: McpServer, store: AthleteDataRepository): void {
   server.registerTool(
@@ -42,7 +43,13 @@ const planBlockSchema = z.object({
   weeklyTargets: z.array(weeklyTargetSchema).optional().describe("Per-week targets inside the block.")
 });
 
+/**
+ * `runTool` + `assertAthleteId` rather than `runAthleteTool`: the `saveTrainingPlan` use-case
+ * scopes the store itself and owns the goal-link rule; this layer only maps its outcome.
+ */
 export function registerPlanWriteTools(server: McpServer, store: AthleteDataRepository): void {
+  const savePlan = createSaveTrainingPlan({ repo: store });
+
   server.registerTool(
     "save_training_plan",
     {
@@ -53,8 +60,9 @@ export function registerPlanWriteTools(server: McpServer, store: AthleteDataRepo
         "replace-all: the list you pass fully replaces the plan's blocks and their order. " +
         "Setting `status` to `active` archives the athlete's other active plans. The plan is the " +
         "macro strategy (phases + weekly targets); the concrete gate-validated week and the " +
-        "Intervals.icu calendar are written elsewhere — do not duplicate them here. An update to " +
-        "an id that is not this athlete's plan fails without touching any data.",
+        "Intervals.icu calendar are written elsewhere — do not duplicate them here. A new plan " +
+        "must pass `goalId`. An update to an id that is not this athlete's plan fails without " +
+        "touching any data.",
       inputSchema: {
         ...athleteIdShape,
         id: z.string().uuid().optional().describe("Plan id to update; omit to create a new plan."),
@@ -71,7 +79,10 @@ export function registerPlanWriteTools(server: McpServer, store: AthleteDataRepo
           .uuid()
           .nullable()
           .optional()
-          .describe("Link to an existing goal, or null to unlink."),
+          .describe(
+            "Required on create: the active goal this plan serves (id from get_goals), or null " +
+              "if the athlete has no goal. On update, omit to keep the link, null to unlink."
+          ),
         rationale: z
           .string()
           .optional()
@@ -83,7 +94,8 @@ export function registerPlanWriteTools(server: McpServer, store: AthleteDataRepo
       }
     },
     (args) =>
-      runAthleteTool(store, args.athleteId, async (scoped) => {
+      runTool(async () => {
+        assertAthleteId(args.athleteId);
         const input: TrainingPlanInput = {
           name: args.name,
           startDate: args.startDate,
@@ -96,11 +108,15 @@ export function registerPlanWriteTools(server: McpServer, store: AthleteDataRepo
         if (args.goalId !== undefined) input.goalId = args.goalId;
         if (args.rationale !== undefined) input.rationale = args.rationale;
 
-        const result = await scoped.saveTrainingPlan(input);
-        if (input.id && result === null) {
-          throw new Error(`Training plan ${input.id} not found for this athlete.`);
+        const outcome = await savePlan.execute(args.athleteId, input);
+        switch (outcome.status) {
+          case "saved":
+            return outcome.plan;
+          case "invalid":
+            throw new Error(outcome.reason);
+          case "not_found":
+            throw new Error(`Training plan ${input.id} not found for this athlete.`);
         }
-        return result;
       })
   );
 }
