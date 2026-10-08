@@ -1,5 +1,6 @@
 [
   {
+    "archived_at": null,
     "created_at": "2026-07-02T14:21:22.566786Z",
     "description": "La **science** du système, séparée des prompts pour être mise à jour seule quand la recherche évolue (ex. plus de Z2 façon Pogačar, protocoles Rønnestad). Les agents lisent ; ils ne devinent jamais. Chaque décision d'entraînement cite un fichier d'ici.",
     "id": "memstore_01Ad3wALLarbS97RbVjT1Hbo",

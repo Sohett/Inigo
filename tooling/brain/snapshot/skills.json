@@ -30,10 +30,10 @@
     "type": "skill",
     "id": "pptx",
     "created_at": "2025-10-14T08:41:11.530747Z",
-    "updated_at": "2026-09-22T18:00:37.886566Z",
+    "updated_at": "2026-10-02T22:00:34.625666Z",
     "display_title": "pptx",
     "source": "anthropic",
-    "latest_version": "20260922"
+    "latest_version": "20261002"
   },
   {
     "type": "skill",
