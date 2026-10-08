@@ -84,7 +84,8 @@
           "permission_policy": {
             "type": "always_allow"
           },
-          "type": "web_fetch"
+          "type": "web_fetch",
+          "url_sources": null
         }
       ],
       "default_config": {
