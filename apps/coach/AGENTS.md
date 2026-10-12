@@ -98,8 +98,9 @@ src/
    `{event,data}` ou plate), **ignore** `fromMe` / groupes / non-message / messages sans texte.
 3. Résout l'athlète via son LID (`findByLid`) ou son numéro (`senderPhone` → `findByPhone`). Les
    décisions métier sont **retournées** en `RouteOutcome` (union) : athlète sans session
-   (`no_session`), sender illisible (`invalid_sender`) → route en 200. Seules les erreurs infra
-   (Neon / Anthropic / passerelle) throw → 502.
+   (`no_session`), sender illisible (`invalid_sender`), athlète terminé (`athlete_ended`) → route
+   en 200. Seules les erreurs infra (Neon / Anthropic / passerelle / Intervals.icu pour l'état
+   d'onboarding) throw → 502.
    **Expéditeur inconnu** (INI-45) → `registerNewAthlete` (`unknown_sender`) :
    - onboarding non réglé dans l'admin (`onboarding_settings` sans agent ou sans code) → `disabled`, ignoré ;
    - message sans le code d'accès → réponse fixe `NO_ACCESS_CODE_REPLY` au `chatId` reçu (`declined`), sans agent ;
@@ -110,8 +111,7 @@ src/
    `onboarding` → `formatOnboardingTurn` (ajoute `onboarding_fait:` / `onboarding_manquant:`, calculés
    par `assessOnboarding` à chaque message) ; `active` et `paused` → `formatTurn` ; `ended` → ignoré
    (`athlete_ended`). L'enveloppe est construite avant tout effet de bord. Puis persiste `chat_id` si
-   nouveau (`repo.setChatId`), formate l'enveloppe `inigo_athlete_id: <uuid>\nmessage: <body>` et **append**
-   à **sa** session via `brain.appendUserMessage` (dernier effet de bord → pas de doublon sur
+   nouveau (`repo.setChatId`) et **append** l'enveloppe à **sa** session via `brain.appendUserMessage` (dernier effet de bord → pas de doublon sur
    retry OpenWA). `inigo_athlete_id` = l'`athlete.id` interne (Neon), que l'agent repasse en
    argument `athleteId` aux tools du MCP athlete-data (`/api/coaching-data/mcp`) — **pas** l'id Intervals.icu.
    **Fire-and-forget** : on n'attend pas le run ; l'agent répond lui-même via le MCP WhatsApp
