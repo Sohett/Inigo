@@ -48,8 +48,10 @@ src/
     coaching.ts                    # modèles métier de la donnée coaching (contrat de sortie des tools MCP) + inputs
     onboarding.ts                  # checklist « onboarding terminé » (7 items) + OnboardingFacts / OnboardingState + enum FtpStatus
   repositories/
-    athleteRepository.ts           # PORT AthleteRepository (findByPhone, findByLid, setChatId, findById, listAll, setSession, listSessions)
+    athleteRepository.ts           # PORT AthleteRepository (findByPhone, findByLid, setChatId, findById, listAll, setSession, listSessions, registerOnboardingAthlete)
     drizzleAthleteRepository.ts     # ADAPTER Drizzle (requête inline) + toAthlete(row→modèle)
+    onboardingSettingsRepository.ts # PORT : agent d'onboarding, coordinateur, code d'accès (singleton en base, édité dans l'admin)
+    drizzleOnboardingSettingsRepository.ts # ADAPTER Drizzle du singleton onboarding_settings
     drizzleOnboardingFactsReader.ts # ADAPTER Drizzle du port OnboardingFactsReader (profil + goals actifs + credential, une requête) + toOnboardingFacts
   use-cases/
     routeInboundMessage.ts         # use-case de routing : une seule fonction publique execute()
@@ -59,6 +61,7 @@ src/
     readActivityStreams.ts         # use-case : fenêtre obligatoire + refus au-delà du plafond, jamais de troncature
     handleGatewaySessionEvent.ts   # use-case : webhook session.* OpenWA → alerte « down » / « recovered »
     checkGatewaySession.ts         # use-case watchdog : session enregistrée en Neon → GET OpenWA → alerte si pas ready
+    registerNewAthlete.ts          # use-case : expéditeur inconnu → réponse fixe, ou athlète en onboarding + sa session (PORT ChatReplier)
     assessOnboarding.ts            # use-case : état d'onboarding calculé (jamais stocké) ; PORTS OnboardingFactsReader + BikeFtpReader
   alerts/
     gatewayAlerter.ts              # PORT GatewayAlerter (notify ne throw jamais)
@@ -75,6 +78,7 @@ src/
     client/                        # client REST OpenWA typé (POST send-text ; zéro retry, un envoi n'est pas idempotent ; GET session pour le watchdog)
     credentials.ts                 # lit OPENWA_BASE_URL/API_KEY dans l'env — JAMAIS dans configSchema (cf. §Admin)
     resolveClient.ts               # createOpenWaResolver() : résout le client à l'appel, pas au boot
+    chatReplier.ts                 # ADAPTER ChatReplier : répond à un chat avant qu'un athlète existe
     mcp-tools/{index,result}.ts    # un seul tool : send_whatsapp_message(athleteId, text) — mapping pur, zéro décision
   intervals/
     client/                        # client REST Intervals.icu typé — transport seul, ajoute fields/limit, ne projette rien
@@ -92,10 +96,16 @@ src/
    `X-OpenWA-Signature` (HMAC sur le corps brut) ; sinon skip. Parse le JSON.
 2. `routeInboundMessage.execute` : valide (zod), normalise l'enveloppe (wrappée
    `{event,data}` ou plate), **ignore** `fromMe` / groupes / non-message / messages sans texte.
-3. Résout l'athlète via `senderPhone` (JID → E.164) puis `repo.findByPhone`. Les décisions
-   métier sont **retournées** en `RouteOutcome` (union) : numéro inconnu (`unknown_number`),
-   athlète sans session (`no_session`), sender illisible (`invalid_sender`) → route en 200.
-   Seules les erreurs infra (Neon / Anthropic) throw → 502.
+3. Résout l'athlète via son LID (`findByLid`) ou son numéro (`senderPhone` → `findByPhone`). Les
+   décisions métier sont **retournées** en `RouteOutcome` (union) : athlète sans session
+   (`no_session`), sender illisible (`invalid_sender`) → route en 200. Seules les erreurs infra
+   (Neon / Anthropic / passerelle) throw → 502.
+   **Expéditeur inconnu** (INI-45) → `registerNewAthlete` (`unknown_sender`) :
+   - onboarding non réglé dans l'admin (`onboarding_settings` sans agent ou sans code) → `disabled`, ignoré ;
+   - message sans le code d'accès → réponse fixe `NO_ACCESS_CODE_REPLY` au `chatId` reçu (`declined`), sans agent ;
+   - avec le code → session de l'agent d'onboarding (environnement et vault = les seuls de l'inventaire,
+     sinon `misconfigured`), puis athlète `onboarding` + session insérés en **un** `db.batch`, puis
+     premier message appendé. Deux premiers messages concurrents → `already_registered`.
 4. Sur un athlète résolu avec session : persiste `chat_id` si nouveau (`repo.setChatId`),
    formate l'enveloppe `inigo_athlete_id: <uuid>\nmessage: <body>` et **append**
    à **sa** session via `brain.appendUserMessage` (dernier effet de bord → pas de doublon sur
@@ -176,7 +186,7 @@ plus une seule clé en env, mais **une par athlète** stockée chiffrée dans Ne
   `https://app.inigo-coach.com/api/intervals/mcp`.
 - **Auth** : même bearer global `MCP_BEARER_TOKEN` que coach-data (`withMcpAuth({ required: true })`).
 - **Écriture d'une clé** : `setIntervalsKey` (`@inigo/db`) — écriture chiffrée + rotation
-  (`rotatedAt`). La **capture par onboarding WhatsApp est hors périmètre** (ticket dédié).
+  (`rotatedAt`). La **capture par onboarding WhatsApp** est le ticket INI-50.
 
 ## MCP WhatsApp (le brain répond à l'athlète) — INI-37
 

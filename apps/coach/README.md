@@ -36,7 +36,9 @@ Managed Agent (Anthropic) — session de l'athlète = mémoire ; MCP: coach (coa
 
 Le use-case dérive le numéro de l'expéditeur depuis le JID WhatsApp, résout l'athlète en base,
 formate `inigo_athlete_id: …\nmessage: …`, et **append** à **sa** session. Un numéro inconnu, un athlète
-sans session ou un sender illisible sont gérés explicitement (aucun forward, réponse 200).
+sans session ou un sender illisible sont gérés explicitement (aucun forward, réponse 200). Un numéro
+inconnu qui envoie le code d'accès devient un athlète en onboarding avec sa propre session ; sans le
+code, il reçoit une réponse fixe (INI-45, réglages dans la Card « Onboarding » de `/admin`).
 L'agent tourne côté Anthropic (les tools MCP s'exécutent server-side via le vault), donc **rien
 ici n'a besoin d'écouter la réponse** ni d'envoyer le message.
 
@@ -76,8 +78,8 @@ webhook WhatsApp et les deux MCP avec elle. Elles sont lues et validées là où
 2. **Session Managed par athlète** : ouverte depuis l'**admin** (`/admin`, bouton
    « Nouvelle session »), qui la crée et en fait la session active de l'athlète dans `athlete_session`
    (les précédentes restent dans l'historique) : c'est ce que le routing résout. Rien n'est stocké de la config de session : l'admin lit la
-   session que l'athlète fait déjà tourner et la recrée à l'identique. L'onboarding
-   automatique d'un nouvel athlète reste hors périmètre.
+   session que l'athlète fait déjà tourner et la recrée à l'identique. Un nouvel
+   athlète arrivé avec le code d'accès a, lui, sa session d'onboarding ouverte automatiquement.
    > Les *deployments* Managed servent uniquement aux runs planifiés (cron) ; ici on n'en utilise pas : le coach pousse les messages à une session existante via l'API (`POST /v1/sessions/:id/events`).
 3. **Prompt système de l'agent** : « tu reçois des messages WhatsApp au format
    `date_du_jour: …\ninigo_athlete_id: …\nmessage: …`. `inigo_athlete_id` est l'id athlète Inigo

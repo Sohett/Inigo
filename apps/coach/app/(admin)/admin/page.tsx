@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { FirstSessionForm } from "./_components/first-session-form";
 import { NewSessionButton } from "./_components/new-session-button";
 import { WhatsappSessionForm } from "./_components/whatsapp-session-form";
+import { OnboardingSettingsForm } from "./_components/onboarding-settings-form";
 
 // Reads live DB and control-plane state, so it must never be prerendered or cached.
 export const dynamic = "force-dynamic";
@@ -100,7 +101,8 @@ export default async function AdminPage() {
   const overview = await createLoadAdminOverview({
     repo: deps.repo,
     brain: deps.brain,
-    gateway: deps.whatsappGateway
+    gateway: deps.whatsappGateway,
+    onboardingSettings: deps.onboardingSettings
   }).execute();
 
   return (
@@ -132,6 +134,29 @@ export default async function AdminPage() {
             </p>
           ) : (
             <WhatsappSessionForm current={overview.whatsappSessionId} />
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Onboarding</CardTitle>
+          <CardDescription>
+            Comment un nouvel athlète arrive : l'agent qui l'accueille, le coordinateur qui prend
+            le relais, et le code qu'il doit envoyer sur WhatsApp.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {overview.onboardingSettings ? (
+            <OnboardingSettingsForm
+              current={overview.onboardingSettings}
+              inventory={overview.inventory}
+              inventoryError={overview.inventoryError}
+            />
+          ) : (
+            <p className="text-sm text-destructive">
+              Réglages illisibles en base : {overview.onboardingSettingsError}
+            </p>
           )}
         </CardContent>
       </Card>

@@ -38,12 +38,19 @@ const inventory: BrainInventory = {
   memoryStores: [{ id: "memstore_1", name: "Inigo Knowledge Base" }]
 };
 
+const onboardingSettings = {
+  onboardingAgentId: "agent_onboarding",
+  coordinatorAgentId: "agent_coord",
+  accessCode: "VELO26"
+};
+
 function makeDeps(
   athletes: Athlete[],
   overrides: {
     readSession?: LoadAdminOverviewDeps["brain"]["readSession"];
     listInventory?: LoadAdminOverviewDeps["brain"]["listInventory"];
     listSessions?: LoadAdminOverviewDeps["repo"]["listSessions"];
+    getOnboardingSettings?: LoadAdminOverviewDeps["onboardingSettings"]["get"];
   } = {}
 ) {
   const readSession = vi.fn(overrides.readSession ?? (() => Promise.resolve(running)));
@@ -62,6 +69,10 @@ function makeDeps(
     gateway: {
       getSessionId: vi.fn(() => Promise.resolve("gateway-session")),
       setSessionId: vi.fn()
+    },
+    onboardingSettings: {
+      get: vi.fn(overrides.getOnboardingSettings ?? (() => Promise.resolve(onboardingSettings))),
+      set: vi.fn()
     },
     brain: {
       appendUserMessage: vi.fn(),
@@ -85,13 +96,30 @@ describe("loadAdminOverview", () => {
     ]);
   });
 
-  it("skips the inventory when every athlete already has a session", async () => {
+  it("always loads the inventory, which the onboarding settings pick their agents from", async () => {
     const { deps, listInventory } = makeDeps([withSession]);
 
     const overview = await createLoadAdminOverview(deps).execute();
 
-    expect(listInventory).not.toHaveBeenCalled();
-    expect(overview.inventory).toBeNull();
+    expect(listInventory).toHaveBeenCalled();
+    expect(overview.inventory).toEqual(inventory);
+  });
+
+  it("reads the onboarding settings", async () => {
+    const { deps } = makeDeps([]);
+    const overview = await createLoadAdminOverview(deps).execute();
+    expect(overview.onboardingSettings).toEqual(onboardingSettings);
+    expect(overview.onboardingSettingsError).toBeNull();
+  });
+
+  it("degrades instead of failing when the onboarding settings are unreadable", async () => {
+    const { deps } = makeDeps([withSession], {
+      getOnboardingSettings: () => Promise.reject(new Error("neon down"))
+    });
+    const overview = await createLoadAdminOverview(deps).execute();
+    expect(overview.onboardingSettings).toBeNull();
+    expect(overview.onboardingSettingsError).toContain("neon down");
+    expect(overview.athletes).toHaveLength(1);
   });
 
   it("loads the inventory when an athlete has no session to clone", async () => {
