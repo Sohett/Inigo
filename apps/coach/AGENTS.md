@@ -52,6 +52,7 @@ src/
     drizzleAthleteRepository.ts     # ADAPTER Drizzle (requête inline) + toAthlete(row→modèle)
     onboardingSettingsRepository.ts # PORT : agent d'onboarding, coordinateur, code d'accès (singleton en base, édité dans l'admin)
     drizzleOnboardingSettingsRepository.ts # ADAPTER Drizzle du singleton onboarding_settings
+    drizzleIntervalsCredentialStore.ts # ADAPTER IntervalsCredentialStore : setIntervalsKey (clé chiffrée, id en clair)
     drizzleOnboardingFactsReader.ts # ADAPTER Drizzle du port OnboardingFactsReader (profil + goals actifs + credential, une requête) + toOnboardingFacts
   use-cases/
     routeInboundMessage.ts         # use-case de routing : une seule fonction publique execute()
@@ -62,6 +63,7 @@ src/
     handleGatewaySessionEvent.ts   # use-case : webhook session.* OpenWA → alerte « down » / « recovered »
     checkGatewaySession.ts         # use-case watchdog : session enregistrée en Neon → GET OpenWA → alerte si pas ready
     registerNewAthlete.ts          # use-case : expéditeur inconnu → réponse fixe, ou athlète en onboarding + sa session (PORT ChatReplier)
+    connectIntervals.ts            # use-case : clé + athlete id Intervals vérifiés puis stockés (outil connect_intervals, INI-50, transitoire avant OAuth)
     assessOnboarding.ts            # use-case : état d'onboarding calculé (jamais stocké) ; PORTS OnboardingFactsReader + BikeFtpReader
   alerts/
     gatewayAlerter.ts              # PORT GatewayAlerter (notify ne throw jamais)
@@ -85,6 +87,7 @@ src/
     mappers/project.ts             # projection objet brut Intervals → modèle du coach (aucune décision)
     mcp-tools/{index,result,tools/*}.ts  # tools MCP Intervals fins ; chaque tool prend athleteId + résout un client par requête
     resolveClient.ts               # createIntervalsResolver(db, encKey, baseUrl) : getIntervalsKey → déchiffre → IntervalsIcuClient
+    credentialVerifier.ts          # ADAPTER IntervalsCredentialVerifier : GET /athlete/{id} avec la clé (401/403/404 → issues, le reste throw)
     bikeFtpReader.ts               # ADAPTER du port BikeFtpReader : profil Intervals → toBikeFtp (réglages Ride)
   deps.ts                          # singleton lazy { config, brain, db, repo, athleteData, intervalsResolver }
 # futur : src/services/…
@@ -189,7 +192,8 @@ plus une seule clé en env, mais **une par athlète** stockée chiffrée dans Ne
   `https://app.inigo-coach.com/api/intervals/mcp`.
 - **Auth** : même bearer global `MCP_BEARER_TOKEN` que coach-data (`withMcpAuth({ required: true })`).
 - **Écriture d'une clé** : `setIntervalsKey` (`@inigo/db`) — écriture chiffrée + rotation
-  (`rotatedAt`). La **capture par onboarding WhatsApp** est le ticket INI-50.
+  (`rotatedAt`). Pendant l'onboarding, l'agent l'enregistre via l'outil `connect_intervals` (INI-50,
+  transitoire avant OAuth) : clé et athlete id vérifiés auprès d'Intervals.icu, puis stockés.
 
 ## MCP WhatsApp (le brain répond à l'athlète) — INI-37
 

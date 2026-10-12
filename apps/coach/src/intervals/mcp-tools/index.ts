@@ -1,6 +1,8 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ResolveClient } from "./result";
 import type { ReadActivityStreams } from "../../use-cases/readActivityStreams";
+import type { ConnectIntervals } from "../../use-cases/connectIntervals";
+import { registerCredentialTools } from "./tools/credentials";
 import { registerAthleteTools, registerAthleteWriteTools } from "./tools/athlete";
 import { registerActivityTools } from "./tools/activities";
 import { registerWellnessTools } from "./tools/wellness";
@@ -21,6 +23,8 @@ export interface IntervalsToolDeps {
   resolve: ResolveClient;
   /** Owns the window rule and the refusal above the value cap. */
   readActivityStreams: ReadActivityStreams;
+  /** Registers an athlete's key and Intervals.icu id (onboarding, INI-50). */
+  connectIntervals: ConnectIntervals;
 }
 
 export function registerIntervalsIcuTools(server: McpServer, deps: IntervalsToolDeps): void {
@@ -34,6 +38,7 @@ export function registerIntervalsIcuTools(server: McpServer, deps: IntervalsTool
   registerEventReadTools(server, resolve);
 
   registerAthleteWriteTools(server, resolve);
+  registerCredentialTools(server, deps.connectIntervals);
   registerEventWriteTools(server, resolve);
 }
 

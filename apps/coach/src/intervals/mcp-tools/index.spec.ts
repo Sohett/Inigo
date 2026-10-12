@@ -1,10 +1,11 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { IntervalsIcuClient } from "../client";
 import { registerIntervalsIcuTools } from "./index";
 import { createReadActivityStreams } from "../../use-cases/readActivityStreams";
+import type { ConnectIntervals } from "../../use-cases/connectIntervals";
 import type { ResolveClient } from "./result";
 import { DEFAULT_READ_BOUNDS } from "../../domain/training";
 
@@ -30,11 +31,17 @@ function recordingResolver(client: IntervalsIcuClient) {
   return { resolve, calls };
 }
 
-async function connect(resolve: ResolveClient) {
+const connected = { status: "connected" as const, intervalsAthleteId: "i42", athleteName: "Thomas" };
+
+async function connect(
+  resolve: ResolveClient,
+  connectIntervals: ConnectIntervals = { execute: vi.fn(async () => connected) }
+) {
   const server = new McpServer({ name: "test", version: "0.0.0" });
   registerIntervalsIcuTools(server, {
     resolve,
-    readActivityStreams: createReadActivityStreams({ resolveClient: resolve })
+    readActivityStreams: createReadActivityStreams({ resolveClient: resolve }),
+    connectIntervals
   });
 
   const client = new Client({ name: "test-client", version: "0.0.0" });
@@ -82,7 +89,8 @@ describe("registerIntervalsIcuTools", () => {
         "create_or_update_event",
         "delete_event",
         "delete_events_by_range",
-        "update_sport_settings"
+        "update_sport_settings",
+        "connect_intervals"
       ])
     );
   });
@@ -142,6 +150,46 @@ describe("registerIntervalsIcuTools", () => {
     const content = result.content as TextContent;
     const parsed = JSON.parse(content[0]!.text) as Record<string, unknown>;
     expect(parsed["start_date_local"]).toBe("2026-07-01T09:30:00");
+  });
+});
+
+describe("connect_intervals", () => {
+  it("passes the key and a normalised Intervals.icu id, and never echoes the key", async () => {
+    const execute = vi.fn(async () => connected);
+    const mcpClient = await connect(recordingResolver(createMockClient()).resolve, { execute });
+
+    const result = await mcpClient.callTool({
+      name: "connect_intervals",
+      arguments: { athleteId: ATHLETE_ID, apiKey: " secret-key-123 ", intervalsAthleteId: "42" }
+    });
+
+    expect(execute).toHaveBeenCalledWith(ATHLETE_ID, "secret-key-123", "i42");
+    const text = (result.content as TextContent)[0]!.text;
+    expect(JSON.parse(text)).toEqual(connected);
+    expect(text).not.toContain("secret-key-123");
+  });
+
+  it("mends an id typed with a capital I", async () => {
+    const execute = vi.fn(async () => connected);
+    const mcpClient = await connect(recordingResolver(createMockClient()).resolve, { execute });
+    await mcpClient.callTool({
+      name: "connect_intervals",
+      arguments: { athleteId: ATHLETE_ID, apiKey: "secret-key-123", intervalsAthleteId: "I42" }
+    });
+    expect(execute).toHaveBeenCalledWith(ATHLETE_ID, "secret-key-123", "i42");
+  });
+
+  it("refuses an id that is not an Intervals.icu athlete id", async () => {
+    const execute = vi.fn(async () => connected);
+    const mcpClient = await connect(recordingResolver(createMockClient()).resolve, { execute });
+
+    const result = await mcpClient.callTool({
+      name: "connect_intervals",
+      arguments: { athleteId: ATHLETE_ID, apiKey: "secret-key-123", intervalsAthleteId: "thomas" }
+    });
+
+    expect(result.isError).toBe(true);
+    expect(execute).not.toHaveBeenCalled();
   });
 });
 
