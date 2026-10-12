@@ -1,5 +1,5 @@
 import type {
-  AdaptationTrigger, AthleteStatus, CoachingTargets, ConstraintActivity, ConstraintKind, GoalPriority,
+  AdaptationTrigger, AthleteStatus, CoachingTargets, ConstraintActivity, ConstraintKind, FtpStatus, GoalPriority,
   GoalStatus, GoalType, PhaseType, PlanAuthor, PlanStatus, Sex, Sport, ThresholdSource,
   WeeklyTarget, Zone
 } from "@inigo/db";
@@ -19,6 +19,10 @@ export interface ProfileDetails {
   constraintsNotes: string | null;
   healthNotes: string | null;
   coachingTargets: CoachingTargets | null;
+  motivation: string | null;
+  trainingBackground: string | null;
+  ftpStatus: FtpStatus | null;
+  educationDone: boolean;
 }
 export interface CoachProfile {
   athleteId: string;
@@ -111,6 +115,10 @@ export interface ProfilePatch {
   constraintsNotes?: string;
   healthNotes?: string;
   coachingTargets?: CoachingTargets;
+  motivation?: string;
+  trainingBackground?: string;
+  ftpStatus?: FtpStatus;
+  educationDone?: boolean;
 }
 /**
  * A whole constraint rule. On update it replaces the stored rule (fields left out are

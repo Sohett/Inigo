@@ -217,6 +217,10 @@ export function createAthleteDataRepository(db: Db) {
               constraintsNotes: athleteProfile.constraintsNotes,
               healthNotes: athleteProfile.healthNotes,
               coachingTargets: athleteProfile.coachingTargets,
+              motivation: athleteProfile.motivation,
+              trainingBackground: athleteProfile.trainingBackground,
+              ftpStatus: athleteProfile.ftpStatus,
+              educationDone: athleteProfile.educationDone,
               updatedAt: athleteProfile.updatedAt
             })
             .from(athleteProfile)
@@ -236,7 +240,11 @@ export function createAthleteDataRepository(db: Db) {
                 equipment: profileRow.equipment,
                 constraintsNotes: profileRow.constraintsNotes,
                 healthNotes: profileRow.healthNotes,
-                coachingTargets: profileRow.coachingTargets
+                coachingTargets: profileRow.coachingTargets,
+                motivation: profileRow.motivation,
+                trainingBackground: profileRow.trainingBackground,
+                ftpStatus: profileRow.ftpStatus,
+                educationDone: profileRow.educationDone
               }
             : null;
           return {

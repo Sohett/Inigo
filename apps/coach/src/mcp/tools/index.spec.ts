@@ -111,6 +111,38 @@ describe("registerAthleteDataTools", () => {
     expect(parsed.summary).toBe("logged an adaptation");
   });
 
+  it("passes the onboarding answers of update_profile to the store", async () => {
+    const updateProfile = vi.fn(async () => ({ athleteId: ATHLETE_ID }));
+    const onboardingClient = await connect({ updateProfile });
+    await onboardingClient.callTool({
+      name: "update_profile",
+      arguments: {
+        athleteId: ATHLETE_ID,
+        motivation: "Préparer l'Étape du Tour",
+        trainingBackground: "5 ans de vélo",
+        ftpStatus: "to_test",
+        educationDone: true
+      }
+    });
+    expect(updateProfile).toHaveBeenCalledWith({
+      motivation: "Préparer l'Étape du Tour",
+      trainingBackground: "5 ans de vélo",
+      ftpStatus: "to_test",
+      educationDone: true
+    });
+  });
+
+  it("rejects an unknown ftpStatus without touching the store", async () => {
+    const updateProfile = vi.fn();
+    const onboardingClient = await connect({ updateProfile });
+    const result = await onboardingClient.callTool({
+      name: "update_profile",
+      arguments: { athleteId: ATHLETE_ID, ftpStatus: "guessed" }
+    });
+    expect(result.isError).toBe(true);
+    expect(updateProfile).not.toHaveBeenCalled();
+  });
+
   it("calls save_training_plan and returns the persisted plan + blocks", async () => {
     const result = await client.callTool({
       name: "save_training_plan",

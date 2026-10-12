@@ -7,7 +7,8 @@
  * How the bike FTP was settled at onboarding. Mirrors the DB CHECK values, redeclared
  * here so the domain owns its own enum.
  */
-export type FtpStatus = "confirmed" | "to_test" | "heart_rate_only";
+export const FTP_STATUSES = ["confirmed", "to_test", "heart_rate_only"] as const;
+export type FtpStatus = (typeof FTP_STATUSES)[number];
 
 /** The seven checks, all blocking: the athlete is handed to the coordinator once every one is done. */
 export type OnboardingItem =
