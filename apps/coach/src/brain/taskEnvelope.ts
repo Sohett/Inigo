@@ -1,3 +1,5 @@
+import type { OnboardingState } from "../domain/onboarding";
+
 /** Fallback timezone when the athlete's own timezone isn't known at the call site. */
 const DEFAULT_TIMEZONE = "Europe/Brussels";
 
@@ -44,4 +46,25 @@ export function formatTurn(
   timeZone: string = DEFAULT_TIMEZONE
 ): string {
   return `date_du_jour: ${formatDateDuJour(now, timeZone)}\ninigo_athlete_id: ${inigoAthleteId}\nmessage: ${text}`;
+}
+
+/**
+ * Format a turn for the onboarding agent (INI-46): the same envelope as `formatTurn`, plus where
+ * the athlete stands in the onboarding checklist, so the agent asks only what is still missing and
+ * picks up where the athlete left off. An empty list stays an empty line, never omitted.
+ */
+export function formatOnboardingTurn(
+  inigoAthleteId: string,
+  state: OnboardingState,
+  text: string,
+  now: Date = new Date(),
+  timeZone: string = DEFAULT_TIMEZONE
+): string {
+  return [
+    `date_du_jour: ${formatDateDuJour(now, timeZone)}`,
+    `inigo_athlete_id: ${inigoAthleteId}`,
+    `onboarding_fait: ${state.done.join(", ")}`,
+    `onboarding_manquant: ${state.missing.join(", ")}`,
+    `message: ${text}`
+  ].join("\n");
 }

@@ -32,6 +32,15 @@ const unusedRepoMethods = () => ({
   listSessions: vi.fn(() => Promise.resolve([])),
   registerOnboardingAthlete: vi.fn(() => Promise.resolve(null))
 });
+const ONBOARDING_STATE = {
+  done: ["motivation" as const],
+  missing: ["goal" as const],
+  complete: false
+};
+/** The onboarding assessment, tested in its own spec: here only what it puts in the turn matters. */
+const fakeAssess = () => ({
+  execute: vi.fn(() => Promise.resolve({ status: "assessed" as const, state: ONBOARDING_STATE }))
+});
 /** Registration of unknown senders, tested in its own spec: here only the hand-off matters. */
 const fakeRegister = () => ({
   execute: vi.fn(() => Promise.resolve({ status: "declined" as const }))
@@ -49,9 +58,11 @@ function makeDeps(athlete: Athlete | null) {
   const setChatId = vi.fn(() => Promise.resolve());
   const repo: AthleteRepository = { findByPhone, findByLid, setChatId, ...unusedRepoMethods() };
   const register = fakeRegister();
+  const assessOnboarding = fakeAssess();
   return {
-    deps: { repo, brain: { appendUserMessage, ...unusedBrainMethods() }, register },
+    deps: { repo, brain: { appendUserMessage, ...unusedBrainMethods() }, register, assessOnboarding },
     register,
+    assessOnboarding,
     appendUserMessage,
     findByPhone,
     findByLid,
@@ -188,6 +199,48 @@ describe("routeInboundMessage", () => {
     expect(appendUserMessage).not.toHaveBeenCalled();
   });
 
+  it("gives an athlete in onboarding their checklist with the message", async () => {
+    const { deps, appendUserMessage, assessOnboarding } = makeDeps(makeAthlete({ status: "onboarding" }));
+    const outcome = await createRouteInboundMessage(deps).execute(inbound);
+
+    expect(assessOnboarding.execute).toHaveBeenCalledWith("a-1");
+    expect(appendUserMessage).toHaveBeenCalledWith(
+      "sesn_abc",
+      `${DATE_LINE}\ninigo_athlete_id: a-1\nonboarding_fait: motivation\nonboarding_manquant: goal\nmessage: salut`
+    );
+    expect(outcome.status).toBe("forwarded");
+  });
+
+  it.each(["active", "paused"] as const)("forwards a %s athlete without any checklist", async (status) => {
+    const { deps, appendUserMessage, assessOnboarding } = makeDeps(makeAthlete({ status }));
+    await createRouteInboundMessage(deps).execute(inbound);
+
+    expect(assessOnboarding.execute).not.toHaveBeenCalled();
+    expect(appendUserMessage).toHaveBeenCalledWith(
+      "sesn_abc",
+      `${DATE_LINE}\ninigo_athlete_id: a-1\nmessage: salut`
+    );
+  });
+
+  it("ignores an ended athlete without touching anything", async () => {
+    const { deps, appendUserMessage, setChatId } = makeDeps(makeAthlete({ status: "ended", chatId: null }));
+    const outcome = await createRouteInboundMessage(deps).execute(inbound);
+
+    expect(outcome).toEqual({ status: "ignored", reason: "athlete_ended" });
+    expect(appendUserMessage).not.toHaveBeenCalled();
+    expect(setChatId).not.toHaveBeenCalled();
+  });
+
+  it("forwards nothing when the onboarding assessment fails (infra → 502 upstream)", async () => {
+    const { deps, appendUserMessage, setChatId, assessOnboarding } = makeDeps(
+      makeAthlete({ status: "onboarding", chatId: null })
+    );
+    assessOnboarding.execute.mockRejectedValueOnce(new Error("intervals down"));
+    await expect(createRouteInboundMessage(deps).execute(inbound)).rejects.toThrow("intervals down");
+    expect(setChatId).not.toHaveBeenCalled();
+    expect(appendUserMessage).not.toHaveBeenCalled();
+  });
+
   it("never registers a known athlete again", async () => {
     const { deps, register } = makeDeps(makeAthlete());
     await createRouteInboundMessage(deps).execute(inbound);
@@ -243,7 +296,8 @@ describe("routeInboundMessage", () => {
     const deps = {
       repo: { findByPhone, findByLid, setChatId: vi.fn(() => Promise.resolve()), ...unusedRepoMethods() },
       brain: { appendUserMessage, ...unusedBrainMethods() },
-      register: fakeRegister()
+      register: fakeRegister(),
+      assessOnboarding: fakeAssess()
     };
     await expect(createRouteInboundMessage(deps).execute(inbound)).rejects.toThrow("neon down");
     expect(appendUserMessage).not.toHaveBeenCalled();
@@ -260,7 +314,8 @@ describe("routeInboundMessage", () => {
         ...unusedRepoMethods()
       },
       brain: { appendUserMessage, ...unusedBrainMethods() },
-      register: fakeRegister()
+      register: fakeRegister(),
+      assessOnboarding: fakeAssess()
     };
     await expect(createRouteInboundMessage(deps).execute(inbound)).rejects.toThrow("neon down");
     expect(appendUserMessage).not.toHaveBeenCalled();
@@ -276,7 +331,8 @@ describe("routeInboundMessage", () => {
         ...unusedRepoMethods()
       },
       brain: { appendUserMessage, ...unusedBrainMethods() },
-      register: fakeRegister()
+      register: fakeRegister(),
+      assessOnboarding: fakeAssess()
     };
     await expect(createRouteInboundMessage(deps).execute(inbound)).rejects.toThrow("anthropic 500");
   });
