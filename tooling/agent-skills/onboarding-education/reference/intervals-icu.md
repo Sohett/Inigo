@@ -3,7 +3,7 @@
 ## Ce que c'est, en une phrase
 
 Intervals.icu est la plateforme où arrivent toutes tes sorties et où Inigo écrit ton plan.
-Tu y vois tes séances prévues, ce que tu as réellement fait, et l'évolution de ta forme.
+Tu y vois tes séances prévues, ce que tu as réellement fait, et l'évolution de ta condition et de ta fraîcheur.
 C'est gratuit (un don est possible, pas obligatoire).
 
 ## Parcours A : l'athlète a déjà un compte
@@ -23,7 +23,7 @@ C'est gratuit (un don est possible, pas obligatoire).
 1. Créer le compte sur https://intervals.icu (bouton d'inscription, email et mot de passe).
 2. Connecter sa source de données dans **Settings**, section des connexions :
    - de préférence la marque de la montre ou du compteur en direct (Garmin, Wahoo, Coros,
-     Polar, Suunto, Zwift…) : les données arrivent complètes ;
+     Polar, Suunto…) : les données arrivent complètes ;
    - Strava en dernier recours : certaines données y sont limitées pour les applications tierces.
 3. Si la plateforme le propose, importer l'historique récent : plus il y a de sorties, plus
    la forme et l'eFTP sont fiables dès le départ.

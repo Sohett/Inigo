@@ -22,6 +22,6 @@ Ouvre la fiche qui correspond au moment de la conversation :
 | Fiche | Quand l'ouvrir |
 |---|---|
 | `reference/intervals-icu.md` | Connexion Intervals : compte existant ou pas, montre, Strava, clé API |
-| `reference/charge-et-forme.md` | Expliquer ce qu'Intervals mesure : TSS, CTL (forme de fond), ATL (fatigue), TSB (fraîcheur) |
+| `reference/charge-et-forme.md` | Expliquer ce qu'Intervals mesure : TSS, CTL (condition, « Fitness »), ATL (fatigue), TSB (fraîcheur, « Form ») |
 | `reference/ftp.md` | Régler la FTP : eFTP, valeur connue, test, ou pas de capteur |
 | `reference/methode-inigo.md` | Récap de la méthode avant la clôture (`educationDone`) |
