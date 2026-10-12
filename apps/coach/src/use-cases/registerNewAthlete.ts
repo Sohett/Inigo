@@ -1,6 +1,6 @@
 import type { ManagedAgentBrain } from "../brain/managedAgents";
 import { formatOnboardingTurn } from "../brain/taskEnvelope";
-import type { BrainInventory, SessionElements } from "../domain/brain";
+import { sessionElementsFrom } from "../mappers/sessionElements";
 import { NOTHING_DONE } from "../domain/onboarding";
 import type { AthleteRepository } from "../repositories/athleteRepository";
 import type { OnboardingSettingsRepository } from "../repositories/onboardingSettingsRepository";
@@ -45,29 +45,6 @@ export function carriesAccessCode(text: string, accessCode: string): boolean {
 }
 
 /**
- * What the onboarding session runs on: the configured agent, and the one environment and vault
- * of the workspace. With none or several, guessing would be worse than refusing. Returns the
- * reason to fix instead when the inventory does not allow it.
- */
-export function onboardingSessionElements(
-  inventory: BrainInventory,
-  agentId: string
-): SessionElements | string {
-  if (!inventory.agents.some((agent) => agent.id === agentId)) {
-    return `onboarding agent ${agentId} does not exist in the workspace`;
-  }
-  const [environment, ...otherEnvironments] = inventory.environments;
-  if (!environment || otherEnvironments.length > 0) {
-    return `expected exactly one environment, found ${inventory.environments.length}`;
-  }
-  const [vault, ...otherVaults] = inventory.vaults;
-  if (!vault || otherVaults.length > 0) {
-    return `expected exactly one vault, found ${inventory.vaults.length}`;
-  }
-  return { agentId, environmentId: environment.id, vaultIds: [vault.id], resources: [] };
-}
-
-/**
  * Turn an unknown number into an athlete in onboarding, if it sent the access code (INI-45).
  *
  * The session is created first and the athlete is written with it in one transaction, so a
@@ -94,7 +71,7 @@ export function createRegisterNewAthlete(deps: {
         return { status: "declined" };
       }
 
-      const elements = onboardingSessionElements(await deps.brain.listInventory(), onboardingAgentId);
+      const elements = sessionElementsFrom(await deps.brain.listInventory(), onboardingAgentId);
       if (typeof elements === "string") return { status: "misconfigured", reason: elements };
 
       const created = await deps.brain.createSession({

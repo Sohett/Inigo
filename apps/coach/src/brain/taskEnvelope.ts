@@ -68,3 +68,25 @@ export function formatOnboardingTurn(
     `message: ${text}`
   ].join("\n");
 }
+
+/** The line telling the coordinator an athlete just finished onboarding (INI-49). */
+export const HANDOFF_LINE = "passation: onboarding terminé, planifie la semaine 1";
+
+/**
+ * Format the first turn the coordinator receives for an athlete who just finished onboarding:
+ * the `formatTurn` envelope with the hand-off line before the message, so the coordinator builds
+ * the plan and week 1 instead of only answering. Only this turn carries it.
+ */
+export function formatHandoffTurn(
+  inigoAthleteId: string,
+  text: string,
+  now: Date = new Date(),
+  timeZone: string = DEFAULT_TIMEZONE
+): string {
+  return [
+    `date_du_jour: ${formatDateDuJour(now, timeZone)}`,
+    `inigo_athlete_id: ${inigoAthleteId}`,
+    HANDOFF_LINE,
+    `message: ${text}`
+  ].join("\n");
+}

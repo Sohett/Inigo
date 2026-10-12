@@ -4,6 +4,7 @@ import { createRouteInboundMessage, type RouteOutcome } from "../../../../src/us
 import { createRegisterNewAthlete, type RegisterOutcome } from "../../../../src/use-cases/registerNewAthlete";
 import { createOpenWaChatReplier } from "../../../../src/whatsapp/chatReplier";
 import { createAssessOnboarding } from "../../../../src/use-cases/assessOnboarding";
+import { createHandOffToCoordinator } from "../../../../src/use-cases/handOffToCoordinator";
 import { createDrizzleOnboardingFactsReader } from "../../../../src/repositories/drizzleOnboardingFactsReader";
 import { createIntervalsBikeFtpReader } from "../../../../src/intervals/bikeFtpReader";
 import { createHandleGatewaySessionEvent } from "../../../../src/use-cases/handleGatewaySessionEvent";
@@ -20,6 +21,17 @@ function logOutcome(outcome: RouteOutcome): void {
     case "forwarded":
       console.info(
         `[coach] forwarded athlete=${outcome.athleteId} session=${outcome.sessionId} chat=${outcome.chatId}`
+      );
+      return;
+    case "handed_off":
+      console.info(
+        `[coach] handed off athlete=${outcome.athleteId} to coordinator session=${outcome.sessionId} chat=${outcome.chatId}`
+      );
+      return;
+    case "handoff_not_configured":
+      console.warn(
+        `[coach] onboarding complete but no hand-off for athlete=${outcome.athleteId} (${outcome.reason}): ` +
+          `forwarded to session=${outcome.sessionId}`
       );
       return;
     case "unknown_sender":
@@ -108,7 +120,8 @@ export async function POST(request: Request): Promise<Response> {
       repo: deps.repo,
       brain: deps.brain,
       register,
-      assessOnboarding
+      assessOnboarding,
+      handOff: createHandOffToCoordinator({ repo: deps.repo, settings: deps.onboardingSettings, brain: deps.brain })
     });
     logOutcome(await routeInboundMessage.execute(payload));
   } catch (error) {

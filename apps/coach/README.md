@@ -38,7 +38,9 @@ Le use-case dérive le numéro de l'expéditeur depuis le JID WhatsApp, résout 
 formate `inigo_athlete_id: …\nmessage: …`, et **append** à **sa** session. Un numéro inconnu, un athlète
 sans session ou un sender illisible sont gérés explicitement (aucun forward, réponse 200). Un numéro
 inconnu qui envoie le code d'accès devient un athlète en onboarding avec sa propre session ; sans le
-code, il reçoit une réponse fixe (INI-45, réglages dans la Card « Onboarding » de `/admin`).
+code, il reçoit une réponse fixe (INI-45, réglages dans la Card « Onboarding » de `/admin`). Quand
+son onboarding est complet, son message suivant le fait passer au coordinateur (INI-49) : statut
+`active`, nouvelle session, et une ligne `passation:` qui déclenche le plan et la semaine 1.
 L'agent tourne côté Anthropic (les tools MCP s'exécutent server-side via le vault), donc **rien
 ici n'a besoin d'écouter la réponse** ni d'envoyer le message.
 

@@ -64,7 +64,8 @@ function makeDeps(
       listAll: vi.fn(() => Promise.resolve(athletes)),
       setSession: vi.fn(),
       listSessions: vi.fn(overrides.listSessions ?? (() => Promise.resolve([]))),
-      registerOnboardingAthlete: vi.fn()
+      registerOnboardingAthlete: vi.fn(),
+      completeOnboarding: vi.fn()
     },
     gateway: {
       getSessionId: vi.fn(() => Promise.resolve("gateway-session")),

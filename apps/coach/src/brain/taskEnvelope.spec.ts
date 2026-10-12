@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatTurn, formatDateDuJour, formatOnboardingTurn } from "./taskEnvelope";
+import { formatTurn, formatDateDuJour, formatOnboardingTurn, formatHandoffTurn } from "./taskEnvelope";
 import { NOTHING_DONE, type OnboardingState } from "../domain/onboarding";
 
 // In Europe/Brussels (the default timezone) this instant is Thursday 2026-07-09.
@@ -55,6 +55,15 @@ describe("formatOnboardingTurn", () => {
     expect(turn).toContain("\nonboarding_fait: \n");
     expect(turn).toContain(
       "onboarding_manquant: motivation, training_background, goal, availability, intervals_connected, ftp, education"
+    );
+  });
+});
+
+describe("formatHandoffTurn", () => {
+  it("carries the hand-off line between the athlete id and the message", () => {
+    expect(formatHandoffTurn("a-1", "go", FIXED_NOW)).toBe(
+      "date_du_jour: 2026-07-09 (jeudi)\ninigo_athlete_id: a-1\n" +
+        "passation: onboarding terminé, planifie la semaine 1\nmessage: go"
     );
   });
 });

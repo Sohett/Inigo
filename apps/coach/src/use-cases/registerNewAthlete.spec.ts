@@ -6,7 +6,6 @@ import {
   carriesAccessCode,
   createRegisterNewAthlete,
   NO_ACCESS_CODE_REPLY,
-  onboardingSessionElements,
   type UnknownSender
 } from "./registerNewAthlete";
 
@@ -23,7 +22,7 @@ const INVENTORY: BrainInventory = {
   ],
   environments: [{ id: "env_1", name: "prod" }],
   vaults: [{ id: "vlt_1", name: "inigo" }],
-  memoryStores: []
+  memoryStores: [{ id: "memstore_1", name: "Inigo Knowledge Base" }]
 };
 const SENDER: UnknownSender = {
   phoneNum: "+32470000001",
@@ -83,30 +82,6 @@ describe("carriesAccessCode", () => {
   });
 });
 
-describe("onboardingSessionElements", () => {
-  it("uses the configured agent with the single environment and vault", () => {
-    expect(onboardingSessionElements(INVENTORY, AGENT)).toEqual({
-      agentId: AGENT,
-      environmentId: "env_1",
-      vaultIds: ["vlt_1"],
-      resources: []
-    });
-  });
-
-  it.each<[string, BrainInventory, RegExp]>([
-    ["an unknown agent", { ...INVENTORY, agents: [] }, /does not exist/],
-    ["no environment", { ...INVENTORY, environments: [] }, /exactly one environment, found 0/],
-    [
-      "two environments",
-      { ...INVENTORY, environments: [...INVENTORY.environments, { id: "env_2", name: "dev" }] },
-      /exactly one environment, found 2/
-    ],
-    ["no vault", { ...INVENTORY, vaults: [] }, /exactly one vault, found 0/]
-  ])("refuses %s", (_label, inventory, reason) => {
-    expect(onboardingSessionElements(inventory, AGENT)).toMatch(reason);
-  });
-});
-
 describe("registerNewAthlete", () => {
   it("registers a sender with the code: session, then athlete, then the first message", async () => {
     const { useCase, brain, registerOnboardingAthlete, calls } = setup();
@@ -118,7 +93,7 @@ describe("registerNewAthlete", () => {
       agentId: AGENT,
       environmentId: "env_1",
       vaultIds: ["vlt_1"],
-      resources: [],
+      resources: [{ kind: "memory_store", memoryStoreId: "memstore_1", access: "read_only", instructions: null }],
       title: "Inigo · +32470000001 · 2026-10-12"
     });
     expect(registerOnboardingAthlete).toHaveBeenCalledWith({

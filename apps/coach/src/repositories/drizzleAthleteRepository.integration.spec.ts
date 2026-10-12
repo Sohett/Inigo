@@ -124,4 +124,31 @@ describe.skipIf(!databaseUrl)("drizzleAthleteRepository (integration)", () => {
       await db.delete(athlete).where(eq(athlete.whatsappLid, lid));
     }
   });
+
+  it("completes an onboarding: the athlete turns active on the coordinator's session", async () => {
+    const repo = createDrizzleAthleteRepository(db);
+    const lid = "990000000000008@lid"; // reserved test LID, never a real athlete
+    await db.delete(athlete).where(eq(athlete.whatsappLid, lid));
+    try {
+      const registered = await repo.registerOnboardingAthlete({
+        phoneNum: null,
+        whatsappLid: lid,
+        chatId: lid,
+        session: { sessionId: "sesn_test_onboarding_2", agentId: "agent_test_onboarding" }
+      });
+      await repo.completeOnboarding(registered!.id, "sesn_test_coordinator", "agent_test_coordinator");
+
+      expect(await repo.findById(registered!.id)).toMatchObject({
+        status: "active",
+        activeSession: { sessionId: "sesn_test_coordinator", agentId: "agent_test_coordinator" }
+      });
+      const sessions = await repo.listSessions(registered!.id);
+      expect(sessions.map((session) => [session.sessionId, session.endedAt === null])).toEqual([
+        ["sesn_test_coordinator", true],
+        ["sesn_test_onboarding_2", false]
+      ]);
+    } finally {
+      await db.delete(athlete).where(eq(athlete.whatsappLid, lid));
+    }
+  });
 });
