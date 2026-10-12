@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   check,
   date,
   integer,
@@ -11,7 +12,7 @@ import {
   uuid
 } from "drizzle-orm/pg-core";
 import { athlete } from "./athlete";
-import type { CoachingTargets, Sex } from "./types";
+import type { CoachingTargets, FtpStatus, Sex } from "./types";
 
 /**
  * Semi-stable athlete profile (1:1 with `athlete`). Physiology reference values plus
@@ -44,12 +45,24 @@ export const athleteProfile = pgTable(
     healthNotes: text("health_notes"),
     /** Coaching config (peak event, CTL peak target, ramp max, TSB window). */
     coachingTargets: jsonb("coaching_targets").$type<CoachingTargets>(),
+    /** Why the athlete came to Inigo, in their words (onboarding, INI-42). */
+    motivation: text("motivation"),
+    /** Sporting background and current training volume, as told at onboarding. */
+    trainingBackground: text("training_background"),
+    /** How the bike FTP was settled at onboarding; the value itself lives on Intervals.icu. */
+    ftpStatus: text("ftp_status").$type<FtpStatus>(),
+    /** The athlete was walked through Intervals.icu and Inigo's way of coaching. */
+    educationDone: boolean("education_done").notNull().default(false),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .defaultNow()
       .$onUpdate(() => new Date())
   },
   (t) => [
-    check("athlete_profile_sex_check", sql`${t.sex} is null or ${t.sex} in ('M', 'F', 'other')`)
+    check("athlete_profile_sex_check", sql`${t.sex} is null or ${t.sex} in ('M', 'F', 'other')`),
+    check(
+      "athlete_profile_ftp_status_check",
+      sql`${t.ftpStatus} is null or ${t.ftpStatus} in ('confirmed', 'to_test', 'heart_rate_only')`
+    )
   ]
 );

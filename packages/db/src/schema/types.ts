@@ -11,9 +11,15 @@
 /** Sports we coach. Multisport from day one via a plain text field. */
 export type Sport = "bike" | "run" | "swim";
 
-export type AthleteStatus = "active" | "paused" | "ended";
+/** `onboarding`: created from WhatsApp, not yet handed to the coordinator (INI-42). */
+export type AthleteStatus = "onboarding" | "active" | "paused" | "ended";
 export type Sex = "M" | "F" | "other";
 export type ThresholdSource = "test" | "estimated" | "manual";
+/**
+ * How the athlete's bike FTP was settled during onboarding: confirmed (and written on
+ * Intervals.icu), to be measured by a test in week 1, or no power meter (heart-rate coaching).
+ */
+export type FtpStatus = "confirmed" | "to_test" | "heart_rate_only";
 
 export type GoalType = "event" | "performance" | "health";
 export type GoalPriority = "A" | "B" | "C";

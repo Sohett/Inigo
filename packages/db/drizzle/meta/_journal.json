@@ -50,6 +50,13 @@
       "when": 1790669813798,
       "tag": "0006_drop_profile_constraints_jsonb",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791804348699,
+      "tag": "0007_athlete_onboarding",
+      "breakpoints": true
     }
   ]
 }
