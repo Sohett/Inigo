@@ -10,6 +10,11 @@ export { sealSecret, openSecret, generateMasterKey, type SealedSecret } from "./
 export { getIntervalsKey, setIntervalsKey, type IntervalsCredential } from "./credentials";
 export { getWhatsappSessionId, setWhatsappSessionId } from "./whatsappGateway";
 export {
+  getOnboardingSettings,
+  setOnboardingSettings,
+  type OnboardingSettingsRow
+} from "./onboardingSettings";
+export {
   insertAthleteSchema,
   selectAthleteSchema,
   insertAthleteProfileSchema,
