@@ -1,11 +1,11 @@
 {
-  "fetchedAt": "2026-10-08T09:09:14.865Z",
+  "fetchedAt": "2026-10-12T12:06:22.983Z",
   "counts": {
     "agents": 5,
     "environments": 1,
     "vaults": 1,
     "memoryStores": 1,
-    "skills": 6
+    "skills": 7
   },
   "agents": [
     {
