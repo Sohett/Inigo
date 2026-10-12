@@ -117,6 +117,8 @@ export const WELLNESS_DAY_FIELDS = [
   "vo2max",
   "injury",
   "comments",
+  // Estimated thresholds per sport (eFTP, W', Pmax): the FTP proposed at onboarding
+  "sportInfo",
   "menstrualPhase",
   "menstrualPhasePredicted"
 ] as const;

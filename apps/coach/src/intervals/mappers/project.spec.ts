@@ -312,6 +312,14 @@ describe("toWellnessDay", () => {
 
     expect(projected).toEqual({ id: "2026-09-21", ctl: 72, hrv: 61, injury: "mollet" });
   });
+
+  it("keeps the per-sport estimates, where the onboarding reads the eFTP", () => {
+    const sportInfo = [{ type: "Ride", eftp: 245.3, wPrime: 18000, pMax: 950 }];
+    expect(toWellnessDay({ id: "2026-10-12", sportInfo })).toEqual({
+      id: "2026-10-12",
+      sportInfo: [{ type: "Ride", eftp: 245.3, wPrime: 18000, pMax: 950 }]
+    });
+  });
 });
 
 describe("toCurveSeriesList", () => {
