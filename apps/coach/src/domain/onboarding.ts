@@ -51,6 +51,13 @@ export interface OnboardingState {
   complete: boolean;
 }
 
+/** Where a freshly registered athlete stands: nothing answered yet, no need to ask the DB. */
+export const NOTHING_DONE: OnboardingState = {
+  done: [],
+  missing: [...ONBOARDING_ITEMS],
+  complete: false
+};
+
 /**
  * How a new athlete is onboarded, edited from the admin. Onboarding is active only once the
  * onboarding agent and the access code are both set.

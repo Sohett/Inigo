@@ -3,6 +3,9 @@ import { verifyWebhookSignature, OPENWA_SIGNATURE_HEADER } from "../../../../src
 import { createRouteInboundMessage, type RouteOutcome } from "../../../../src/use-cases/routeInboundMessage";
 import { createRegisterNewAthlete, type RegisterOutcome } from "../../../../src/use-cases/registerNewAthlete";
 import { createOpenWaChatReplier } from "../../../../src/whatsapp/chatReplier";
+import { createAssessOnboarding } from "../../../../src/use-cases/assessOnboarding";
+import { createDrizzleOnboardingFactsReader } from "../../../../src/repositories/drizzleOnboardingFactsReader";
+import { createIntervalsBikeFtpReader } from "../../../../src/intervals/bikeFtpReader";
 import { createHandleGatewaySessionEvent } from "../../../../src/use-cases/handleGatewaySessionEvent";
 import { isGatewaySessionEvent } from "../../../../src/mappers/whatsappPayload";
 
@@ -97,7 +100,16 @@ export async function POST(request: Request): Promise<Response> {
       brain: deps.brain,
       replier: createOpenWaChatReplier({ gateway: deps.whatsappGateway, resolveClient: deps.whatsapp })
     });
-    const routeInboundMessage = createRouteInboundMessage({ repo: deps.repo, brain: deps.brain, register });
+    const assessOnboarding = createAssessOnboarding({
+      facts: createDrizzleOnboardingFactsReader(deps.db),
+      bikeFtp: createIntervalsBikeFtpReader(deps.intervalsResolver)
+    });
+    const routeInboundMessage = createRouteInboundMessage({
+      repo: deps.repo,
+      brain: deps.brain,
+      register,
+      assessOnboarding
+    });
     logOutcome(await routeInboundMessage.execute(payload));
   } catch (error) {
     console.error("[coach] failed to forward inbound message", error);

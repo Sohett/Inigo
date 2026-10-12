@@ -106,8 +106,11 @@ src/
    - avec le code → session de l'agent d'onboarding (environnement et vault = les seuls de l'inventaire,
      sinon `misconfigured`), puis athlète `onboarding` + session insérés en **un** `db.batch`, puis
      premier message appendé. Deux premiers messages concurrents → `already_registered`.
-4. Sur un athlète résolu avec session : persiste `chat_id` si nouveau (`repo.setChatId`),
-   formate l'enveloppe `inigo_athlete_id: <uuid>\nmessage: <body>` et **append**
+4. Sur un athlète résolu avec session, l'enveloppe dépend du **statut** (INI-46, switch exhaustif) :
+   `onboarding` → `formatOnboardingTurn` (ajoute `onboarding_fait:` / `onboarding_manquant:`, calculés
+   par `assessOnboarding` à chaque message) ; `active` et `paused` → `formatTurn` ; `ended` → ignoré
+   (`athlete_ended`). L'enveloppe est construite avant tout effet de bord. Puis persiste `chat_id` si
+   nouveau (`repo.setChatId`), formate l'enveloppe `inigo_athlete_id: <uuid>\nmessage: <body>` et **append**
    à **sa** session via `brain.appendUserMessage` (dernier effet de bord → pas de doublon sur
    retry OpenWA). `inigo_athlete_id` = l'`athlete.id` interne (Neon), que l'agent repasse en
    argument `athleteId` aux tools du MCP athlete-data (`/api/coaching-data/mcp`) — **pas** l'id Intervals.icu.

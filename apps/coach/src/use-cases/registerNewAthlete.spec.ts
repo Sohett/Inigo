@@ -129,7 +129,11 @@ describe("registerNewAthlete", () => {
     });
     expect(brain.appendUserMessage).toHaveBeenCalledWith(
       "sesn_new",
-      expect.stringContaining("inigo_athlete_id: athlete-new\nmessage: Salut Inigo, mon code : velo26")
+      expect.stringContaining(
+        "inigo_athlete_id: athlete-new\nonboarding_fait: \nonboarding_manquant: motivation, " +
+          "training_background, goal, availability, intervals_connected, ftp, education\n" +
+          "message: Salut Inigo, mon code : velo26"
+      )
     );
   });
 

@@ -1,6 +1,7 @@
 import type { ManagedAgentBrain } from "../brain/managedAgents";
-import { formatTurn } from "../brain/taskEnvelope";
+import { formatOnboardingTurn } from "../brain/taskEnvelope";
 import type { BrainInventory, SessionElements } from "../domain/brain";
+import { NOTHING_DONE } from "../domain/onboarding";
 import type { AthleteRepository } from "../repositories/athleteRepository";
 import type { OnboardingSettingsRepository } from "../repositories/onboardingSettingsRepository";
 import { sessionTitle } from "./startAthleteSession";
@@ -108,7 +109,7 @@ export function createRegisterNewAthlete(deps: {
       });
       if (!athlete) return { status: "already_registered" };
 
-      await deps.brain.appendUserMessage(created.sessionId, formatTurn(athlete.id, sender.text));
+      await deps.brain.appendUserMessage(created.sessionId, formatOnboardingTurn(athlete.id, NOTHING_DONE, sender.text));
       return { status: "registered", athleteId: athlete.id, sessionId: created.sessionId };
     }
   };

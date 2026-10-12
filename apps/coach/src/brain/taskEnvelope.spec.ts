@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { formatTurn, formatDateDuJour } from "./taskEnvelope";
+import { formatTurn, formatDateDuJour, formatOnboardingTurn } from "./taskEnvelope";
+import { NOTHING_DONE, type OnboardingState } from "../domain/onboarding";
 
 // In Europe/Brussels (the default timezone) this instant is Thursday 2026-07-09.
 const FIXED_NOW = new Date("2026-07-09T09:05:56Z");
@@ -33,5 +34,27 @@ describe("formatTurn", () => {
   // identifier it had no use for. `send_whatsapp_message` resolves it from the athlete now.
   it("does not carry the WhatsApp chat id", () => {
     expect(formatTurn("a-1", "salut", FIXED_NOW, "Europe/Brussels")).not.toContain("chat_id");
+  });
+});
+
+describe("formatOnboardingTurn", () => {
+  it("carries what is done and what is missing between the athlete id and the message", () => {
+    const state: OnboardingState = {
+      done: ["motivation", "goal"],
+      missing: ["ftp", "education"],
+      complete: false
+    };
+    expect(formatOnboardingTurn("a-1", state, "ok", FIXED_NOW)).toBe(
+      "date_du_jour: 2026-07-09 (jeudi)\ninigo_athlete_id: a-1\n" +
+        "onboarding_fait: motivation, goal\nonboarding_manquant: ftp, education\nmessage: ok"
+    );
+  });
+
+  it("keeps an empty list as an empty line", () => {
+    const turn = formatOnboardingTurn("a-1", NOTHING_DONE, "salut", FIXED_NOW);
+    expect(turn).toContain("\nonboarding_fait: \n");
+    expect(turn).toContain(
+      "onboarding_manquant: motivation, training_background, goal, availability, intervals_connected, ftp, education"
+    );
   });
 });
