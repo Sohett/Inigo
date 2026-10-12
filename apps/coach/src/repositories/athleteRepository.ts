@@ -29,4 +29,9 @@ export interface AthleteRepository {
    * null when the phone or LID is already registered (two first messages racing).
    */
   registerOnboardingAthlete(input: NewOnboardingAthlete): Promise<Athlete | null>;
+  /**
+   * End an athlete's onboarding (INI-49), atomically: they become `active` and the given
+   * session, run by the coordinator, replaces their live one (closed, kept in the history).
+   */
+  completeOnboarding(athleteId: string, sessionId: string, agentId: string): Promise<void>;
 }

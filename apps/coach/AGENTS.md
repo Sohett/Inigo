@@ -48,7 +48,7 @@ src/
     coaching.ts                    # modèles métier de la donnée coaching (contrat de sortie des tools MCP) + inputs
     onboarding.ts                  # checklist « onboarding terminé » (7 items) + OnboardingFacts / OnboardingState + enum FtpStatus
   repositories/
-    athleteRepository.ts           # PORT AthleteRepository (findByPhone, findByLid, setChatId, findById, listAll, setSession, listSessions, registerOnboardingAthlete)
+    athleteRepository.ts           # PORT AthleteRepository (findByPhone, findByLid, setChatId, findById, listAll, setSession, listSessions, registerOnboardingAthlete, completeOnboarding)
     drizzleAthleteRepository.ts     # ADAPTER Drizzle (requête inline) + toAthlete(row→modèle)
     onboardingSettingsRepository.ts # PORT : agent d'onboarding, coordinateur, code d'accès (singleton en base, édité dans l'admin)
     drizzleOnboardingSettingsRepository.ts # ADAPTER Drizzle du singleton onboarding_settings
@@ -65,12 +65,14 @@ src/
     registerNewAthlete.ts          # use-case : expéditeur inconnu → réponse fixe, ou athlète en onboarding + sa session (PORT ChatReplier)
     connectIntervals.ts            # use-case : clé + athlete id Intervals vérifiés puis stockés (outil connect_intervals, INI-50, transitoire avant OAuth)
     assessOnboarding.ts            # use-case : état d'onboarding calculé (jamais stocké) ; PORTS OnboardingFactsReader + BikeFtpReader
+    handOffToCoordinator.ts        # use-case : onboarding complet → session du coordinateur + statut active, en un db.batch (INI-49)
   alerts/
     gatewayAlerter.ts              # PORT GatewayAlerter (notify ne throw jamais)
     logAndSlackAlerter.ts          # ADAPTER : log structuré [coach][alert] + Slack si SLACK_ALERT_WEBHOOK_URL
     slack.ts                       # POST Incoming Webhook (timeout 5s), l'URL n'apparaît jamais dans une erreur
   repositories/whatsappGatewayRepository.ts  # PORT : la session de passerelle (en base, pas en env)
   mappers/
+    sessionElements.ts             # sessionElementsFrom : agent + l'environnement, le vault et la knowledge base (read_only) uniques de l'inventaire
     whatsappPayload.ts             # schémas zod + normalisation du payload OpenWA + senderPhone
   brain/managedAgents.ts           # FRONTIÈRE cerveau : appendUserMessage + readSession + createSession + listInventory
   mcp/
@@ -107,13 +109,18 @@ src/
    **Expéditeur inconnu** (INI-45) → `registerNewAthlete` (`unknown_sender`) :
    - onboarding non réglé dans l'admin (`onboarding_settings` sans agent ou sans code) → `disabled`, ignoré ;
    - message sans le code d'accès → réponse fixe `NO_ACCESS_CODE_REPLY` au `chatId` reçu (`declined`), sans agent ;
-   - avec le code → session de l'agent d'onboarding (environnement et vault = les seuls de l'inventaire,
-     sinon `misconfigured`), puis athlète `onboarding` + session insérés en **un** `db.batch`, puis
+   - avec le code → session de l'agent d'onboarding (`sessionElementsFrom` : environnement, vault et
+     knowledge base `read_only` = les seuls de l'inventaire, sinon `misconfigured`), puis athlète `onboarding` + session insérés en **un** `db.batch`, puis
      premier message appendé. Deux premiers messages concurrents → `already_registered`.
 4. Sur un athlète résolu avec session, l'enveloppe dépend du **statut** (INI-46, switch exhaustif) :
    `onboarding` → `formatOnboardingTurn` (ajoute `onboarding_fait:` / `onboarding_manquant:`, calculés
    par `assessOnboarding` à chaque message) ; `active` et `paused` → `formatTurn` ; `ended` → ignoré
-   (`athlete_ended`). L'enveloppe est construite avant tout effet de bord. Puis persiste `chat_id` si
+   (`athlete_ended`). **Onboarding complet** (INI-49) → `handOffToCoordinator` : session du coordinateur
+   (`onboarding_settings.coordinator_agent_id`), puis statut `active` + bascule de session en **un**
+   `db.batch` (`completeOnboarding`), et le message part à la nouvelle session via `formatHandoffTurn`
+   (ligne `passation:`, ce tour seulement) → `handed_off`. Sans coordinateur utilisable → le message
+   reste à la session d'onboarding (`handoff_not_configured`, warning). Le tour est résolu avant tout
+   autre effet de bord (la passation est le seul, atomique). Puis persiste `chat_id` si
    nouveau (`repo.setChatId`) et **append** l'enveloppe à **sa** session via `brain.appendUserMessage` (dernier effet de bord → pas de doublon sur
    retry OpenWA). `inigo_athlete_id` = l'`athlete.id` interne (Neon), que l'agent repasse en
    argument `athleteId` aux tools du MCP athlete-data (`/api/coaching-data/mcp`) — **pas** l'id Intervals.icu.

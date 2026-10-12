@@ -99,6 +99,15 @@ export function createDrizzleAthleteRepository(db: Db): AthleteRepository {
         db.insert(athleteSession).values({ athleteId, anthropicSessionId: sessionId, managedAgentId: agentId })
       ]);
     },
+    async completeOnboarding(athleteId: string, sessionId: string, agentId: string): Promise<void> {
+      // Same swap as `setSession`, with the status change in the same transaction: an athlete is
+      // never `active` while still routed to their onboarding session, nor the reverse.
+      await db.batch([
+        db.update(athlete).set({ status: "active" }).where(eq(athlete.id, athleteId)),
+        db.update(athleteSession).set({ endedAt: sql`now()` }).where(isLiveSessionOf(athleteId)),
+        db.insert(athleteSession).values({ athleteId, anthropicSessionId: sessionId, managedAgentId: agentId })
+      ]);
+    },
     async registerOnboardingAthlete(input: NewOnboardingAthlete): Promise<Athlete | null> {
       // The id is chosen here so the athlete and its session go in one batch (a single
       // Postgres transaction over Neon HTTP): never an athlete without a session to route to.

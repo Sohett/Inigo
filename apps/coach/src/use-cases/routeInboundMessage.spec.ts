@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createRouteInboundMessage } from "./routeInboundMessage";
 import type { Athlete } from "../domain/athlete";
+import { ONBOARDING_ITEMS, type OnboardingState } from "../domain/onboarding";
 import type { AthleteRepository } from "../repositories/athleteRepository";
+import type { HandOffOutcome } from "./handOffToCoordinator";
 
 // A fixed instant so the `date_du_jour` the envelope carries is deterministic. In
 // Europe/Brussels (the default routing timezone) this is Thursday 2026-07-09.
@@ -30,11 +32,12 @@ const unusedRepoMethods = () => ({
   listAll: vi.fn(() => Promise.resolve([])),
   setSession: vi.fn(() => Promise.resolve()),
   listSessions: vi.fn(() => Promise.resolve([])),
-  registerOnboardingAthlete: vi.fn(() => Promise.resolve(null))
+  registerOnboardingAthlete: vi.fn(() => Promise.resolve(null)),
+  completeOnboarding: vi.fn(() => Promise.resolve())
 });
-const ONBOARDING_STATE = {
-  done: ["motivation" as const],
-  missing: ["goal" as const],
+const ONBOARDING_STATE: OnboardingState = {
+  done: ["motivation"],
+  missing: ["goal"],
   complete: false
 };
 /** The onboarding assessment, tested in its own spec: here only what it puts in the turn matters. */
@@ -44,6 +47,12 @@ const fakeAssess = () => ({
 /** Registration of unknown senders, tested in its own spec: here only the hand-off matters. */
 const fakeRegister = () => ({
   execute: vi.fn(() => Promise.resolve({ status: "declined" as const }))
+});
+/** The hand-off, tested in its own spec: here only where the message goes matters. */
+const fakeHandOff = () => ({
+  execute: vi.fn(
+    (): Promise<HandOffOutcome> => Promise.resolve({ status: "handed_off", sessionId: "sesn_coordinator" })
+  )
 });
 const unusedBrainMethods = () => ({
   createSession: vi.fn(() => Promise.resolve({ sessionId: "sesn_unused", agentVersion: 1 })),
@@ -59,10 +68,12 @@ function makeDeps(athlete: Athlete | null) {
   const repo: AthleteRepository = { findByPhone, findByLid, setChatId, ...unusedRepoMethods() };
   const register = fakeRegister();
   const assessOnboarding = fakeAssess();
+  const handOff = fakeHandOff();
   return {
-    deps: { repo, brain: { appendUserMessage, ...unusedBrainMethods() }, register, assessOnboarding },
+    deps: { repo, brain: { appendUserMessage, ...unusedBrainMethods() }, register, assessOnboarding, handOff },
     register,
     assessOnboarding,
+    handOff,
     appendUserMessage,
     findByPhone,
     findByLid,
@@ -200,15 +211,68 @@ describe("routeInboundMessage", () => {
   });
 
   it("gives an athlete in onboarding their checklist with the message", async () => {
-    const { deps, appendUserMessage, assessOnboarding } = makeDeps(makeAthlete({ status: "onboarding" }));
+    const { deps, appendUserMessage, assessOnboarding, handOff } = makeDeps(makeAthlete({ status: "onboarding" }));
     const outcome = await createRouteInboundMessage(deps).execute(inbound);
 
     expect(assessOnboarding.execute).toHaveBeenCalledWith("a-1");
+    expect(handOff.execute).not.toHaveBeenCalled();
     expect(appendUserMessage).toHaveBeenCalledWith(
       "sesn_abc",
       `${DATE_LINE}\ninigo_athlete_id: a-1\nonboarding_fait: motivation\nonboarding_manquant: goal\nmessage: salut`
     );
     expect(outcome.status).toBe("forwarded");
+  });
+
+  it("hands an athlete whose onboarding is complete to the coordinator, with the hand-off line", async () => {
+    const { deps, appendUserMessage, assessOnboarding, handOff } = makeDeps(makeAthlete({ status: "onboarding" }));
+    assessOnboarding.execute.mockResolvedValueOnce({
+      status: "assessed",
+      state: { done: [...ONBOARDING_ITEMS], missing: [], complete: true }
+    });
+    const outcome = await createRouteInboundMessage(deps).execute(inbound);
+
+    expect(handOff.execute).toHaveBeenCalledWith(makeAthlete({ status: "onboarding" }));
+    expect(appendUserMessage).toHaveBeenCalledOnce();
+    expect(appendUserMessage).toHaveBeenCalledWith(
+      "sesn_coordinator",
+      `${DATE_LINE}\ninigo_athlete_id: a-1\npassation: onboarding terminé, planifie la semaine 1\nmessage: salut`
+    );
+    expect(outcome).toEqual({
+      status: "handed_off",
+      athleteId: "a-1",
+      sessionId: "sesn_coordinator",
+      chatId: "32475123456@c.us"
+    });
+  });
+
+  it("keeps a complete athlete on their onboarding session when no coordinator can take them", async () => {
+    const { deps, appendUserMessage, assessOnboarding, handOff } = makeDeps(makeAthlete({ status: "onboarding" }));
+    assessOnboarding.execute.mockResolvedValueOnce({
+      status: "assessed",
+      state: { done: [...ONBOARDING_ITEMS], missing: [], complete: true }
+    });
+    handOff.execute.mockResolvedValueOnce({ status: "not_configured", reason: "no coordinator agent set" });
+    const outcome = await createRouteInboundMessage(deps).execute(inbound);
+
+    expect(appendUserMessage).toHaveBeenCalledWith("sesn_abc", expect.stringContaining("onboarding_manquant: \n"));
+    expect(outcome).toEqual({
+      status: "handoff_not_configured",
+      athleteId: "a-1",
+      sessionId: "sesn_abc",
+      chatId: "32475123456@c.us",
+      reason: "no coordinator agent set"
+    });
+  });
+
+  it("forwards nothing when the hand-off fails (infra → 502 upstream)", async () => {
+    const { deps, appendUserMessage, assessOnboarding, handOff } = makeDeps(makeAthlete({ status: "onboarding" }));
+    assessOnboarding.execute.mockResolvedValueOnce({
+      status: "assessed",
+      state: { done: [...ONBOARDING_ITEMS], missing: [], complete: true }
+    });
+    handOff.execute.mockRejectedValueOnce(new Error("anthropic 500"));
+    await expect(createRouteInboundMessage(deps).execute(inbound)).rejects.toThrow("anthropic 500");
+    expect(appendUserMessage).not.toHaveBeenCalled();
   });
 
   it.each(["active", "paused"] as const)("forwards a %s athlete without any checklist", async (status) => {
@@ -297,7 +361,8 @@ describe("routeInboundMessage", () => {
       repo: { findByPhone, findByLid, setChatId: vi.fn(() => Promise.resolve()), ...unusedRepoMethods() },
       brain: { appendUserMessage, ...unusedBrainMethods() },
       register: fakeRegister(),
-      assessOnboarding: fakeAssess()
+      assessOnboarding: fakeAssess(),
+      handOff: fakeHandOff()
     };
     await expect(createRouteInboundMessage(deps).execute(inbound)).rejects.toThrow("neon down");
     expect(appendUserMessage).not.toHaveBeenCalled();
@@ -315,7 +380,8 @@ describe("routeInboundMessage", () => {
       },
       brain: { appendUserMessage, ...unusedBrainMethods() },
       register: fakeRegister(),
-      assessOnboarding: fakeAssess()
+      assessOnboarding: fakeAssess(),
+      handOff: fakeHandOff()
     };
     await expect(createRouteInboundMessage(deps).execute(inbound)).rejects.toThrow("neon down");
     expect(appendUserMessage).not.toHaveBeenCalled();
@@ -332,7 +398,8 @@ describe("routeInboundMessage", () => {
       },
       brain: { appendUserMessage, ...unusedBrainMethods() },
       register: fakeRegister(),
-      assessOnboarding: fakeAssess()
+      assessOnboarding: fakeAssess(),
+      handOff: fakeHandOff()
     };
     await expect(createRouteInboundMessage(deps).execute(inbound)).rejects.toThrow("anthropic 500");
   });
