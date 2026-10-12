@@ -74,14 +74,6 @@ export const eventSchema = z
 export type IntervalsEvent = z.infer<typeof eventSchema>;
 export const eventListSchema = z.array(eventSchema);
 
-export const athleteSchema = z
-  .object({
-    id: id.nullish(),
-    name: z.string().nullish()
-  })
-  .catchall(z.unknown());
-export type Athlete = z.infer<typeof athleteSchema>;
-
 /**
  * Per-sport thresholds and zones (FTP, LTHR, max HR, threshold pace, power/HR/pace
  * zones). The full object carries ~60 fields; we validate the coach-controlled ones and
@@ -92,6 +84,8 @@ export const sportSettingsSchema = z
   .object({
     id: id.nullish(),
     type: z.string().nullish(),
+    /** Activity types these settings apply to (e.g. Ride, VirtualRide, GravelRide). */
+    types: z.array(z.string()).nullish(),
     ftp: z.number().nullish(),
     indoor_ftp: z.number().nullish(),
     lthr: z.number().nullish(),
@@ -103,6 +97,15 @@ export const sportSettingsSchema = z
   })
   .catchall(z.unknown());
 export type SportSettings = z.infer<typeof sportSettingsSchema>;
+
+export const athleteSchema = z
+  .object({
+    id: id.nullish(),
+    name: z.string().nullish(),
+    sportSettings: z.array(sportSettingsSchema).nullish()
+  })
+  .catchall(z.unknown());
+export type Athlete = z.infer<typeof athleteSchema>;
 
 export const gearSchema = z
   .object({
