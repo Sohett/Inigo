@@ -63,7 +63,7 @@ function setup(
   const replyToChat = vi.fn(async () => undefined);
   const useCase = createRegisterNewAthlete({
     repo: { registerOnboardingAthlete },
-    settings: { get: vi.fn(async () => overrides.settings ?? SETTINGS), set: vi.fn() },
+    settings: { get: vi.fn(async () => overrides.settings ?? SETTINGS) },
     brain,
     replier: { replyToChat },
     now: () => new Date("2026-10-12T10:00:00Z")

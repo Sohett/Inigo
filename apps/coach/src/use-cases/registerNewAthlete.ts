@@ -76,8 +76,8 @@ export function onboardingSessionElements(
  */
 export function createRegisterNewAthlete(deps: {
   repo: Pick<AthleteRepository, "registerOnboardingAthlete">;
-  settings: OnboardingSettingsRepository;
-  brain: ManagedAgentBrain;
+  settings: Pick<OnboardingSettingsRepository, "get">;
+  brain: Pick<ManagedAgentBrain, "listInventory" | "createSession" | "appendUserMessage">;
   replier: ChatReplier;
   now?: () => Date;
 }): RegisterNewAthlete {

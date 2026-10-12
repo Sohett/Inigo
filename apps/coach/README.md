@@ -2,7 +2,7 @@
 
 Backend d'Inigo (Next.js, full-stack, sur Vercel). Aujourd'hui il expose **un webhook**
 qui **route** les messages WhatsApp entrants (depuis une gateway **OpenWA** auto-hébergée)
-vers la **bonne session de Managed Agent Anthropic**, résolue par le **`phone_num`** de
+vers la **bonne session de Managed Agent Anthropic**, résolue par le **`phone_num`** ou le **LID WhatsApp** de
 l'athlète en base (Neon). L'agent répond ensuite **lui-même** sur WhatsApp, via le serveur
 MCP WhatsApp de cette app.
 
@@ -19,7 +19,7 @@ OpenWA (INI-37).
 > WhatsApp non-officiel, par choix : on garde toute la flexibilité de WhatsApp classique.
 > L'API Cloud officielle de Meta n'est volontairement pas utilisée.
 
-## Flux (multi-athlète, routing par `phone_num`)
+## Flux (multi-athlète, routing par `phone_num` ou LID)
 
 ```
 WhatsApp (athlète)
@@ -29,7 +29,7 @@ OpenWA (Railway) — webhook message.received ──►  coach
    ⇅
 coach (Vercel)
    POST /api/webhooks/whatsapp → routeInboundMessage.execute
-     → résout l'athlète + sa session via phone_num (Neon) → append user.message à SA session
+     → résout l'athlète + sa session via phone_num ou LID (Neon) → append user.message à SA session
    ⇅
 Managed Agent (Anthropic) — session de l'athlète = mémoire ; MCP: coach (coaching-data + Intervals + WhatsApp) ; répond via send_whatsapp_message
 ```

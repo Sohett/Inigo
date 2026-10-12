@@ -7,7 +7,7 @@ humain / déploiement / setup : `README.md`.
 
 App **full-stack unique** : le **backend** (route handlers `app/api/*` + logique `src/`) et
 l'**admin** (pages sous `app/(admin)/…`) vivent ensemble. Deux capacités : **router** un message
-WhatsApp entrant vers la bonne session Managed Agent, résolue par le `phone_num` de l'athlète en
+WhatsApp entrant vers la bonne session Managed Agent, résolue par le `phone_num` ou le LID WhatsApp de l'athlète en
 base (Neon) ; et **ouvrir une nouvelle session** pour un athlète depuis l'admin.
 
 Séparation nette du système : le **cerveau** tourne chez Anthropic (Managed Agents),
@@ -391,7 +391,7 @@ coordinateur et en fait la session active de l'athlète dans `athlete_session`.
   (`repositories/athleteRepository.ts`), jamais de l'ORM. Deux couches seulement connaissent
   `@inigo/db` : l'adapter Drizzle du routing (rows → **modèles métier** `domain/`), et le
   repository MCP (`src/mcp/repository/athleteDataRepository.ts`) qui mappe rows→modèles (`domain/coaching.ts`).
-- **Multi-athlète** : le routing résout l'athlète + sa session par `phone_num` en base (Neon).
+- **Multi-athlète** : le routing résout l'athlète + sa session par `phone_num` ou LID en base (Neon). Limite connue : un athlète connu par une seule clé qui écrit avec l'autre est traité comme un inconnu (aucune normalisation, cf. INI-5).
   Plus de session fixe en env ; pas de mapping en mémoire locale.
 - Secrets : env serveur uniquement, validés au boot, jamais en log.
 

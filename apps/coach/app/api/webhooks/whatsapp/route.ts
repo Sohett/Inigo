@@ -1,7 +1,7 @@
 import { getDeps } from "../../../../src/deps";
 import { verifyWebhookSignature, OPENWA_SIGNATURE_HEADER } from "../../../../src/auth";
 import { createRouteInboundMessage, type RouteOutcome } from "../../../../src/use-cases/routeInboundMessage";
-import { createRegisterNewAthlete } from "../../../../src/use-cases/registerNewAthlete";
+import { createRegisterNewAthlete, type RegisterOutcome } from "../../../../src/use-cases/registerNewAthlete";
 import { createOpenWaChatReplier } from "../../../../src/whatsapp/chatReplier";
 import { createHandleGatewaySessionEvent } from "../../../../src/use-cases/handleGatewaySessionEvent";
 import { isGatewaySessionEvent } from "../../../../src/mappers/whatsappPayload";
@@ -20,16 +20,36 @@ function logOutcome(outcome: RouteOutcome): void {
       );
       return;
     case "unknown_sender":
-      // A misconfigured onboarding is an operator problem, not a normal delivery.
-      if (outcome.registration.status === "misconfigured") {
-        console.error(`[coach] onboarding misconfigured: ${outcome.registration.reason}`);
-        return;
-      }
-      console.info(`[coach] unknown sender: ${JSON.stringify(outcome.registration)}`);
+      logRegistration(outcome.registration);
       return;
     case "ignored":
       console.info(`[coach] ignored delivery: ${outcome.reason}`);
       return;
+    default: {
+      const unhandled: never = outcome;
+      throw new Error(`Unhandled route outcome: ${JSON.stringify(unhandled)}`);
+    }
+  }
+}
+
+/** What happened to a sender no athlete carries. A misconfiguration is for the operator to fix. */
+function logRegistration(registration: RegisterOutcome): void {
+  switch (registration.status) {
+    case "misconfigured":
+      console.error(`[coach] onboarding misconfigured: ${registration.reason}`);
+      return;
+    case "registered":
+      console.info(`[coach] registered athlete=${registration.athleteId} session=${registration.sessionId}`);
+      return;
+    case "declined":
+    case "disabled":
+    case "already_registered":
+      console.info(`[coach] unknown sender: ${registration.status}`);
+      return;
+    default: {
+      const unhandled: never = registration;
+      throw new Error(`Unhandled registration outcome: ${JSON.stringify(unhandled)}`);
+    }
   }
 }
 

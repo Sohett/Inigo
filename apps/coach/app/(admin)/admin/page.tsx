@@ -171,7 +171,9 @@ export default async function AdminPage() {
                 {athlete.displayName ?? "Sans nom"}
                 <Badge variant={STATUS_VARIANT[athlete.status]}>{athlete.status}</Badge>
               </CardTitle>
-              <CardDescription className="font-mono text-xs">{athlete.phoneNum}</CardDescription>
+              <CardDescription className="font-mono text-xs">
+                {athlete.phoneNum ?? athlete.whatsappLid}
+              </CardDescription>
             </CardHeader>
 
             <CardContent className="grid gap-4">
