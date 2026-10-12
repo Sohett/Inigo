@@ -1,8 +1,9 @@
 import type {
-  AdaptationTrigger, AthleteStatus, CoachingTargets, ConstraintActivity, ConstraintKind, FtpStatus, GoalPriority,
+  AdaptationTrigger, AthleteStatus, CoachingTargets, ConstraintActivity, ConstraintKind, GoalPriority,
   GoalStatus, GoalType, PhaseType, PlanAuthor, PlanStatus, Sex, Sport, ThresholdSource,
   WeeklyTarget, Zone
 } from "@inigo/db";
+import type { FtpStatus } from "./onboarding";
 
 /* ---------- Modèles métier (contrat de sortie des tools) ---------- */
 
