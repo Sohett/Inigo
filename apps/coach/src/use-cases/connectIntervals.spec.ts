@@ -21,7 +21,7 @@ describe("connectIntervals", () => {
     expect(outcome).toEqual({ status: "connected", intervalsAthleteId: "i42", athleteName: "Thomas" });
   });
 
-  it.each(["invalid_credentials", "unknown_athlete_id"] as const)(
+  it.each(["invalid_credentials", "credentials_mismatch", "unknown_athlete_id"] as const)(
     "stores nothing and explains when Intervals.icu answers %s",
     async (status) => {
       const { useCase, save } = setup({ status });

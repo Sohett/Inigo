@@ -31,7 +31,7 @@ describe("createIntervalsCredentialVerifier", () => {
 
   it.each([
     [401, "invalid_credentials"],
-    [403, "invalid_credentials"],
+    [403, "credentials_mismatch"],
     [404, "unknown_athlete_id"]
   ] as const)("reads a %s as %s", async (status, expected) => {
     answer(status);

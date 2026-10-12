@@ -20,7 +20,9 @@ C'est gratuit (un don est possible, pas obligatoire).
    l'enregistrer (clé chiffrée) :
    - `connected` : c'est bon, les autres outils Intervals marchent pour cet athlète ;
    - `invalid_credentials` : la clé est refusée, souvent un copier-coller incomplet ;
-   - `unknown_athlete_id` : la clé marche mais l'id est faux, redemande celui de la section Developer.
+   - `credentials_mismatch` : la clé marche mais ne correspond pas à cet id, presque toujours une
+     faute de frappe dans l'id : redemande celui de la section Developer ;
+   - `unknown_athlete_id` : aucun athlète ne porte cet id.
    Ne recopie jamais la clé dans un message.
 
 ## Parcours B : pas encore de compte

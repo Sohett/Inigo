@@ -1,8 +1,10 @@
 /** What Intervals.icu says about a key and an athlete id, tried together. */
 export type IntervalsCredentialCheck =
   | { status: "valid"; athleteName: string | null }
-  /** The key is refused (401/403). */
+  /** The key itself is refused (401). */
   | { status: "invalid_credentials" }
+  /** The key works but does not own this athlete id (403): usually a typo in the id. */
+  | { status: "credentials_mismatch" }
   /** The key works but no athlete carries this id (404). */
   | { status: "unknown_athlete_id" };
 
@@ -20,6 +22,7 @@ export interface IntervalsCredentialStore {
 export type ConnectIntervalsOutcome =
   | { status: "connected"; intervalsAthleteId: string; athleteName: string | null }
   | { status: "invalid_credentials"; reason: string }
+  | { status: "credentials_mismatch"; reason: string }
   | { status: "unknown_athlete_id"; reason: string };
 
 export interface ConnectIntervals {
@@ -43,6 +46,11 @@ export function createConnectIntervals(deps: {
           return {
             status: "invalid_credentials",
             reason: "Intervals.icu refuses this API key: ask the athlete to copy it again from Settings, Developer Settings."
+          };
+        case "credentials_mismatch":
+          return {
+            status: "credentials_mismatch",
+            reason: `This key does not give access to athlete ${intervalsAthleteId}: the id is probably mistyped. Ask for the athlete id shown next to the key in Settings, Developer Settings.`
           };
         case "unknown_athlete_id":
           return {

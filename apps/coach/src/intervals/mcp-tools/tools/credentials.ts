@@ -3,10 +3,11 @@ import { z } from "zod";
 import type { ConnectIntervals } from "../../../use-cases/connectIntervals";
 import { assertAthleteId, athleteIdShape, runTool } from "../result";
 
-/** An Intervals.icu athlete id, `i123456`; a bare number gets its `i` back. */
+/** An Intervals.icu athlete id, `i123456`; a capital `I` (phone keyboards) or a bare number is mended. */
 const intervalsAthleteIdShape = z
   .string()
   .trim()
+  .toLowerCase()
   .regex(/^i?\d+$/, "an Intervals.icu athlete id looks like i123456")
   .transform((id) => (id.startsWith("i") ? id : `i${id}`));
 

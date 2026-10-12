@@ -169,6 +169,16 @@ describe("connect_intervals", () => {
     expect(text).not.toContain("secret-key-123");
   });
 
+  it("mends an id typed with a capital I", async () => {
+    const execute = vi.fn(async () => connected);
+    const mcpClient = await connect(recordingResolver(createMockClient()).resolve, { execute });
+    await mcpClient.callTool({
+      name: "connect_intervals",
+      arguments: { athleteId: ATHLETE_ID, apiKey: "secret-key-123", intervalsAthleteId: "I42" }
+    });
+    expect(execute).toHaveBeenCalledWith(ATHLETE_ID, "secret-key-123", "i42");
+  });
+
   it("refuses an id that is not an Intervals.icu athlete id", async () => {
     const execute = vi.fn(async () => connected);
     const mcpClient = await connect(recordingResolver(createMockClient()).resolve, { execute });
