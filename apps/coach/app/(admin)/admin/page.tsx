@@ -14,6 +14,7 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin · Inigo coach" };
 
 const STATUS_VARIANT: Record<Athlete["status"], "default" | "secondary" | "outline"> = {
+  onboarding: "secondary",
   active: "default",
   paused: "secondary",
   ended: "outline"

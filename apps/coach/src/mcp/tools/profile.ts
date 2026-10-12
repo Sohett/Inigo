@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AthleteDataRepository } from "../repository/athleteDataRepository";
 import type { ProfilePatch } from "../../domain/coaching";
+import { FTP_STATUSES } from "../../domain/onboarding";
 import { athleteIdShape, runAthleteTool } from "./result";
 
 const coachingTargetsShape = z
@@ -22,7 +23,8 @@ export function registerProfileReadTools(server: McpServer, store: AthleteDataRe
         "Read the athlete's structured coaching profile from the shared DB: identity " +
         "(display name, timezone, locale, status), physiology reference (birth date, sex, " +
         "height, reference weight + target, resting/max HR), weekly hours, equipment, " +
-        "narrative constraints/health notes, coaching targets, and the active schedule " +
+        "narrative constraints/health notes, coaching targets, onboarding answers (motivation, " +
+        "training background, how the FTP was settled, education done), and the active schedule " +
         "constraints (every recurring one + dated ones not yet over). This is the coaching layer " +
         "(preferences, health rules, targets) — live fitness/FTP/zones come from the Intervals.icu MCP.",
       inputSchema: { ...athleteIdShape }
@@ -38,8 +40,8 @@ export function registerProfileWriteTools(server: McpServer, store: AthleteDataR
       title: "Update athlete profile notes & preferences",
       description:
         "Update simple notes/preferences on the athlete's profile (upsert; only the fields " +
-        "you pass change). Use for target weight, weekly hours, equipment, health notes and " +
-        "coaching targets — not for FTP/zones (those are historised via thresholds and computed " +
+        "you pass change). Use for target weight, weekly hours, equipment, health notes, " +
+        "coaching targets and the onboarding answers — not for FTP/zones (those are historised via thresholds and computed " +
         "by Intervals.icu), nor for schedule rules (upsert_constraint). At least one field " +
         "beyond athleteId is required.",
       inputSchema: {
@@ -52,7 +54,24 @@ export function registerProfileWriteTools(server: McpServer, store: AthleteDataR
           .string()
           .optional()
           .describe("Active limitations and hard rules the coaching must respect (markdown)."),
-        coachingTargets: coachingTargetsShape.optional()
+        coachingTargets: coachingTargetsShape.optional(),
+        motivation: z.string().min(1).optional().describe("Why the athlete came to Inigo, in their words."),
+        trainingBackground: z
+          .string()
+          .min(1)
+          .optional()
+          .describe("Sporting background and current training volume."),
+        ftpStatus: z
+          .enum(FTP_STATUSES)
+          .optional()
+          .describe(
+            "How the bike FTP was settled: confirmed (and written on Intervals.icu), to_test " +
+              "(a test in week 1) or heart_rate_only (no power meter)."
+          ),
+        educationDone: z
+          .boolean()
+          .optional()
+          .describe("The athlete was walked through Intervals.icu and Inigo's way of coaching.")
       }
     },
     (args) =>
@@ -64,6 +83,10 @@ export function registerProfileWriteTools(server: McpServer, store: AthleteDataR
         if (args.constraintsNotes !== undefined) patch.constraintsNotes = args.constraintsNotes;
         if (args.healthNotes !== undefined) patch.healthNotes = args.healthNotes;
         if (args.coachingTargets !== undefined) patch.coachingTargets = args.coachingTargets;
+        if (args.motivation !== undefined) patch.motivation = args.motivation;
+        if (args.trainingBackground !== undefined) patch.trainingBackground = args.trainingBackground;
+        if (args.ftpStatus !== undefined) patch.ftpStatus = args.ftpStatus;
+        if (args.educationDone !== undefined) patch.educationDone = args.educationDone;
         if (Object.keys(patch).length === 0) {
           throw new Error("update_profile requires at least one field to update.");
         }

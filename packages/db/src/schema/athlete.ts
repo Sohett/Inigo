@@ -31,5 +31,5 @@ export const athlete = pgTable(
     status: text("status").$type<AthleteStatus>().notNull().default("active"),
     ...timestamps()
   },
-  (t) => [check("athlete_status_check", sql`${t.status} in ('active', 'paused', 'ended')`)]
+  (t) => [check("athlete_status_check", sql`${t.status} in ('onboarding', 'active', 'paused', 'ended')`)]
 );

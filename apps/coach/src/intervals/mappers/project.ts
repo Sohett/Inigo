@@ -22,6 +22,7 @@ import {
   type FitnessPoint,
   type WellnessDay
 } from "../../domain/training";
+import type { Athlete } from "../client";
 
 /**
  * Trim a number to the precision a coach reads, recursing into arrays and objects.
@@ -242,4 +243,13 @@ export function toCoachedEvent(
 /** The week's calendar: no `workout_doc`, which `get_event` serves for one session. */
 export function toCoachedEvents(raw: Record<string, unknown>[]): CoachedEvent[] {
   return raw.map((event) => toCoachedEvent(event, EVENT_SUMMARY_FIELDS));
+}
+
+/**
+ * The bike FTP set on an Intervals.icu athlete, in watts, or null when none is set. The
+ * bike settings are the ones that apply to the `Ride` activity type.
+ */
+export function toBikeFtp(athlete: Athlete): number | null {
+  const ftp = athlete.sportSettings?.find((settings) => settings.types?.includes("Ride"))?.ftp;
+  return ftp !== null && ftp !== undefined && ftp > 0 ? ftp : null;
 }

@@ -3,6 +3,7 @@ import type {
   GoalStatus, GoalType, PhaseType, PlanAuthor, PlanStatus, Sex, Sport, ThresholdSource,
   WeeklyTarget, Zone
 } from "@inigo/db";
+import type { FtpStatus } from "./onboarding";
 
 /* ---------- Modèles métier (contrat de sortie des tools) ---------- */
 
@@ -19,6 +20,10 @@ export interface ProfileDetails {
   constraintsNotes: string | null;
   healthNotes: string | null;
   coachingTargets: CoachingTargets | null;
+  motivation: string | null;
+  trainingBackground: string | null;
+  ftpStatus: FtpStatus | null;
+  educationDone: boolean;
 }
 export interface CoachProfile {
   athleteId: string;
@@ -111,6 +116,10 @@ export interface ProfilePatch {
   constraintsNotes?: string;
   healthNotes?: string;
   coachingTargets?: CoachingTargets;
+  motivation?: string;
+  trainingBackground?: string;
+  ftpStatus?: FtpStatus;
+  educationDone?: boolean;
 }
 /**
  * A whole constraint rule. On update it replaces the stored rule (fields left out are

@@ -7,7 +7,7 @@
  */
 
 /** Lifecycle of an athlete. Mirrors the DB CHECK values, redeclared here so the domain owns its own enum. */
-export type AthleteStatus = "active" | "paused" | "ended";
+export type AthleteStatus = "onboarding" | "active" | "paused" | "ended";
 
 export interface Athlete {
   id: string;

@@ -46,9 +46,11 @@ src/
     whatsappGateway.ts             # GatewaySession + GatewayAlert (santé de la passerelle, indépendants d'OpenWA)
     brain.ts                       # SessionElements / RunningSession / BrainInventory (indépendants du SDK)
     coaching.ts                    # modèles métier de la donnée coaching (contrat de sortie des tools MCP) + inputs
+    onboarding.ts                  # checklist « onboarding terminé » (7 items) + OnboardingFacts / OnboardingState + enum FtpStatus
   repositories/
     athleteRepository.ts           # PORT AthleteRepository (findByPhone, findByLid, setChatId, findById, listAll, setSession, listSessions)
     drizzleAthleteRepository.ts     # ADAPTER Drizzle (requête inline) + toAthlete(row→modèle)
+    drizzleOnboardingFactsReader.ts # ADAPTER Drizzle du port OnboardingFactsReader (profil + goals actifs + credential, une requête) + toOnboardingFacts
   use-cases/
     routeInboundMessage.ts         # use-case de routing : une seule fonction publique execute()
     startAthleteSession.ts         # use-case admin : clone la session courante, repointe l'athlète
@@ -57,6 +59,7 @@ src/
     readActivityStreams.ts         # use-case : fenêtre obligatoire + refus au-delà du plafond, jamais de troncature
     handleGatewaySessionEvent.ts   # use-case : webhook session.* OpenWA → alerte « down » / « recovered »
     checkGatewaySession.ts         # use-case watchdog : session enregistrée en Neon → GET OpenWA → alerte si pas ready
+    assessOnboarding.ts            # use-case : état d'onboarding calculé (jamais stocké) ; PORTS OnboardingFactsReader + BikeFtpReader
   alerts/
     gatewayAlerter.ts              # PORT GatewayAlerter (notify ne throw jamais)
     logAndSlackAlerter.ts          # ADAPTER : log structuré [coach][alert] + Slack si SLACK_ALERT_WEBHOOK_URL
@@ -78,6 +81,7 @@ src/
     mappers/project.ts             # projection objet brut Intervals → modèle du coach (aucune décision)
     mcp-tools/{index,result,tools/*}.ts  # tools MCP Intervals fins ; chaque tool prend athleteId + résout un client par requête
     resolveClient.ts               # createIntervalsResolver(db, encKey, baseUrl) : getIntervalsKey → déchiffre → IntervalsIcuClient
+    bikeFtpReader.ts               # ADAPTER du port BikeFtpReader : profil Intervals → toBikeFtp (réglages Ride)
   deps.ts                          # singleton lazy { config, brain, db, repo, athleteData, intervalsResolver }
 # futur : src/services/…
 ```
@@ -137,7 +141,7 @@ Un serveur MCP hébergé **dans coach** (choix assumé : pas d'app séparée) do
 | `get_goals` | read | `goal` filtrés (`status?`, défaut active). |
 | `get_training_plan` | read | plan courant + `plan_block` ordonnés (weekly targets). |
 | `get_adaptation_log` | read | journal (`limit?` défaut 5, max 30, `since?`), plus récent d'abord. |
-| `update_profile` | write | upsert notes/prefs (`weightTargetKg`, `weeklyHours`, `equipment`, `constraintsNotes`, `healthNotes`, `coachingTargets`). |
+| `update_profile` | write | upsert notes/prefs (`weightTargetKg`, `weeklyHours`, `equipment`, `constraintsNotes`, `healthNotes`, `coachingTargets`) + réponses d'onboarding (`motivation`, `trainingBackground`, `ftpStatus`, `educationDone`). |
 | `upsert_constraint` | write | create / **replace-all** (`id`) d'une règle d'horaire : `kind` (`fixed_session` \| `unavailable` \| `limited`), récurrente (`weekday` 1-7) **ou** datée (`startDate`..`endDate`). Règle validée par le use-case `saveAthleteConstraint`, puis par les CHECKs DB. Pas de tool de lecture : `get_profile` la renvoie. |
 | `delete_constraint` | write | supprime une règle (scopée par athleteId). Une datée terminée n'a pas besoin d'être supprimée. |
 | `log_adaptation` | write | append au journal (`summary` requis). |
