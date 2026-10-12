@@ -1,4 +1,4 @@
-import type { Athlete, AthleteSession } from "../domain/athlete";
+import type { Athlete, AthleteSession, NewOnboardingAthlete } from "../domain/athlete";
 
 /**
  * Port for athlete persistence. Business logic (the routing use-case) depends only
@@ -24,4 +24,9 @@ export interface AthleteRepository {
   setSession(athleteId: string, sessionId: string, agentId: string): Promise<void>;
   /** Every session the athlete has been routed to, newest first, the live one included. */
   listSessions(athleteId: string): Promise<AthleteSession[]>;
+  /**
+   * Create an athlete in `onboarding` together with their live session, atomically. Returns
+   * null when the phone or LID is already registered (two first messages racing).
+   */
+  registerOnboardingAthlete(input: NewOnboardingAthlete): Promise<Athlete | null>;
 }

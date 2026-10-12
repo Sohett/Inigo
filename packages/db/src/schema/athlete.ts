@@ -15,8 +15,11 @@ export const athlete = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     displayName: text("display_name"),
-    /** WhatsApp number in E.164. A routing key. */
-    phoneNum: text("phone_num").notNull().unique(),
+    /**
+     * WhatsApp number in E.164. A routing key. Null for an athlete who first wrote from a
+     * LID (WhatsApp's privacy addressing hides the number); one of the two keys is always set.
+     */
+    phoneNum: text("phone_num").unique(),
     /**
      * WhatsApp LID JID (`…@lid`) when the sender is identified by a linked id
      * rather than a phone number (WhatsApp's privacy addressing). A routing key
@@ -31,5 +34,11 @@ export const athlete = pgTable(
     status: text("status").$type<AthleteStatus>().notNull().default("active"),
     ...timestamps()
   },
-  (t) => [check("athlete_status_check", sql`${t.status} in ('onboarding', 'active', 'paused', 'ended')`)]
+  (t) => [
+    check("athlete_status_check", sql`${t.status} in ('onboarding', 'active', 'paused', 'ended')`),
+    check(
+      "athlete_routing_key_check",
+      sql`${t.phoneNum} is not null or ${t.whatsappLid} is not null`
+    )
+  ]
 );

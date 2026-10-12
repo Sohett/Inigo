@@ -75,6 +75,9 @@ export function replyChatId(message: InboundMessage): string | undefined {
   return message.chatId ?? message.from;
 }
 
+/** JID domains that address a person by phone number. Anything else (group, LID, newsletter, broadcast) has no phone. */
+const PERSON_JID_DOMAINS = ["c.us", "s.whatsapp.net"];
+
 /**
  * The sender's phone as E.164 (`+…`), parsed from the WhatsApp JID transport
  * envelope. This is NOT phone normalisation: WhatsApp already delivers a full
@@ -85,8 +88,9 @@ export function replyChatId(message: InboundMessage): string | undefined {
  */
 export function senderPhone(message: InboundMessage): string | null {
   const jid = message.from ?? message.chatId;
-  if (!jid || jid.endsWith("@g.us") || jid.endsWith("@lid")) return null;
-  const local = jid.split("@", 1)[0] ?? "";
+  if (!jid) return null;
+  const [local = "", domain] = jid.split("@", 2);
+  if (domain !== undefined && !PERSON_JID_DOMAINS.includes(domain)) return null;
   const digits = (local.split(":", 1)[0] ?? "").replace(/\D/g, "");
   return digits.length > 0 ? `+${digits}` : null;
 }

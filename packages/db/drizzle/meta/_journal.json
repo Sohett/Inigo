@@ -57,6 +57,13 @@
       "when": 1791804348699,
       "tag": "0007_athlete_onboarding",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791810869253,
+      "tag": "0008_onboarding_settings",
+      "breakpoints": true
     }
   ]
 }

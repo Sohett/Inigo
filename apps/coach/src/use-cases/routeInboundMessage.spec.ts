@@ -29,7 +29,12 @@ const unusedRepoMethods = () => ({
   findById: vi.fn(() => Promise.resolve(null)),
   listAll: vi.fn(() => Promise.resolve([])),
   setSession: vi.fn(() => Promise.resolve()),
-  listSessions: vi.fn(() => Promise.resolve([]))
+  listSessions: vi.fn(() => Promise.resolve([])),
+  registerOnboardingAthlete: vi.fn(() => Promise.resolve(null))
+});
+/** Registration of unknown senders, tested in its own spec: here only the hand-off matters. */
+const fakeRegister = () => ({
+  execute: vi.fn(() => Promise.resolve({ status: "declined" as const }))
 });
 const unusedBrainMethods = () => ({
   createSession: vi.fn(() => Promise.resolve({ sessionId: "sesn_unused", agentVersion: 1 })),
@@ -43,8 +48,10 @@ function makeDeps(athlete: Athlete | null) {
   const findByLid = vi.fn((_lid: string) => Promise.resolve(athlete));
   const setChatId = vi.fn(() => Promise.resolve());
   const repo: AthleteRepository = { findByPhone, findByLid, setChatId, ...unusedRepoMethods() };
+  const register = fakeRegister();
   return {
-    deps: { repo, brain: { appendUserMessage, ...unusedBrainMethods() } },
+    deps: { repo, brain: { appendUserMessage, ...unusedBrainMethods() }, register },
+    register,
     appendUserMessage,
     findByPhone,
     findByLid,
@@ -135,13 +142,19 @@ describe("routeInboundMessage", () => {
     });
   });
 
-  it("ignores a LID sender that matches no athlete", async () => {
-    const { deps, findByLid, findByPhone } = makeDeps(null);
+  it("hands a LID sender that matches no athlete to registration, without a phone", async () => {
+    const { deps, findByLid, findByPhone, register } = makeDeps(null);
     const outcome = await createRouteInboundMessage(deps).execute(lidInbound);
 
     expect(findByLid).toHaveBeenCalledWith("10325252415590@lid");
     expect(findByPhone).not.toHaveBeenCalled();
-    expect(outcome).toEqual({ status: "ignored", reason: "unknown_number" });
+    expect(register.execute).toHaveBeenCalledWith({
+      phoneNum: null,
+      whatsappLid: "10325252415590@lid",
+      chatId: "10325252415590@lid",
+      text: "ok"
+    });
+    expect(outcome).toEqual({ status: "unknown_sender", registration: { status: "declined" } });
   });
 
   it("resolves a phone sender via findByPhone, never findByLid", async () => {
@@ -161,12 +174,24 @@ describe("routeInboundMessage", () => {
     expect(setChatId).not.toHaveBeenCalled();
   });
 
-  it("ignores an unknown number", async () => {
-    const { deps, appendUserMessage } = makeDeps(null);
+  it("hands an unknown number to registration and forwards nothing itself", async () => {
+    const { deps, appendUserMessage, register } = makeDeps(null);
     const outcome = await createRouteInboundMessage(deps).execute(inbound);
 
-    expect(outcome).toEqual({ status: "ignored", reason: "unknown_number" });
+    expect(register.execute).toHaveBeenCalledWith({
+      phoneNum: "+32475123456",
+      whatsappLid: null,
+      chatId: "32475123456@c.us",
+      text: "salut"
+    });
+    expect(outcome).toEqual({ status: "unknown_sender", registration: { status: "declined" } });
     expect(appendUserMessage).not.toHaveBeenCalled();
+  });
+
+  it("never registers a known athlete again", async () => {
+    const { deps, register } = makeDeps(makeAthlete());
+    await createRouteInboundMessage(deps).execute(inbound);
+    expect(register.execute).not.toHaveBeenCalled();
   });
 
   it("ignores an unparseable sender without hitting the repo", async () => {
@@ -217,7 +242,8 @@ describe("routeInboundMessage", () => {
     const appendUserMessage = vi.fn(() => Promise.resolve());
     const deps = {
       repo: { findByPhone, findByLid, setChatId: vi.fn(() => Promise.resolve()), ...unusedRepoMethods() },
-      brain: { appendUserMessage, ...unusedBrainMethods() }
+      brain: { appendUserMessage, ...unusedBrainMethods() },
+      register: fakeRegister()
     };
     await expect(createRouteInboundMessage(deps).execute(inbound)).rejects.toThrow("neon down");
     expect(appendUserMessage).not.toHaveBeenCalled();
@@ -233,7 +259,8 @@ describe("routeInboundMessage", () => {
         setChatId,
         ...unusedRepoMethods()
       },
-      brain: { appendUserMessage, ...unusedBrainMethods() }
+      brain: { appendUserMessage, ...unusedBrainMethods() },
+      register: fakeRegister()
     };
     await expect(createRouteInboundMessage(deps).execute(inbound)).rejects.toThrow("neon down");
     expect(appendUserMessage).not.toHaveBeenCalled();
@@ -248,7 +275,8 @@ describe("routeInboundMessage", () => {
         setChatId: vi.fn(() => Promise.resolve()),
         ...unusedRepoMethods()
       },
-      brain: { appendUserMessage, ...unusedBrainMethods() }
+      brain: { appendUserMessage, ...unusedBrainMethods() },
+      register: fakeRegister()
     };
     await expect(createRouteInboundMessage(deps).execute(inbound)).rejects.toThrow("anthropic 500");
   });

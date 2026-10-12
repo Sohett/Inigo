@@ -12,8 +12,11 @@ export type AthleteStatus = "onboarding" | "active" | "paused" | "ended";
 export interface Athlete {
   id: string;
   displayName: string | null;
-  /** WhatsApp number in E.164 (`+32…`). A routing key. */
-  phoneNum: string;
+  /**
+   * WhatsApp number in E.164 (`+32…`). A routing key. Null for an athlete who first wrote from
+   * a LID: WhatsApp hides the number, and `whatsappLid` is the key instead.
+   */
+  phoneNum: string | null;
   /**
    * WhatsApp LID JID (`…@lid`) for senders identified by a linked id instead of
    * a phone number; a routing key alongside `phoneNum`. Null until known.
@@ -45,4 +48,15 @@ export interface AthleteSession extends ActiveSession {
   startedAt: Date;
   /** When a newer session replaced this one; null for the live session. */
   endedAt: Date | null;
+}
+
+/**
+ * A new athlete as WhatsApp first delivers them (INI-45): one of the two routing keys, the chat
+ * to reply to, and the onboarding session already opened for them.
+ */
+export interface NewOnboardingAthlete {
+  phoneNum: string | null;
+  whatsappLid: string | null;
+  chatId: string;
+  session: ActiveSession;
 }

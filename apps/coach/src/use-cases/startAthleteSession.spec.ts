@@ -58,7 +58,8 @@ function makeDeps(
       ),
       listAll: vi.fn(() => Promise.resolve([athlete])),
       setSession,
-      listSessions: vi.fn()
+      listSessions: vi.fn(),
+      registerOnboardingAthlete: vi.fn()
     },
     brain: {
       appendUserMessage: vi.fn(),

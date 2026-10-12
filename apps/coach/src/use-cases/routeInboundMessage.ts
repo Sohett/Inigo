@@ -2,6 +2,7 @@ import type { ManagedAgentBrain } from "../brain/managedAgents";
 import { formatTurn } from "../brain/taskEnvelope";
 import type { Athlete } from "../domain/athlete";
 import type { AthleteRepository } from "../repositories/athleteRepository";
+import type { RegisterNewAthlete, RegisterOutcome } from "./registerNewAthlete";
 import {
   webhookEnvelopeSchema,
   normaliseInbound,
@@ -24,8 +25,6 @@ export const IgnoreReason = {
   NoText: "no_text",
   /** (d) The sender JID held no usable phone digits. */
   InvalidSender: "invalid_sender",
-  /** (c) No athlete is registered for this phone or WhatsApp LID. */
-  UnknownNumber: "unknown_number",
   /** (b) The athlete exists but has no Managed Agent session yet. */
   NoSession: "no_session"
 } as const;
@@ -34,11 +33,15 @@ export type IgnoreReason = (typeof IgnoreReason)[keyof typeof IgnoreReason];
 
 export type RouteOutcome =
   | { status: "forwarded"; athleteId: string; sessionId: string; chatId: string }
+  /** No athlete carries this phone or LID: the sender went through onboarding registration. */
+  | { status: "unknown_sender"; registration: RegisterOutcome }
   | { status: "ignored"; reason: IgnoreReason };
 
 export interface RouteInboundMessageDeps {
   repo: AthleteRepository;
   brain: ManagedAgentBrain;
+  /** What happens to a sender no athlete carries (INI-45). */
+  register: RegisterNewAthlete;
 }
 
 export interface RouteInboundMessage {
@@ -76,15 +79,13 @@ export function createRouteInboundMessage(deps: RouteInboundMessageDeps): RouteI
       // The sender arrives either as a LID (WhatsApp privacy addressing) or a phone
       // JID. A LID is an opaque token, not a phone, so each has its own routing key.
       const lid = senderLid(message);
-      let athlete: Athlete | null;
-      if (lid) {
-        athlete = await deps.repo.findByLid(lid);
-      } else {
-        const phone = senderPhone(message);
-        if (!phone) return ignored(IgnoreReason.InvalidSender);
-        athlete = await deps.repo.findByPhone(phone);
+      const phone = senderPhone(message);
+      if (!lid && !phone) return ignored(IgnoreReason.InvalidSender);
+      const athlete = await findSender(deps.repo, lid, phone);
+      if (!athlete) {
+        const registration = await deps.register.execute({ phoneNum: phone, whatsappLid: lid, chatId, text });
+        return { status: "unknown_sender", registration };
       }
-      if (!athlete) return ignored(IgnoreReason.UnknownNumber);
       const { activeSession } = athlete;
       if (!activeSession) return ignored(IgnoreReason.NoSession);
 
@@ -97,6 +98,17 @@ export function createRouteInboundMessage(deps: RouteInboundMessageDeps): RouteI
       return { status: "forwarded", athleteId: athlete.id, sessionId: activeSession.sessionId, chatId };
     }
   };
+}
+
+/** The athlete behind a sender: by LID when WhatsApp hides the number, else by phone. */
+function findSender(
+  repo: AthleteRepository,
+  lid: string | null,
+  phone: string | null
+): Promise<Athlete | null> {
+  if (lid) return repo.findByLid(lid);
+  if (phone) return repo.findByPhone(phone);
+  return Promise.resolve(null);
 }
 
 function ignored(reason: IgnoreReason): RouteOutcome {

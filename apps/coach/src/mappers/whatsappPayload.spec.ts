@@ -64,6 +64,17 @@ describe("whatsappPayload", () => {
       expect(senderPhone({ from: "10325252415590@lid", isLidSender: true })).toBeNull();
     });
 
+    it("accepts the s.whatsapp.net person domain", () => {
+      expect(senderPhone({ from: "32475123456@s.whatsapp.net" })).toBe("+32475123456");
+    });
+
+    it.each(["120363000000000000@newsletter", "32475123456@broadcast"])(
+      "returns null for %s, which is not a person",
+      (from) => {
+        expect(senderPhone({ from })).toBeNull();
+      }
+    );
+
     it("returns null when no digits remain", () => {
       expect(senderPhone({ from: "status@broadcast" })).toBeNull();
     });

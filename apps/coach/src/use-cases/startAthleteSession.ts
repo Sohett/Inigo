@@ -71,8 +71,11 @@ export interface StartAthleteSession {
  * A human-readable session title, so the Anthropic console shows who a session belongs
  * to and when it was opened. Middle dots rather than dashes, per the repo's copy rule.
  */
-export function sessionTitle(athlete: Athlete, at: Date): string {
-  const who = athlete.displayName ?? athlete.phoneNum;
+export function sessionTitle(
+  athlete: Pick<Athlete, "displayName" | "phoneNum" | "whatsappLid">,
+  at: Date
+): string {
+  const who = athlete.displayName ?? athlete.phoneNum ?? athlete.whatsappLid;
   return `Inigo · ${who} · ${at.toISOString().slice(0, 10)}`;
 }
 
