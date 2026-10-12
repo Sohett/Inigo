@@ -29,7 +29,17 @@ describe("sessionElementsFrom", () => {
       /exactly one environment, found 2/
     ],
     ["no vault", { ...INVENTORY, vaults: [] }, /exactly one vault, found 0/],
-    ["no knowledge base", { ...INVENTORY, memoryStores: [] }, /exactly one memory store, found 0/]
+    [
+      "two vaults",
+      { ...INVENTORY, vaults: [...INVENTORY.vaults, { id: "vlt_2", name: "other" }] },
+      /exactly one vault, found 2/
+    ],
+    ["no knowledge base", { ...INVENTORY, memoryStores: [] }, /exactly one memory store, found 0/],
+    [
+      "two memory stores",
+      { ...INVENTORY, memoryStores: [...INVENTORY.memoryStores, { id: "memstore_2", name: "other" }] },
+      /exactly one memory store, found 2/
+    ]
   ])("refuses %s", (_label, inventory, reason) => {
     expect(sessionElementsFrom(inventory, AGENT)).toMatch(reason);
   });
