@@ -98,4 +98,30 @@ describe.skipIf(!databaseUrl)("drizzleAthleteRepository (integration)", () => {
       db.insert(athleteSession).values({ athleteId, anthropicSessionId: "sesn_test_rogue", managedAgentId: "agent_test" })
     ).rejects.toThrow();
   });
+
+  it("registers a LID-only athlete in onboarding with its session, and refuses it twice", async () => {
+    const repo = createDrizzleAthleteRepository(db);
+    const lid = "990000000000007@lid"; // reserved test LID, never a real athlete
+    await db.delete(athlete).where(eq(athlete.whatsappLid, lid));
+    const input = {
+      phoneNum: null,
+      whatsappLid: lid,
+      chatId: lid,
+      session: { sessionId: "sesn_test_onboarding", agentId: "agent_test_onboarding" }
+    };
+    try {
+      const registered = await repo.registerOnboardingAthlete(input);
+      expect(registered).toMatchObject({
+        phoneNum: null,
+        whatsappLid: lid,
+        status: "onboarding",
+        activeSession: { sessionId: "sesn_test_onboarding", agentId: "agent_test_onboarding" }
+      });
+      expect(
+        await repo.registerOnboardingAthlete({ ...input, session: { ...input.session, sessionId: "sesn_test_dup" } })
+      ).toBeNull();
+    } finally {
+      await db.delete(athlete).where(eq(athlete.whatsappLid, lid));
+    }
+  });
 });

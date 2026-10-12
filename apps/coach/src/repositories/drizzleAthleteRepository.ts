@@ -1,6 +1,7 @@
+import { randomUUID } from "node:crypto";
 import { and, desc, eq, isNull, sql, type SQL } from "drizzle-orm";
 import { athlete, athleteSession, type Db } from "@inigo/db";
-import type { Athlete, AthleteSession } from "../domain/athlete";
+import type { Athlete, AthleteSession, NewOnboardingAthlete } from "../domain/athlete";
 import type { AthleteRepository } from "./athleteRepository";
 
 type AthleteRow = typeof athlete.$inferSelect;
@@ -33,6 +34,17 @@ export function toAthleteSession(row: AthleteSessionRow): AthleteSession {
     startedAt: row.createdAt,
     endedAt: row.endedAt
   };
+}
+
+/** Postgres `unique_violation`, as raised by the driver or wrapped once by Drizzle. */
+const UNIQUE_VIOLATION = "23505";
+
+/** Whether a failed write hit a UNIQUE constraint. Exported for unit tests. */
+export function isUniqueViolation(error: unknown): boolean {
+  const codeOf = (value: unknown): unknown =>
+    value !== null && typeof value === "object" ? (value as { code?: unknown }).code : undefined;
+  const cause = error instanceof Error ? error.cause : undefined;
+  return codeOf(error) === UNIQUE_VIOLATION || codeOf(cause) === UNIQUE_VIOLATION;
 }
 
 /** The live session of an athlete: the one no newer session has closed. */
@@ -86,6 +98,32 @@ export function createDrizzleAthleteRepository(db: Db): AthleteRepository {
         db.update(athleteSession).set({ endedAt: sql`now()` }).where(isLiveSessionOf(athleteId)),
         db.insert(athleteSession).values({ athleteId, anthropicSessionId: sessionId, managedAgentId: agentId })
       ]);
+    },
+    async registerOnboardingAthlete(input: NewOnboardingAthlete): Promise<Athlete | null> {
+      // The id is chosen here so the athlete and its session go in one batch (a single
+      // Postgres transaction over Neon HTTP): never an athlete without a session to route to.
+      const athleteId = randomUUID();
+      try {
+        await db.batch([
+          db.insert(athlete).values({
+            id: athleteId,
+            phoneNum: input.phoneNum,
+            whatsappLid: input.whatsappLid,
+            chatId: input.chatId,
+            status: "onboarding"
+          }),
+          db.insert(athleteSession).values({
+            athleteId,
+            anthropicSessionId: input.session.sessionId,
+            managedAgentId: input.session.agentId
+          })
+        ]);
+      } catch (error) {
+        // Two first messages racing: the other one already registered this phone or LID.
+        if (isUniqueViolation(error)) return null;
+        throw error;
+      }
+      return findOne(eq(athlete.id, athleteId));
     },
     async listSessions(athleteId: string): Promise<AthleteSession[]> {
       const rows = await db

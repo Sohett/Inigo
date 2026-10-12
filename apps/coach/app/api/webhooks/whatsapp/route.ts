@@ -1,6 +1,8 @@
 import { getDeps } from "../../../../src/deps";
 import { verifyWebhookSignature, OPENWA_SIGNATURE_HEADER } from "../../../../src/auth";
-import { createRouteInboundMessage } from "../../../../src/use-cases/routeInboundMessage";
+import { createRouteInboundMessage, type RouteOutcome } from "../../../../src/use-cases/routeInboundMessage";
+import { createRegisterNewAthlete } from "../../../../src/use-cases/registerNewAthlete";
+import { createOpenWaChatReplier } from "../../../../src/whatsapp/chatReplier";
 import { createHandleGatewaySessionEvent } from "../../../../src/use-cases/handleGatewaySessionEvent";
 import { isGatewaySessionEvent } from "../../../../src/mappers/whatsappPayload";
 
@@ -8,6 +10,28 @@ import { isGatewaySessionEvent } from "../../../../src/mappers/whatsappPayload";
 export const dynamic = "force-dynamic";
 // Appending one event to a session is a single fast POST; keep a small ceiling.
 export const maxDuration = 30;
+
+/** One log line per delivery, saying what happened to it. */
+function logOutcome(outcome: RouteOutcome): void {
+  switch (outcome.status) {
+    case "forwarded":
+      console.info(
+        `[coach] forwarded athlete=${outcome.athleteId} session=${outcome.sessionId} chat=${outcome.chatId}`
+      );
+      return;
+    case "unknown_sender":
+      // A misconfigured onboarding is an operator problem, not a normal delivery.
+      if (outcome.registration.status === "misconfigured") {
+        console.error(`[coach] onboarding misconfigured: ${outcome.registration.reason}`);
+        return;
+      }
+      console.info(`[coach] unknown sender: ${JSON.stringify(outcome.registration)}`);
+      return;
+    case "ignored":
+      console.info(`[coach] ignored delivery: ${outcome.reason}`);
+      return;
+  }
+}
 
 function json(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {
@@ -47,15 +71,14 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   try {
-    const routeInboundMessage = createRouteInboundMessage({ repo: deps.repo, brain: deps.brain });
-    const outcome = await routeInboundMessage.execute(payload);
-    if (outcome.status === "forwarded") {
-      console.info(
-        `[coach] forwarded athlete=${outcome.athleteId} session=${outcome.sessionId} chat=${outcome.chatId}`
-      );
-    } else {
-      console.info(`[coach] ignored delivery: ${outcome.reason}`);
-    }
+    const register = createRegisterNewAthlete({
+      repo: deps.repo,
+      settings: deps.onboardingSettings,
+      brain: deps.brain,
+      replier: createOpenWaChatReplier({ gateway: deps.whatsappGateway, resolveClient: deps.whatsapp })
+    });
+    const routeInboundMessage = createRouteInboundMessage({ repo: deps.repo, brain: deps.brain, register });
+    logOutcome(await routeInboundMessage.execute(payload));
   } catch (error) {
     console.error("[coach] failed to forward inbound message", error);
     return json({ ok: false, error: "forward_failed" }, 502);

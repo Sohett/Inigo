@@ -50,3 +50,14 @@ export interface OnboardingState {
   /** Every item is done: the athlete can be handed to the coordinator. */
   complete: boolean;
 }
+
+/**
+ * How a new athlete is onboarded, edited from the admin. Onboarding is active only once the
+ * onboarding agent and the access code are both set.
+ */
+export interface OnboardingSettings {
+  onboardingAgentId: string | null;
+  /** The agent an athlete is handed to once onboarding is complete (INI-49). */
+  coordinatorAgentId: string | null;
+  accessCode: string | null;
+}
