@@ -8,7 +8,7 @@ import type { HandOffOutcome } from "./handOffToCoordinator";
 // A fixed instant so the `date_du_jour` the envelope carries is deterministic. In
 // Europe/Brussels (the default routing timezone) this is Thursday 2026-07-09.
 const FIXED_NOW = new Date("2026-07-09T09:05:56Z");
-const DATE_LINE = "date_du_jour: 2026-07-09 (jeudi)";
+const DATE_LINE = "date_time: 2026-07-09 11:05 (jeudi)";
 
 function makeAthlete(overrides: Partial<Athlete> = {}): Athlete {
   return {
@@ -18,6 +18,8 @@ function makeAthlete(overrides: Partial<Athlete> = {}): Athlete {
     whatsappLid: null,
     chatId: "32475123456@c.us",
     status: "active",
+    timezone: "Europe/Brussels",
+    locale: "fr",
     activeSession: { sessionId: "sesn_abc", agentId: "agent_abc" },
     ...overrides
   };
@@ -100,7 +102,7 @@ describe("routeInboundMessage", () => {
     expect(findBySender).toHaveBeenCalledWith({ phone: "+32475123456", lid: null });
     expect(appendUserMessage).toHaveBeenCalledWith(
       "sesn_abc",
-      `${DATE_LINE}\ninigo_athlete_id: a-1\nmessage: salut`
+      `${DATE_LINE}\ninigo_athlete_id: a-1\nathlete_display_name: Thomas\nlocale: fr\nmessage: "salut"`
     );
     expect(outcome).toEqual({
       status: "forwarded",
@@ -139,7 +141,7 @@ describe("routeInboundMessage", () => {
     expect(outcome.status).toBe("forwarded");
     expect(appendUserMessage).toHaveBeenCalledWith(
       "sesn_abc",
-      `${DATE_LINE}\ninigo_athlete_id: a-1\nmessage: yo`
+      `${DATE_LINE}\ninigo_athlete_id: a-1\nathlete_display_name: Thomas\nlocale: fr\nmessage: "yo"`
     );
   });
 
@@ -151,7 +153,7 @@ describe("routeInboundMessage", () => {
     expect(findBySender).toHaveBeenCalledWith({ phone: null, lid: "10325252415590@lid" });
     expect(appendUserMessage).toHaveBeenCalledWith(
       "sesn_abc",
-      `${DATE_LINE}\ninigo_athlete_id: a-1\nmessage: ok`
+      `${DATE_LINE}\ninigo_athlete_id: a-1\nathlete_display_name: Thomas\nlocale: fr\nmessage: "ok"`
     );
     expect(outcome).toEqual({
       status: "forwarded",
@@ -213,7 +215,7 @@ describe("routeInboundMessage", () => {
     expect(handOff.execute).not.toHaveBeenCalled();
     expect(appendUserMessage).toHaveBeenCalledWith(
       "sesn_abc",
-      `${DATE_LINE}\ninigo_athlete_id: a-1\nonboarding_fait: motivation\nonboarding_manquant: goal\nmessage: salut`
+      `${DATE_LINE}\ninigo_athlete_id: a-1\nathlete_display_name: Thomas\nlocale: fr\nonboarding_fait: motivation\nonboarding_manquant: goal\nmessage: "salut"`
     );
     expect(outcome.status).toBe("forwarded");
   });
@@ -230,7 +232,7 @@ describe("routeInboundMessage", () => {
     expect(appendUserMessage).toHaveBeenCalledOnce();
     expect(appendUserMessage).toHaveBeenCalledWith(
       "sesn_coordinator",
-      `${DATE_LINE}\ninigo_athlete_id: a-1\npassation: onboarding terminé, planifie la semaine 1\nmessage: salut`
+      `${DATE_LINE}\ninigo_athlete_id: a-1\nathlete_display_name: Thomas\nlocale: fr\npassation: onboarding terminé, planifie la semaine 1\nmessage: "salut"`
     );
     expect(outcome).toEqual({
       status: "handed_off",
@@ -277,7 +279,7 @@ describe("routeInboundMessage", () => {
     expect(assessOnboarding.execute).not.toHaveBeenCalled();
     expect(appendUserMessage).toHaveBeenCalledWith(
       "sesn_abc",
-      `${DATE_LINE}\ninigo_athlete_id: a-1\nmessage: salut`
+      `${DATE_LINE}\ninigo_athlete_id: a-1\nathlete_display_name: Thomas\nlocale: fr\nmessage: "salut"`
     );
   });
 
@@ -439,7 +441,7 @@ describe("routeInboundMessage", () => {
       const outcome = await createRouteInboundMessage(deps).execute(LID_DELIVERY);
 
       expect(findBySender).toHaveBeenCalledWith({ phone: null, lid: "10325252415590@lid" });
-      expect(appendUserMessage).toHaveBeenCalledWith("sesn_abc", `${DATE_LINE}\ninigo_athlete_id: a-1\nmessage: ok`);
+      expect(appendUserMessage).toHaveBeenCalledWith("sesn_abc", `${DATE_LINE}\ninigo_athlete_id: a-1\nathlete_display_name: Thomas\nlocale: fr\nmessage: "ok"`);
       expect(outcome).toMatchObject({ status: "forwarded", chatId: "10325252415590@lid" });
     });
 

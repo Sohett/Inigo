@@ -5,6 +5,9 @@ import type { Athlete, AthleteSession, NewOnboardingAthlete, SenderChanges, Send
 import type { AthleteRepository } from "./athleteRepository";
 
 type AthleteRow = typeof athlete.$inferSelect;
+
+/** The language of an athlete whose row has none (the column's own default). */
+const DEFAULT_LOCALE = "fr";
 type AthleteSessionRow = typeof athleteSession.$inferSelect;
 
 /**
@@ -20,6 +23,8 @@ export function toAthlete(row: AthleteRow, liveSession: AthleteSessionRow | null
     whatsappLid: row.whatsappLid,
     chatId: row.chatId,
     status: row.status,
+    timezone: row.timezone,
+    locale: row.locale ?? DEFAULT_LOCALE,
     activeSession: liveSession
       ? { sessionId: liveSession.anthropicSessionId, agentId: liveSession.managedAgentId }
       : null

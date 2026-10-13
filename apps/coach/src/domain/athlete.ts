@@ -25,6 +25,10 @@ export interface Athlete {
   /** Where replies go (the conversation JID as received), never an identity; null until the first inbound message. */
   chatId: string | null;
   status: AthleteStatus;
+  /** IANA timezone the athlete lives in (`Europe/Brussels`): their local date and time in every turn. */
+  timezone: string;
+  /** The athlete's language (`fr`). */
+  locale: string;
   /**
    * The session this athlete's messages are appended to; null if none yet. Loaded with the
    * athlete in the same query (the history is only read by `listSessions`).

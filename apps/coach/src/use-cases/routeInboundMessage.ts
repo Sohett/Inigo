@@ -172,7 +172,7 @@ async function resolveTurn(
       return resolveOnboardingTurn(athlete, sessionId, text, deps);
     case "active":
     case "paused":
-      return { sessionId, text: formatTurn(athlete.id, text), outcome: { status: RouteStatus.Forwarded } };
+      return { sessionId, text: formatTurn(athlete, text), outcome: { status: RouteStatus.Forwarded } };
     case "ended":
       return null;
   }
@@ -188,7 +188,7 @@ async function resolveOnboardingTurn(
   if (assessed.status === AssessStatus.UnknownAthlete) {
     throw new Error(`Athlete ${athlete.id} vanished while routing their message.`);
   }
-  const onboardingTurn = formatOnboardingTurn(athlete.id, assessed.state, text);
+  const onboardingTurn = formatOnboardingTurn(athlete, assessed.state, text);
   if (!assessed.state.complete) return { sessionId, text: onboardingTurn, outcome: { status: RouteStatus.Forwarded } };
 
   const handOff = await deps.handOff.execute(athlete);
@@ -196,7 +196,7 @@ async function resolveOnboardingTurn(
     case HandOffStatus.HandedOff:
       return {
         sessionId: handOff.sessionId,
-        text: formatHandoffTurn(athlete.id, text),
+        text: formatHandoffTurn(athlete, text),
         outcome: { status: RouteStatus.HandedOff }
       };
     case HandOffStatus.NotConfigured:

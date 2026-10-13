@@ -37,6 +37,8 @@ const REGISTERED: Athlete = {
   whatsappLid: null,
   chatId: SENDER.chatId,
   status: "onboarding",
+  timezone: "Europe/Brussels",
+  locale: "fr",
   activeSession: { sessionId: "sesn_new", agentId: AGENT }
 };
 
@@ -105,9 +107,10 @@ describe("registerNewAthlete", () => {
     expect(brain.appendUserMessage).toHaveBeenCalledWith(
       "sesn_new",
       expect.stringContaining(
-        "inigo_athlete_id: athlete-new\nonboarding_fait: \nonboarding_manquant: motivation, " +
+        "inigo_athlete_id: athlete-new\nathlete_display_name: \nlocale: fr\n" +
+          "onboarding_fait: \nonboarding_manquant: motivation, " +
           "training_background, goal, availability, intervals_connected, ftp, education\n" +
-          "message: Salut Inigo, mon code : velo26"
+          'message: "Salut Inigo, mon code : velo26"'
       )
     );
   });

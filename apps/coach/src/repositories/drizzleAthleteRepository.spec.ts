@@ -43,8 +43,14 @@ describe("toAthlete", () => {
       whatsappLid: "10325252415590@lid",
       chatId: "32475123456@c.us",
       status: "active",
+      timezone: "Europe/Brussels",
+      locale: "fr",
       activeSession: { sessionId: "sesn_abc", agentId: "agent_abc" }
     });
+  });
+
+  it("falls back to French for a row without a locale", () => {
+    expect(toAthlete(makeRow({ locale: null }), null).locale).toBe("fr");
   });
 
   it("maps an athlete without a live session to a null active session", () => {
@@ -53,9 +59,19 @@ describe("toAthlete", () => {
     expect(mapped.activeSession).toBeNull();
   });
 
-  it("does not leak DB-only columns (timezone, timestamps)", () => {
+  it("does not leak DB-only columns (timestamps)", () => {
     expect(Object.keys(toAthlete(makeRow(), makeSessionRow())).sort()).toEqual(
-      ["activeSession", "chatId", "displayName", "id", "phoneNum", "status", "whatsappLid"].sort()
+      [
+        "activeSession",
+        "chatId",
+        "displayName",
+        "id",
+        "locale",
+        "phoneNum",
+        "status",
+        "timezone",
+        "whatsappLid"
+      ].sort()
     );
   });
 });
