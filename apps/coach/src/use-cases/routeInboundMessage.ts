@@ -46,10 +46,11 @@ export type RouteOutcome =
   /** No athlete carries this phone or LID: the sender went through onboarding registration. */
   | { status: "unknown_sender"; registration: RegisterOutcome }
   /**
-   * The sender's LID and number belong to two different athletes: nothing is forwarded, an
-   * operator must merge or fix the records (INI-64).
+   * The sender's aliases contradict the records (INI-64): their LID and number belong to two
+   * athletes, or their number belongs to an athlete whose known LID is another one (a recycled
+   * number). Nothing is forwarded; an operator must fix the records.
    */
-  | { status: "ambiguous_sender"; athleteIds: string[] }
+  | { status: "sender_conflict"; athleteIds: string[] }
   | { status: "ignored"; reason: IgnoreReason };
 
 export interface RouteInboundMessageDeps {
@@ -102,8 +103,11 @@ export function createRouteInboundMessage(deps: RouteInboundMessageDeps): RouteI
       const sender = senderIdentity(message);
       if (!sender.lid && !sender.phone) return ignored(IgnoreReason.InvalidSender);
       const found = await deps.repo.findBySender(sender);
-      if (found.length > 1) return { status: "ambiguous_sender", athleteIds: found.map(({ id }) => id) };
+      if (found.length > 1) return { status: "sender_conflict", athleteIds: found.map(({ id }) => id) };
       const [athlete] = found;
+      // The LID is bound to the WhatsApp account, a number can be reassigned: another LID behind a
+      // known number is someone else, never a reason to rewrite the record.
+      if (athlete && hasAnotherLid(athlete, sender)) return { status: "sender_conflict", athleteIds: [athlete.id] };
       if (!athlete) {
         const registration = await deps.register.execute({
           phoneNum: sender.phone,
@@ -191,15 +195,20 @@ async function resolveOnboardingTurn(
   }
 }
 
+/** Whether the sender carries a LID and the athlete already has a different one. */
+function hasAnotherLid(athlete: Athlete, sender: SenderIdentity): boolean {
+  return sender.lid !== null && athlete.whatsappLid !== null && sender.lid !== athlete.whatsappLid;
+}
+
 /**
- * What this message teaches about a known athlete, or null when nothing differs: an alias the record
- * lacks or that WhatsApp now reports differently, and the reply address. What the gateway reports is
- * the account's current truth, so it replaces a stale value; a missing alias never erases one.
+ * What this message teaches about a known athlete, or null when nothing differs: the LID the record
+ * lacks, a number that changed behind the same LID, and the reply address. A missing alias never
+ * erases one, and a known LID is never replaced (see `hasAnotherLid`).
  */
 function senderChanges(athlete: Athlete, sender: SenderIdentity, chatId: string): SenderChanges | null {
   const changes: SenderChanges = {};
   if (sender.phone && sender.phone !== athlete.phoneNum) changes.phoneNum = sender.phone;
-  if (sender.lid && sender.lid !== athlete.whatsappLid) changes.whatsappLid = sender.lid;
+  if (sender.lid && !athlete.whatsappLid) changes.whatsappLid = sender.lid;
   if (chatId !== athlete.chatId) changes.chatId = chatId;
   return Object.keys(changes).length > 0 ? changes : null;
 }

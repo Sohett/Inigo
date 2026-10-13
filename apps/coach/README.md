@@ -47,7 +47,8 @@ LID (`whatsapp_lid`), deux alias du même compte, appris automatiquement au fil 
 - garder `WHATSAPP_WEBHOOK_SECRET` défini en prod : c'est lui qui garantit que le webhook vient
   bien d'OpenWA ;
 - garder `RESOLVE_LID_TO_PHONE=true` sur le service OpenWA : c'est lui qui relie un LID au numéro ;
-- un log `sender matches several athletes` signale deux fiches pour la même personne : les fusionner.
+- un log `sender conflicts with athlete records` signale des alias contradictoires (deux fiches pour
+  la même personne, ou un numéro recyclé par quelqu'un d'autre) : corriger les fiches à la main.
 
 Détails : `AGENTS.md`, section « Identification d'un athlète (WhatsApp) ».
 

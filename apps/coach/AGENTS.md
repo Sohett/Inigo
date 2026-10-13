@@ -104,7 +104,7 @@ src/
 3. Résout l'athlète par l'un ou l'autre de ses alias WhatsApp (`senderIdentity` → `findBySender`,
    voir « Identification d'un athlète »). Les
    décisions métier sont **retournées** en `RouteOutcome` (union) : athlète sans session
-   (`no_session`), sender illisible (`invalid_sender`), alias de deux athlètes (`ambiguous_sender`,
+   (`no_session`), sender illisible (`invalid_sender`), alias en conflit avec les fiches (`sender_conflict`,
    loggé en erreur), athlète terminé (`athlete_ended`) → route
    en 200. Seules les erreurs infra (Neon / Anthropic / passerelle / Intervals.icu pour l'état
    d'onboarding) throw → 502.
@@ -167,15 +167,24 @@ Au moins un alias est posé (CHECK `athlete_routing_key_check`).
    message (posteur d'un statut ou d'un groupe) n'est **jamais** pris pour l'expéditeur.
 2. **Une recherche** : `whatsapp_lid = lid OR phone_num = phone`. Aucun athlète → inscription par
    code d'accès (`registerNewAthlete`, qui enregistre les deux alias s'ils sont connus) ; un athlète
-   → c'est lui ; deux athlètes différents → `ambiguous_sender` : rien n'est transmis, erreur loggée,
+   → c'est lui ; deux athlètes différents → `sender_conflict` : rien n'est transmis, erreur loggée,
    un opérateur corrige les fiches.
-3. **Apprendre** : un alias reçu qui manque sur la fiche, ou qui a changé (numéro changé derrière le
-   même LID), la met à jour, avec `chat_id`, en une écriture (`rememberSender`). Un alias absent du
+3. **Le LID prime** : il est lié au compte WhatsApp, alors qu'un numéro peut être réattribué. Un
+   numéro connu qui arrive avec un **autre** LID que celui de la fiche est quelqu'un d'autre (numéro
+   recyclé) : `sender_conflict` aussi, rien n'est transmis ni réécrit. Un LID connu n'est donc jamais
+   remplacé automatiquement.
+4. **Apprendre** : le LID s'il manque sur la fiche, le numéro s'il manque ou a changé derrière le
+   même LID, et `chat_id`, en une écriture (`rememberSender`). Un alias absent du
    message n'efface jamais celui de la fiche. Rien à apprendre → aucune écriture.
 
-**Limite qui reste** : un expéditeur LID dont la passerelle ne connaît pas le numéro
-(`senderPhone: null`, numéro caché) et dont le LID n'est sur aucune fiche est un inconnu : il passe par
-le code d'accès et sa fiche n'aura que le LID. Sans lien possible, on ne devine pas.
+**Limites qui restent** (sans lien possible, on ne devine pas) :
+- un expéditeur LID dont la passerelle ne connaît pas le numéro (`senderPhone: null`, numéro caché)
+  et dont le LID n'est sur aucune fiche est un inconnu : il passe par le code d'accès, et sa fiche
+  n'aura que le LID ;
+- un athlète qui change de numéro avant que son LID soit connu, puis écrit en `@c.us`, est aussi un
+  inconnu ;
+- un athlète qui recrée son compte WhatsApp (nouveau LID, même numéro) tombe en `sender_conflict` :
+  corriger son LID à la main.
 
 ## MCP coaching-data (le brain lit/écrit la donnée coaching)
 

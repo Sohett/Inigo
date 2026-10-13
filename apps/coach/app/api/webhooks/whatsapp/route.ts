@@ -37,9 +37,9 @@ function logOutcome(outcome: RouteOutcome): void {
     case "unknown_sender":
       logRegistration(outcome.registration);
       return;
-    case "ambiguous_sender":
+    case "sender_conflict":
       console.error(
-        `[coach] sender matches several athletes (${outcome.athleteIds.join(", ")}): nothing forwarded, fix the records`
+        `[coach] sender conflicts with athlete records (${outcome.athleteIds.join(", ")}): nothing forwarded, fix the records`
       );
       return;
     case "ignored":

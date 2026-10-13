@@ -489,6 +489,19 @@ describe("routeInboundMessage", () => {
       expect(rememberSender).toHaveBeenCalledWith("a-1", { phoneNum: "+32475123456" });
     });
 
+    it("refuses a known number behind another LID (recycled number), and rewrites nothing", async () => {
+      const athlete = makeAthlete({ whatsappLid: "999999999999999@lid", chatId: "999999999999999@lid" });
+      const { deps, appendUserMessage, rememberSender } = makeDeps(athlete);
+      const outcome = await createRouteInboundMessage(deps).execute({
+        ...LID_DELIVERY,
+        data: { ...LID_DELIVERY.data, senderPhone: "32475123456" }
+      });
+
+      expect(outcome).toEqual({ status: "sender_conflict", athleteIds: ["a-1"] });
+      expect(appendUserMessage).not.toHaveBeenCalled();
+      expect(rememberSender).not.toHaveBeenCalled();
+    });
+
     it("writes nothing when the message teaches nothing new", async () => {
       const athlete = makeAthlete({ whatsappLid: "10325252415590@lid", chatId: "10325252415590@lid" });
       const { deps, rememberSender } = makeDeps(athlete);
@@ -523,7 +536,7 @@ describe("routeInboundMessage", () => {
         data: { ...LID_DELIVERY.data, senderPhone: "32475123456" }
       });
 
-      expect(outcome).toEqual({ status: "ambiguous_sender", athleteIds: ["a-1", "a-2"] });
+      expect(outcome).toEqual({ status: "sender_conflict", athleteIds: ["a-1", "a-2"] });
       expect(appendUserMessage).not.toHaveBeenCalled();
       expect(rememberSender).not.toHaveBeenCalled();
       expect(register.execute).not.toHaveBeenCalled();
