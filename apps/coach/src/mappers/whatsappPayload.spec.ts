@@ -6,6 +6,7 @@ import {
   replyChatId,
   senderPhone,
   senderLid,
+  senderIdentity,
   isGatewaySessionEvent
 } from "./whatsappPayload";
 
@@ -105,6 +106,38 @@ describe("whatsappPayload", () => {
       expect(senderLid({ from: "120363000000000000@g.us" })).toBeNull();
       expect(senderLid({ body: "hi" })).toBeNull();
     });
+  });
+});
+
+describe("senderIdentity", () => {
+  it("reads the number of a phone sender, with no LID", () => {
+    expect(senderIdentity({ from: "32475123456@c.us" })).toEqual({ phone: "+32475123456", lid: null });
+  });
+
+  it("reads the LID of a LID sender, and the number the gateway resolved for it", () => {
+    expect(senderIdentity({ from: "10325252415590@lid", isLidSender: true, senderPhone: "32475123456" })).toEqual({
+      phone: "+32475123456",
+      lid: "10325252415590@lid"
+    });
+  });
+
+  it.each([null, undefined, ""])("has no number for a LID sender the gateway could not resolve (%s)", (resolved) => {
+    expect(senderIdentity({ from: "10325252415590@lid", senderPhone: resolved })).toEqual({
+      phone: null,
+      lid: "10325252415590@lid"
+    });
+  });
+
+  it("never reads a senderPhone on a phone sender: the JID is the number", () => {
+    expect(senderIdentity({ from: "32475123456@c.us", senderPhone: "32499999999" })).toEqual({
+      phone: "+32475123456",
+      lid: null
+    });
+  });
+
+  it("has neither alias for a group or a status", () => {
+    expect(senderIdentity({ from: "status@broadcast" })).toEqual({ phone: null, lid: null });
+    expect(senderIdentity({ from: "120363000000000000@g.us" })).toEqual({ phone: null, lid: null });
   });
 });
 

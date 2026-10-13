@@ -13,9 +13,17 @@ export interface OnboardingFactsReader {
 /** Port: the athlete's bike FTP on Intervals.icu in watts, or null when none is set. */
 export type BikeFtpReader = (athleteId: string) => Promise<number | null>;
 
+/** Whether an athlete's onboarding could be assessed. */
+export const AssessStatus = {
+  Assessed: "assessed",
+  UnknownAthlete: "unknown_athlete"
+} as const;
+
+export type AssessStatus = (typeof AssessStatus)[keyof typeof AssessStatus];
+
 export type AssessOnboardingOutcome =
-  | { status: "assessed"; state: OnboardingState }
-  | { status: "unknown_athlete" };
+  | { status: typeof AssessStatus.Assessed; state: OnboardingState }
+  | { status: typeof AssessStatus.UnknownAthlete };
 
 export interface AssessOnboarding {
   execute(athleteId: string): Promise<AssessOnboardingOutcome>;
@@ -87,9 +95,9 @@ export function createAssessOnboarding(deps: {
   return {
     async execute(athleteId: string): Promise<AssessOnboardingOutcome> {
       const facts = await deps.facts.getOnboardingFacts(athleteId);
-      if (!facts) return { status: "unknown_athlete" };
+      if (!facts) return { status: AssessStatus.UnknownAthlete };
       const bikeFtpWatts = needsBikeFtp(facts) ? await deps.bikeFtp(athleteId) : null;
-      return { status: "assessed", state: assessOnboardingState(facts, bikeFtpWatts) };
+      return { status: AssessStatus.Assessed, state: assessOnboardingState(facts, bikeFtpWatts) };
     }
   };
 }

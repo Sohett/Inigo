@@ -57,9 +57,8 @@ function makeDeps(
   const listInventory = vi.fn(overrides.listInventory ?? (() => Promise.resolve(inventory)));
   const deps: LoadAdminOverviewDeps = {
     repo: {
-      findByPhone: vi.fn(),
-      findByLid: vi.fn(),
-      setChatId: vi.fn(),
+      findBySender: vi.fn(),
+      rememberSender: vi.fn(),
       findById: vi.fn(),
       listAll: vi.fn(() => Promise.resolve(athletes)),
       setSession: vi.fn(),

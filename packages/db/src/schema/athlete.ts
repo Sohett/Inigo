@@ -16,14 +16,14 @@ export const athlete = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     displayName: text("display_name"),
     /**
-     * WhatsApp number in E.164. A routing key. Null for an athlete who first wrote from a
-     * LID (WhatsApp's privacy addressing hides the number); one of the two keys is always set.
+     * WhatsApp number in E.164: one alias of the athlete's WhatsApp account, learned as messages
+     * arrive. Null while unknown (a LID can hide it); one of the two aliases is always set.
      */
     phoneNum: text("phone_num").unique(),
     /**
      * WhatsApp LID JID (`…@lid`) when the sender is identified by a linked id
-     * rather than a phone number (WhatsApp's privacy addressing). A routing key
-     * alongside `phone_num`; stored as the full JID (opaque token, no E.164 form)
+     * rather than a phone number (WhatsApp's privacy addressing). The other alias
+     * of the same account, beside `phone_num`; stored as the full JID (opaque token, no E.164 form)
      * so it never collides with a phone number. Null until known (seed or onboarding).
      */
     whatsappLid: text("whatsapp_lid").unique(),

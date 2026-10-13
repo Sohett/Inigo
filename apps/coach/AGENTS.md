@@ -48,7 +48,7 @@ src/
     coaching.ts                    # modèles métier de la donnée coaching (contrat de sortie des tools MCP) + inputs
     onboarding.ts                  # checklist « onboarding terminé » (7 items) + OnboardingFacts / OnboardingState + enum FtpStatus
   repositories/
-    athleteRepository.ts           # PORT AthleteRepository (findByPhone, findByLid, setChatId, findById, listAll, setSession, listSessions, registerOnboardingAthlete, completeOnboarding)
+    athleteRepository.ts           # PORT AthleteRepository (findBySender, rememberSender, findById, listAll, setSession, listSessions, registerOnboardingAthlete, completeOnboarding)
     drizzleAthleteRepository.ts     # ADAPTER Drizzle (requête inline) + toAthlete(row→modèle)
     onboardingSettingsRepository.ts # PORT : agent d'onboarding, coordinateur, code d'accès (singleton en base, édité dans l'admin)
     drizzleOnboardingSettingsRepository.ts # ADAPTER Drizzle du singleton onboarding_settings
@@ -101,9 +101,11 @@ src/
    `X-OpenWA-Signature` (HMAC sur le corps brut) ; sinon skip. Parse le JSON.
 2. `routeInboundMessage.execute` : valide (zod), normalise l'enveloppe (wrappée
    `{event,data}` ou plate), **ignore** `fromMe` / groupes / non-message / messages sans texte.
-3. Résout l'athlète via son LID (`findByLid`) ou son numéro (`senderPhone` → `findByPhone`). Les
+3. Résout l'athlète par l'un ou l'autre de ses alias WhatsApp (`senderIdentity` → `findBySender`,
+   voir « Identification d'un athlète »). Les
    décisions métier sont **retournées** en `RouteOutcome` (union) : athlète sans session
-   (`no_session`), sender illisible (`invalid_sender`), athlète terminé (`athlete_ended`) → route
+   (`no_session`), sender illisible (`invalid_sender`), alias en conflit avec les fiches (`sender_conflict`,
+   loggé en erreur), athlète terminé (`athlete_ended`) → route
    en 200. Seules les erreurs infra (Neon / Anthropic / passerelle / Intervals.icu pour l'état
    d'onboarding) throw → 502.
    **Expéditeur inconnu** (INI-45) → `registerNewAthlete` (`unknown_sender`) :
@@ -120,13 +122,69 @@ src/
    `db.batch` (`completeOnboarding`), et le message part à la nouvelle session via `formatHandoffTurn`
    (ligne `passation:`, ce tour seulement) → `handed_off`. Sans coordinateur utilisable → le message
    reste à la session d'onboarding (`handoff_not_configured`, warning). Le tour est résolu avant tout
-   autre effet de bord (la passation est le seul, atomique). Puis persiste `chat_id` si
-   nouveau (`repo.setChatId`) et **append** l'enveloppe à **sa** session via `brain.appendUserMessage` (dernier effet de bord → pas de doublon sur
+   autre effet de bord (la passation est le seul, atomique). Puis enregistre ce que le message apprend
+   (alias manquant ou changé, `chat_id`) en une écriture (`repo.rememberSender`) et **append** l'enveloppe à **sa** session via `brain.appendUserMessage` (dernier effet de bord → pas de doublon sur
    retry OpenWA). `inigo_athlete_id` = l'`athlete.id` interne (Neon), que l'agent repasse en
    argument `athleteId` aux tools du MCP athlete-data (`/api/coaching-data/mcp`) — **pas** l'id Intervals.icu.
    **Fire-and-forget** : on n'attend pas le run ; l'agent répond lui-même via le MCP WhatsApp
    de cette app (`send_whatsapp_message`). Le `chat_id` n'est **pas** dans l'enveloppe : il est
-   persisté (`repo.setChatId`) et résolu côté serveur au moment de l'envoi.
+   persisté (`repo.rememberSender`) et résolu côté serveur au moment de l'envoi.
+
+## Identification d'un athlète (WhatsApp)
+
+La seule preuve d'identité est **l'adresse WhatsApp de l'expéditeur**, telle qu'OpenWA la relaie.
+Pas de mot de passe, pas de session côté athlète : tout repose sur l'authenticité du webhook (HMAC
+`X-OpenWA-Signature`, actif seulement si `WHATSAPP_WEBHOOK_SECRET` est défini, à garder défini en prod :
+sans lui, n'importe qui peut poster un payload au nom d'un athlète).
+
+**Ce qu'OpenWA envoie** (moteur whatsapp-web.js, payload réel d'INI-20 rejoué dans
+`routeInboundMessage.spec.ts`) : `data.from` est le JID brut de l'expéditeur, `data.chatId` celui de
+la conversation (en 1:1, OpenWA pose `chatId = from` pour un message entrant). Le JID est soit
+`<chiffres>@c.us` (un numéro), soit `<chiffres>@lid` (un LID : identifiant opaque de l'adressage
+confidentiel de WhatsApp, **sans** numéro dans le payload). Pour un LID, OpenWA ajoute `senderPhone`
+(chiffres, ou `null` s'il ne connaît pas le numéro) quand `RESOLVE_LID_TO_PHONE=true` est activé sur la
+passerelle (**requis en prod**, désactivé par défaut). OpenWA ne sait pas faire l'inverse : un
+message `@c.us` ne porte jamais le LID.
+
+**Modèle (INI-64).** L'identité d'un athlète est `athlete.id`. Le numéro et le LID sont **deux alias
+du même compte WhatsApp**, l'un ou l'autre pouvant manquer (un LID peut cacher le numéro, et le
+cachera avec les noms d'utilisateur WhatsApp). On les garde tous les deux et on les apprend au fil des
+messages, plutôt que de stocker un seul « from » : après une bascule vers le LID, un message revenu en
+`@c.us` serait sinon perdu.
+
+| Colonne | Rôle | Valeur | Écrite par |
+|---|---|---|---|
+| `phone_num` | alias (unique) | E.164 `+32475123456` : d'un JID `@c.us` / `@s.whatsapp.net` (domaine et suffixe `:device` retirés, `+` ajouté ; pas de normalisation), ou du `senderPhone` d'un LID | l'inscription, puis chaque message qui l'apporte ou le change |
+| `whatsapp_lid` | alias (unique) | JID complet `10325252415590@lid` (suffixe `:device` retiré, domaine gardé pour ne jamais le confondre avec un numéro) | idem |
+| `chat_id` | **adresse de réponse**, pas une identité | le JID de la conversation tel que reçu (`replyChatId` : `chatId`, sinon `from`) | chaque message entrant s'il a changé |
+
+Au moins un alias est posé (CHECK `athlete_routing_key_check`).
+
+**Règles** (`senderIdentity`, `findBySender`, `senderChanges` dans `routeInboundMessage`) :
+1. **Lire les alias du message** : JID `@lid` → LID, plus le numéro de `senderPhone` s'il y en a un
+   (les chiffres d'un LID ne sont **jamais** lus comme un numéro) ; JID numéro → numéro seul ;
+   tout autre domaine (groupe, `status@broadcast`, newsletter) → `invalid_sender`. L'`author` d'un
+   message (posteur d'un statut ou d'un groupe) n'est **jamais** pris pour l'expéditeur.
+2. **Une recherche** : `whatsapp_lid = lid OR phone_num = phone`. Aucun athlète → inscription par
+   code d'accès (`registerNewAthlete`, qui enregistre les deux alias s'ils sont connus) ; un athlète
+   → c'est lui ; deux athlètes différents → `sender_conflict` : rien n'est transmis, erreur loggée,
+   un opérateur corrige les fiches.
+3. **Le LID prime** : il est lié au compte WhatsApp, alors qu'un numéro peut être réattribué. Un
+   numéro connu qui arrive avec un **autre** LID que celui de la fiche est quelqu'un d'autre (numéro
+   recyclé) : `sender_conflict` aussi, rien n'est transmis ni réécrit. Un LID connu n'est donc jamais
+   remplacé automatiquement.
+4. **Apprendre** : le LID s'il manque sur la fiche, le numéro s'il manque ou a changé derrière le
+   même LID, et `chat_id`, en une écriture (`rememberSender`). Un alias absent du
+   message n'efface jamais celui de la fiche. Rien à apprendre → aucune écriture.
+
+**Limites qui restent** (sans lien possible, on ne devine pas) :
+- un expéditeur LID dont la passerelle ne connaît pas le numéro (`senderPhone: null`, numéro caché)
+  et dont le LID n'est sur aucune fiche est un inconnu : il passe par le code d'accès, et sa fiche
+  n'aura que le LID ;
+- un athlète qui change de numéro avant que son LID soit connu, puis écrit en `@c.us`, est aussi un
+  inconnu ;
+- un athlète qui recrée son compte WhatsApp (nouveau LID, même numéro) tombe en `sender_conflict` :
+  corriger son LID à la main.
 
 ## MCP coaching-data (le brain lit/écrit la donnée coaching)
 
@@ -405,7 +463,7 @@ coordinateur et en fait la session active de l'athlète dans `athlete_session`.
   (`repositories/athleteRepository.ts`), jamais de l'ORM. Deux couches seulement connaissent
   `@inigo/db` : l'adapter Drizzle du routing (rows → **modèles métier** `domain/`), et le
   repository MCP (`src/mcp/repository/athleteDataRepository.ts`) qui mappe rows→modèles (`domain/coaching.ts`).
-- **Multi-athlète** : le routing résout l'athlète + sa session par `phone_num` ou LID en base (Neon). Limite connue : un athlète connu par une seule clé qui écrit avec l'autre est traité comme un inconnu (aucune normalisation, cf. INI-5).
+- **Multi-athlète** : le routing résout l'athlète + sa session par `phone_num` ou LID en base (Neon). Règles et limites : voir « Identification d'un athlète (WhatsApp) ».
   Plus de session fixe en env ; pas de mapping en mémoire locale.
 - Secrets : env serveur uniquement, validés au boot, jamais en log.
 

@@ -13,16 +13,16 @@ export interface Athlete {
   id: string;
   displayName: string | null;
   /**
-   * WhatsApp number in E.164 (`+32…`). A routing key. Null for an athlete who first wrote from
-   * a LID: WhatsApp hides the number, and `whatsappLid` is the key instead.
+   * WhatsApp number in E.164 (`+32…`): one alias of the athlete's WhatsApp account, learned from
+   * a phone JID or from the gateway for a LID sender (INI-64). Null while unknown (hidden number).
    */
   phoneNum: string | null;
   /**
-   * WhatsApp LID JID (`…@lid`) for senders identified by a linked id instead of
-   * a phone number; a routing key alongside `phoneNum`. Null until known.
+   * WhatsApp LID JID (`…@lid`): the other alias of the same account, learned from a LID JID.
+   * Null until the athlete writes from their LID.
    */
   whatsappLid: string | null;
-  /** WhatsApp chat id the agent replies to; null until the first inbound message. */
+  /** Where replies go (the conversation JID as received), never an identity; null until the first inbound message. */
   chatId: string | null;
   status: AthleteStatus;
   /**
@@ -51,7 +51,7 @@ export interface AthleteSession extends ActiveSession {
 }
 
 /**
- * A new athlete as WhatsApp first delivers them (INI-45): one of the two routing keys, the chat
+ * A new athlete as WhatsApp first delivers them (INI-45): the aliases known so far, the chat
  * to reply to, and the onboarding session already opened for them.
  */
 export interface NewOnboardingAthlete {
@@ -59,4 +59,23 @@ export interface NewOnboardingAthlete {
   whatsappLid: string | null;
   chatId: string;
   session: ActiveSession;
+}
+
+/**
+ * Who sent a WhatsApp message, as far as the gateway can tell (INI-64). The number and the LID are
+ * two aliases of one WhatsApp account, either of which may be missing: a LID can hide the number,
+ * a phone JID never carries the LID. At least one is set.
+ */
+export interface SenderIdentity {
+  /** E.164 (`+32…`), from a phone JID or resolved by the gateway for a LID sender. */
+  phone: string | null;
+  /** Full LID JID (`…@lid`). */
+  lid: string | null;
+}
+
+/** What to record about a known sender: the aliases and the reply address that differ from what is stored. */
+export interface SenderChanges {
+  phoneNum?: string;
+  whatsappLid?: string;
+  chatId?: string;
 }

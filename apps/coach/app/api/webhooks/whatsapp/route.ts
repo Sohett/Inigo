@@ -1,7 +1,7 @@
 import { getDeps } from "../../../../src/deps";
 import { verifyWebhookSignature, OPENWA_SIGNATURE_HEADER } from "../../../../src/auth";
-import { createRouteInboundMessage, type RouteOutcome } from "../../../../src/use-cases/routeInboundMessage";
-import { createRegisterNewAthlete, type RegisterOutcome } from "../../../../src/use-cases/registerNewAthlete";
+import { createRouteInboundMessage, RouteStatus, type RouteOutcome } from "../../../../src/use-cases/routeInboundMessage";
+import { createRegisterNewAthlete, RegisterStatus, type RegisterOutcome } from "../../../../src/use-cases/registerNewAthlete";
 import { createOpenWaChatReplier } from "../../../../src/whatsapp/chatReplier";
 import { createAssessOnboarding } from "../../../../src/use-cases/assessOnboarding";
 import { createHandOffToCoordinator } from "../../../../src/use-cases/handOffToCoordinator";
@@ -18,26 +18,31 @@ export const maxDuration = 30;
 /** One log line per delivery, saying what happened to it. */
 function logOutcome(outcome: RouteOutcome): void {
   switch (outcome.status) {
-    case "forwarded":
+    case RouteStatus.Forwarded:
       console.info(
         `[coach] forwarded athlete=${outcome.athleteId} session=${outcome.sessionId} chat=${outcome.chatId}`
       );
       return;
-    case "handed_off":
+    case RouteStatus.HandedOff:
       console.info(
         `[coach] handed off athlete=${outcome.athleteId} to coordinator session=${outcome.sessionId} chat=${outcome.chatId}`
       );
       return;
-    case "handoff_not_configured":
+    case RouteStatus.HandoffNotConfigured:
       console.warn(
         `[coach] onboarding complete but no hand-off for athlete=${outcome.athleteId} (${outcome.reason}): ` +
           `forwarded to session=${outcome.sessionId}`
       );
       return;
-    case "unknown_sender":
+    case RouteStatus.UnknownSender:
       logRegistration(outcome.registration);
       return;
-    case "ignored":
+    case RouteStatus.SenderConflict:
+      console.error(
+        `[coach] sender conflicts with athlete records (${outcome.athleteIds.join(", ")}): nothing forwarded, fix the records`
+      );
+      return;
+    case RouteStatus.Ignored:
       console.info(`[coach] ignored delivery: ${outcome.reason}`);
       return;
     default: {
@@ -50,15 +55,15 @@ function logOutcome(outcome: RouteOutcome): void {
 /** What happened to a sender no athlete carries. A misconfiguration is for the operator to fix. */
 function logRegistration(registration: RegisterOutcome): void {
   switch (registration.status) {
-    case "misconfigured":
+    case RegisterStatus.Misconfigured:
       console.error(`[coach] onboarding misconfigured: ${registration.reason}`);
       return;
-    case "registered":
+    case RegisterStatus.Registered:
       console.info(`[coach] registered athlete=${registration.athleteId} session=${registration.sessionId}`);
       return;
-    case "declined":
-    case "disabled":
-    case "already_registered":
+    case RegisterStatus.Declined:
+    case RegisterStatus.Disabled:
+    case RegisterStatus.AlreadyRegistered:
       console.info(`[coach] unknown sender: ${registration.status}`);
       return;
     default: {

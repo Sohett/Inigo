@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, isNull, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, isNull, or, sql, type SQL } from "drizzle-orm";
 import { athlete, athleteSession, type Db } from "@inigo/db";
-import type { Athlete, AthleteSession, NewOnboardingAthlete } from "../domain/athlete";
+import type { Athlete, AthleteSession, NewOnboardingAthlete, SenderChanges, SenderIdentity } from "../domain/athlete";
 import type { AthleteRepository } from "./athleteRepository";
 
 type AthleteRow = typeof athlete.$inferSelect;
@@ -72,15 +72,19 @@ export function createDrizzleAthleteRepository(db: Db): AthleteRepository {
   }
 
   return {
-    findByPhone(phoneNum: string): Promise<Athlete | null> {
-      return findOne(eq(athlete.phoneNum, phoneNum));
+    async findBySender(sender: SenderIdentity): Promise<Athlete[]> {
+      const matches = [
+        sender.lid ? eq(athlete.whatsappLid, sender.lid) : undefined,
+        sender.phone ? eq(athlete.phoneNum, sender.phone) : undefined
+      ].filter((match) => match !== undefined);
+      if (matches.length === 0) return [];
+      // Both aliases are UNIQUE, so at most two rows: the same athlete twice is one row.
+      const rows = await selectAthletesWithActiveSession().where(or(...matches)).limit(2);
+      return rows.map((row) => toAthlete(row.athlete, row.liveSession));
     },
-    findByLid(whatsappLid: string): Promise<Athlete | null> {
-      return findOne(eq(athlete.whatsappLid, whatsappLid));
-    },
-    async setChatId(athleteId: string, chatId: string): Promise<void> {
+    async rememberSender(athleteId: string, changes: SenderChanges): Promise<void> {
       // `updated_at` auto-bumps via the column's `$onUpdate`, so no manual set is needed.
-      await db.update(athlete).set({ chatId }).where(eq(athlete.id, athleteId));
+      await db.update(athlete).set(changes).where(eq(athlete.id, athleteId));
     },
     findById(athleteId: string): Promise<Athlete | null> {
       return findOne(eq(athlete.id, athleteId));

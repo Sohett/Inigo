@@ -5,11 +5,19 @@ import type { AthleteRepository } from "../repositories/athleteRepository";
 import type { OnboardingSettingsRepository } from "../repositories/onboardingSettingsRepository";
 import { sessionTitle } from "./startAthleteSession";
 
+/** What a hand-off attempt ended in. */
+export const HandOffStatus = {
+  HandedOff: "handed_off",
+  NotConfigured: "not_configured"
+} as const;
+
+export type HandOffStatus = (typeof HandOffStatus)[keyof typeof HandOffStatus];
+
 export type HandOffOutcome =
   /** The athlete is `active` and `sessionId`, run by the coordinator, is their live session. */
-  | { status: "handed_off"; sessionId: string }
+  | { status: typeof HandOffStatus.HandedOff; sessionId: string }
   /** No coordinator set, or the control plane cannot host its session: nothing changed. */
-  | { status: "not_configured"; reason: string };
+  | { status: typeof HandOffStatus.NotConfigured; reason: string };
 
 export interface HandOffToCoordinator {
   execute(athlete: Athlete): Promise<HandOffOutcome>;
@@ -33,14 +41,14 @@ export function createHandOffToCoordinator(deps: {
   return {
     async execute(athlete: Athlete): Promise<HandOffOutcome> {
       const { coordinatorAgentId } = await deps.settings.get();
-      if (!coordinatorAgentId) return { status: "not_configured", reason: "no coordinator agent set" };
+      if (!coordinatorAgentId) return { status: HandOffStatus.NotConfigured, reason: "no coordinator agent set" };
 
       const elements = sessionElementsFrom(await deps.brain.listInventory(), coordinatorAgentId);
-      if (typeof elements === "string") return { status: "not_configured", reason: elements };
+      if (typeof elements === "string") return { status: HandOffStatus.NotConfigured, reason: elements };
 
       const created = await deps.brain.createSession({ ...elements, title: sessionTitle(athlete, now()) });
       await deps.repo.completeOnboarding(athlete.id, created.sessionId, coordinatorAgentId);
-      return { status: "handed_off", sessionId: created.sessionId };
+      return { status: HandOffStatus.HandedOff, sessionId: created.sessionId };
     }
   };
 }
