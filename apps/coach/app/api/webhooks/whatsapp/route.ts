@@ -6,7 +6,7 @@ import { createOpenWaChatReplier } from "../../../../src/whatsapp/chatReplier";
 import { createAssessOnboarding } from "../../../../src/use-cases/assessOnboarding";
 import { createHandOffToCoordinator } from "../../../../src/use-cases/handOffToCoordinator";
 import { createDrizzleOnboardingFactsReader } from "../../../../src/repositories/drizzleOnboardingFactsReader";
-import { createIntervalsBikeFtpReader } from "../../../../src/intervals/bikeFtpReader";
+import { createIntervalsAthleteReader } from "../../../../src/intervals/intervalsAthleteReader";
 import { createHandleGatewaySessionEvent } from "../../../../src/use-cases/handleGatewaySessionEvent";
 import { isGatewaySessionEvent } from "../../../../src/mappers/whatsappPayload";
 
@@ -117,7 +117,7 @@ export async function POST(request: Request): Promise<Response> {
     });
     const assessOnboarding = createAssessOnboarding({
       facts: createDrizzleOnboardingFactsReader(deps.db),
-      bikeFtp: createIntervalsBikeFtpReader(deps.intervalsResolver)
+      intervals: createIntervalsAthleteReader(deps.intervalsResolver)
     });
     const routeInboundMessage = createRouteInboundMessage({
       repo: deps.repo,

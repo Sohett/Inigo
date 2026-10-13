@@ -10,23 +10,31 @@
 export const FTP_STATUSES = ["confirmed", "to_test", "heart_rate_only"] as const;
 export type FtpStatus = (typeof FTP_STATUSES)[number];
 
-/** The seven checks, all blocking: the athlete is handed to the coordinator once every one is done. */
+/** The checks, all blocking: the athlete is handed to the coordinator once every one is done. */
 export type OnboardingItem =
-  | "intervals_connected"
+  | "identity"
   | "motivation"
-  | "training_background"
   | "goal"
+  | "goal_details"
+  | "expectations"
+  | "training_background"
   | "availability"
+  | "intervals_connected"
+  | "body"
   | "ftp"
   | "education";
 
 /** Every item, in the order the conversation usually covers them. */
 export const ONBOARDING_ITEMS: readonly OnboardingItem[] = [
+  "identity",
   "motivation",
-  "training_background",
   "goal",
+  "goal_details",
+  "expectations",
+  "training_background",
   "availability",
   "intervals_connected",
+  "body",
   "ftp",
   "education"
 ];
@@ -35,9 +43,15 @@ export const ONBOARDING_ITEMS: readonly OnboardingItem[] = [
 export interface OnboardingFacts {
   /** A usable Intervals.icu credential is stored (key and Intervals athlete id). */
   intervalsConnected: boolean;
+  /** How the athlete wants to be called. */
+  displayName: string | null;
   motivation: string | null;
   trainingBackground: string | null;
   activeGoalCount: number;
+  /** Active goals whose target result and past experience are both told. */
+  detailedGoalCount: number;
+  pastCoaching: string | null;
+  coachExpectations: string | null;
   /** Usual weekly training time, hours (decimal string, as stored). */
   weeklyHours: string | null;
   ftpStatus: FtpStatus | null;

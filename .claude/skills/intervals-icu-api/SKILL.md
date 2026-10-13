@@ -74,6 +74,10 @@ console.log(JSON.stringify(s.components.schemas[process.argv[1]],null,2))' Activ
   `events{format}`). Calling the bare path (empty ext) returns JSON; append `.csv` for CSV.
 - **Array query params** (`curves`, `category`, `types`, `fields`) are sent as repeated
   params (`?category=A&category=B`).
+- **Athlete physiology** (`GET`/`PUT /athlete/{id}`, checked on a live account): `sex` is
+  `"M"`/`"F"`, `icu_date_of_birth` is `YYYY-MM-DD`, `height` is in **metres** even when
+  `height_units` is `"CM"` (display unit only), the settings weight is `icu_weight` in kg
+  (`weight` is the Strava-synced one, often null).
 - Filter params `f1`/`f2`/`f3` on curve endpoints are marked `required` in the spec but
   described as "if set" — currently omitted; validate against the live API with a real key.
 

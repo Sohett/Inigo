@@ -3,6 +3,7 @@ export type {
   IntervalsIcuClientOptions,
   DateRange,
   CurveQuery,
+  AthleteBodyPatch,
   SportSettingsPatch
 } from "./client";
 export { IntervalsIcuApiError } from "./errors";

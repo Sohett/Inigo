@@ -111,6 +111,8 @@ function toGoal(row: GoalRow): Goal {
     description: row.description,
     type: row.type,
     targetDate: toDateString(row.targetDate),
+    targetResult: row.targetResult,
+    experience: row.experience,
     priority: row.priority,
     status: row.status,
     intervalsEventId: row.intervalsEventId
@@ -205,13 +207,7 @@ export function createAthleteDataRepository(db: Db) {
           // guarantee resilient if a column is ever added — the caller chooses what is exposed.
           const profileRows = await db
             .select({
-              birthDate: athleteProfile.birthDate,
-              sex: athleteProfile.sex,
-              heightCm: athleteProfile.heightCm,
-              weightKg: athleteProfile.weightKg,
               weightTargetKg: athleteProfile.weightTargetKg,
-              restingHr: athleteProfile.restingHr,
-              maxHr: athleteProfile.maxHr,
               weeklyHours: athleteProfile.weeklyHours,
               equipment: athleteProfile.equipment,
               constraintsNotes: athleteProfile.constraintsNotes,
@@ -219,6 +215,8 @@ export function createAthleteDataRepository(db: Db) {
               coachingTargets: athleteProfile.coachingTargets,
               motivation: athleteProfile.motivation,
               trainingBackground: athleteProfile.trainingBackground,
+              pastCoaching: athleteProfile.pastCoaching,
+              coachExpectations: athleteProfile.coachExpectations,
               ftpStatus: athleteProfile.ftpStatus,
               educationDone: athleteProfile.educationDone,
               updatedAt: athleteProfile.updatedAt
@@ -229,13 +227,7 @@ export function createAthleteDataRepository(db: Db) {
           const profileRow = profileRows[0];
           const profile: ProfileDetails | null = profileRow
             ? {
-                birthDate: toDateString(profileRow.birthDate),
-                sex: profileRow.sex,
-                heightCm: profileRow.heightCm,
-                weightKg: profileRow.weightKg,
                 weightTargetKg: profileRow.weightTargetKg,
-                restingHr: profileRow.restingHr,
-                maxHr: profileRow.maxHr,
                 weeklyHours: profileRow.weeklyHours,
                 equipment: profileRow.equipment,
                 constraintsNotes: profileRow.constraintsNotes,
@@ -243,6 +235,8 @@ export function createAthleteDataRepository(db: Db) {
                 coachingTargets: profileRow.coachingTargets,
                 motivation: profileRow.motivation,
                 trainingBackground: profileRow.trainingBackground,
+                pastCoaching: profileRow.pastCoaching,
+                coachExpectations: profileRow.coachExpectations,
                 ftpStatus: profileRow.ftpStatus,
                 educationDone: profileRow.educationDone
               }
@@ -359,12 +353,30 @@ export function createAthleteDataRepository(db: Db) {
           return rows.map(toAdaptationLogEntry);
         },
 
-        /** Upsert the 1:1 profile (PK = athlete_id); only the provided fields change. */
+        /**
+         * Update what the patch carries: `displayName` on `athlete`, the rest by upserting the
+         * 1:1 profile (PK = athlete_id). Only the provided fields change. Both writes go in one
+         * `db.batch` (a single Postgres transaction over Neon HTTP): all or nothing.
+         */
         async updateProfile(patch: ProfilePatch): Promise<CoachProfile | null> {
-          await db
-            .insert(athleteProfile)
-            .values({ athleteId, ...patch })
-            .onConflictDoUpdate({ target: athleteProfile.athleteId, set: patch });
+          const { displayName, ...profilePatch } = patch;
+          const hasProfileFields = Object.keys(profilePatch).length > 0;
+          if (displayName === undefined && !hasProfileFields) return this.getProfile();
+          const upsertProfile = () =>
+            db
+              .insert(athleteProfile)
+              .values({ athleteId, ...profilePatch })
+              .onConflictDoUpdate({ target: athleteProfile.athleteId, set: profilePatch });
+          if (displayName === undefined) {
+            await upsertProfile();
+            return this.getProfile();
+          }
+          const renameAthlete = db.update(athlete).set({ displayName }).where(eq(athlete.id, athleteId));
+          if (!hasProfileFields) {
+            await renameAthlete;
+            return this.getProfile();
+          }
+          await db.batch([renameAthlete, upsertProfile()]);
           return this.getProfile();
         },
 

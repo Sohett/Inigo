@@ -10,6 +10,7 @@ import {
 } from "../../domain/training";
 import {
   toBikeFtp,
+  toBodyComplete,
   toCoachedActivities,
   toCoachedActivity,
   toCoachedActivityIntervals,
@@ -453,5 +454,26 @@ describe("toBikeFtp", () => {
     ["a zero bike FTP", { sportSettings: [{ types: ["Ride"], ftp: 0 }] }]
   ])("is null with %s", (_label, athlete) => {
     expect(toBikeFtp(athlete)).toBeNull();
+  });
+});
+
+describe("toBodyComplete", () => {
+  const COMPLETE = { sex: "F", icu_date_of_birth: "1990-04-12", height: 1.68, icu_weight: 61 };
+
+  it("is true when sex, birth date, height and the settings weight are set", () => {
+    expect(toBodyComplete(COMPLETE)).toBe(true);
+  });
+
+  it("accepts the Strava-synced weight when the settings weight is empty", () => {
+    expect(toBodyComplete({ ...COMPLETE, icu_weight: null, weight: 61 })).toBe(true);
+  });
+
+  it.each([
+    ["no sex", { ...COMPLETE, sex: null }],
+    ["a blank birth date", { ...COMPLETE, icu_date_of_birth: " " }],
+    ["no height", { ...COMPLETE, height: undefined }],
+    ["a zero weight and no synced one", { ...COMPLETE, icu_weight: 0 }]
+  ])("is false with %s", (_label, athlete) => {
+    expect(toBodyComplete(athlete)).toBe(false);
   });
 });

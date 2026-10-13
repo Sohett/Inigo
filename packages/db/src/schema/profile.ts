@@ -2,8 +2,6 @@ import { sql } from "drizzle-orm";
 import {
   boolean,
   check,
-  date,
-  integer,
   jsonb,
   numeric,
   pgTable,
@@ -12,14 +10,14 @@ import {
   uuid
 } from "drizzle-orm/pg-core";
 import { athlete } from "./athlete";
-import type { CoachingTargets, FtpStatus, Sex } from "./types";
+import type { CoachingTargets, FtpStatus } from "./types";
 
 /**
- * Semi-stable athlete profile (1:1 with `athlete`). Physiology reference values plus
- * narrative coaching context. Current weight lives here as a reference; the weight
- * *series* and daily wellness stay on Intervals.icu. Thresholds are historised in
- * `athlete_threshold`, not frozen here. Objectives and schedule constraints get their own
- * structured tables (`goal`, `athlete_constraint`).
+ * Semi-stable athlete profile (1:1 with `athlete`): the coaching context Intervals.icu does
+ * not hold. Physiology (sex, birth date, height, weight, resting/max HR) lives on
+ * Intervals.icu only and is never copied here (INI-62). Thresholds are historised in
+ * `athlete_threshold`. Objectives and schedule constraints get their own structured tables
+ * (`goal`, `athlete_constraint`).
  */
 export const athleteProfile = pgTable(
   "athlete_profile",
@@ -27,14 +25,8 @@ export const athleteProfile = pgTable(
     athleteId: uuid("athlete_id")
       .primaryKey()
       .references(() => athlete.id, { onDelete: "cascade" }),
-    birthDate: date("birth_date"),
-    sex: text("sex").$type<Sex>(),
-    heightCm: numeric("height_cm", { precision: 5, scale: 2 }),
-    /** Reference weight; the historical series lives in Intervals.icu wellness. */
-    weightKg: numeric("weight_kg", { precision: 5, scale: 2 }),
+    /** Target weight, a coaching goal Intervals.icu does not hold (the weight itself lives there). */
     weightTargetKg: numeric("weight_target_kg", { precision: 5, scale: 2 }),
-    restingHr: integer("resting_hr"),
-    maxHr: integer("max_hr"),
     /** Usual weekly training volume available, in hours. */
     weeklyHours: numeric("weekly_hours", { precision: 4, scale: 1 }),
     /** Equipment at hand (home trainer, power meter, gym…). */
@@ -49,6 +41,10 @@ export const athleteProfile = pgTable(
     motivation: text("motivation"),
     /** Sporting background and current training volume, as told at onboarding. */
     trainingBackground: text("training_background"),
+    /** Programmes, apps or coaches already tried, and what worked or not (INI-62). */
+    pastCoaching: text("past_coaching"),
+    /** What the athlete expects from Inigo, in their words (INI-62). */
+    coachExpectations: text("coach_expectations"),
     /** How the bike FTP was settled at onboarding; the value itself lives on Intervals.icu. */
     ftpStatus: text("ftp_status").$type<FtpStatus>(),
     /** The athlete was walked through Intervals.icu and Inigo's way of coaching. */
@@ -59,7 +55,6 @@ export const athleteProfile = pgTable(
       .$onUpdate(() => new Date())
   },
   (t) => [
-    check("athlete_profile_sex_check", sql`${t.sex} is null or ${t.sex} in ('M', 'F', 'other')`),
     check(
       "athlete_profile_ftp_status_check",
       sql`${t.ftpStatus} is null or ${t.ftpStatus} in ('confirmed', 'to_test', 'heart_rate_only')`

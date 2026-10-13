@@ -37,9 +37,13 @@ describe.skipIf(!databaseUrl || !encryptionKey)("drizzleOnboardingFactsReader (i
     const facts = await createDrizzleOnboardingFactsReader(db).getOnboardingFacts(athleteId);
     expect(facts).toEqual({
       intervalsConnected: false,
+      displayName: null,
       motivation: null,
       trainingBackground: null,
       activeGoalCount: 0,
+      detailedGoalCount: 0,
+      pastCoaching: null,
+      coachExpectations: null,
       weeklyHours: null,
       ftpStatus: null,
       educationDone: false
@@ -55,8 +59,9 @@ describe.skipIf(!databaseUrl || !encryptionKey)("drizzleOnboardingFactsReader (i
       educationDone: true
     });
     await db.insert(goal).values([
-      { athleteId, title: "Gran Fondo", status: "active" },
-      { athleteId, title: "Ancien objectif", status: "abandoned" }
+      { athleteId, title: "Gran Fondo", status: "active", priority: "A", targetResult: "sub 6h", experience: "Jamais fait" },
+      { athleteId, title: "Semi", status: "active", priority: "A", targetResult: "finir", experience: "  " },
+      { athleteId, title: "Ancien objectif", status: "abandoned", targetResult: "x", experience: "y" }
     ]);
     await setIntervalsKey(
       db,
@@ -68,7 +73,8 @@ describe.skipIf(!databaseUrl || !encryptionKey)("drizzleOnboardingFactsReader (i
     expect(facts).toMatchObject({
       intervalsConnected: true,
       motivation: "Reprendre",
-      activeGoalCount: 1,
+      activeGoalCount: 2,
+      detailedGoalCount: 1,
       ftpStatus: "to_test",
       educationDone: true
     });

@@ -132,6 +132,55 @@ describe("registerAthleteDataTools", () => {
     });
   });
 
+  it("passes the display name and the coaching answers of update_profile to the store", async () => {
+    const updateProfile = vi.fn(async () => ({ athleteId: ATHLETE_ID }));
+    const onboardingClient = await connect({ updateProfile });
+    await onboardingClient.callTool({
+      name: "update_profile",
+      arguments: {
+        athleteId: ATHLETE_ID,
+        displayName: "  Astrid ",
+        pastCoaching: "Plan TrainerRoad 2 ans, lâché faute de suivi",
+        coachExpectations: "Un plan qui s'adapte à mes gardes"
+      }
+    });
+    expect(updateProfile).toHaveBeenCalledWith({
+      displayName: "Astrid",
+      pastCoaching: "Plan TrainerRoad 2 ans, lâché faute de suivi",
+      coachExpectations: "Un plan qui s'adapte à mes gardes"
+    });
+  });
+
+  it("rejects a blank display name without touching the store", async () => {
+    const updateProfile = vi.fn();
+    const onboardingClient = await connect({ updateProfile });
+    const result = await onboardingClient.callTool({
+      name: "update_profile",
+      arguments: { athleteId: ATHLETE_ID, displayName: "   " }
+    });
+    expect(result.isError).toBe(true);
+    expect(updateProfile).not.toHaveBeenCalled();
+  });
+
+  it("passes the goal details of upsert_goal to the store", async () => {
+    const upsertGoal = vi.fn(async () => ({ id: "g1" }));
+    const goalClient = await connect({ upsertGoal });
+    await goalClient.callTool({
+      name: "upsert_goal",
+      arguments: {
+        athleteId: ATHLETE_ID,
+        id: "22222222-2222-4222-8222-222222222222",
+        targetResult: "sub 5h30",
+        experience: "Jamais fait de 70.3, deux marathons"
+      }
+    });
+    expect(upsertGoal).toHaveBeenCalledWith({
+      id: "22222222-2222-4222-8222-222222222222",
+      targetResult: "sub 5h30",
+      experience: "Jamais fait de 70.3, deux marathons"
+    });
+  });
+
   it("rejects an unknown ftpStatus without touching the store", async () => {
     const updateProfile = vi.fn();
     const onboardingClient = await connect({ updateProfile });
