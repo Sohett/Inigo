@@ -186,6 +186,9 @@ curl -X POST "$OWA_URL/api/sessions/$OWA_SESSION_ID/webhooks" \
 curl "$OWA_URL/api/sessions/$OWA_SESSION_ID/webhooks" -H "X-API-Key: $OWA_API_KEY"
 ```
 
+Les alertes de session (INI-40) passent par un webhook vers la même URL, abonné aux événements
+`session.*` (liste dans `AGENTS.md`, « Surveillance de la session WhatsApp »). Même `secret`.
+
 ---
 
 ## 7. Câbler les variables
@@ -243,8 +246,8 @@ Si le coach devient muet après un rescan de QR, c'est là qu'on la remet, sans 
 | 502 / domaine ne répond pas | `BIND_HOST` resté `127.0.0.1`, ou target port ≠ `API_PORT` | `BIND_HOST=0.0.0.0`, target port = `2785` |
 | Session perdue après redeploy | pas de volume, ou `AUTO_START_SESSIONS=false`, ou Serverless ON | volume `/app/data`, `AUTO_START_SESSIONS=true`, Serverless OFF |
 | QR à re-scanner tout le temps | volume non monté sur `/app/data` | corriger le mount path |
-| Webhook ne part pas | mauvais `events`, `secret` divergent, ou URL injoignable | `events:["message.received"]`, même secret des 2 côtés, URL glue publique |
-| Glue répond 401 | `OPENWA_WEBHOOK_SECRET` ≠ `secret` du webhook | aligner les deux |
+| Webhook ne part pas | mauvais `events`, ou URL injoignable | `events:["message.received"]` (et `session.*` sur le webhook d'alertes), URL publique de coach |
+| coach répond 401 `invalid_signature` | `secret` du webhook OpenWA ≠ `WHATSAPP_WEBHOOK_SECRET` (ou webhook sans secret) | même secret sur **chaque** webhook OpenWA et dans Vercel |
 | `tools/list` 401 | mauvais header d'auth | `Authorization: Bearer $OWA_API_KEY` (ou `X-API-Key`) |
 | `mcp__open-whatsapp__MessageSendText is not an available tool` | MCP monté en lecture seule (25 tools au lieu de 51) : `MCP_READONLY` absent ou ≠ `false` sur le service/environnement qui tourne | mettre `MCP_READONLY` à exactement `false`, redeploy, revérifier le compte de tools (§5) |
 | Numéro banni | volume/pattern trop agressif | numéro dédié, volume bas, pas d'envoi en masse |

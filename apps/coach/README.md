@@ -71,7 +71,7 @@ Validées au boot par `src/config/config.ts`. Copie `.env.example` → `.env` **
 | `ANTHROPIC_API_KEY` | Clé API Anthropic (server-side) |
 | `DATABASE_URL` | Connexion Neon (base coaching partagée via `@inigo/db`), server-side |
 | `DB_ENCRYPTION_KEY` | Clé base64 32 octets (AES-256-GCM) pour sceller les secrets par athlète |
-| `WHATSAPP_WEBHOOK_SECRET` | Obligatoire (min 16 car.) : clé HMAC de `X-OpenWA-Signature`, identique au secret des webhooks OpenWA. Sans elle, coach refuse de démarrer |
+| `WHATSAPP_WEBHOOK_SECRET` | Obligatoire (min 16 car.) : clé HMAC de `X-OpenWA-Signature`, identique au secret des webhooks OpenWA. Sans elle, toutes les requêtes (webhook, les trois MCP, cron, admin) échouent en 500 |
 | `MCP_BEARER_TOKEN` | Bearer que le brain présente aux trois MCP (min 16 car., server-side) |
 | `INTERVALS_BASE_URL` | Optionnel : override de l'URL de l'API Intervals.icu (défaut `https://intervals.icu/api/v1`) |
 | `OPENWA_BASE_URL` | URL de la passerelle OpenWA vers laquelle le coach relaie les réponses |
@@ -171,11 +171,12 @@ pnpm dev:coach     # next dev (depuis la racine)
 
 # Admin : http://localhost:3000/admin — le navigateur demande ADMIN_USER / ADMIN_PASSWORD.
 
-# Tester le webhook (sans secret) :
+# Tester le webhook (livraison signée comme le fait OpenWA, avec le secret de apps/coach/.env) :
+BODY='{"chatId":"628@c.us","body":"salut coach","type":"text"}'
+SIG="sha256=$(printf %s "$BODY" | openssl dgst -sha256 -hmac "$WHATSAPP_WEBHOOK_SECRET" -hex | sed 's/^.* //')"
 curl -X POST http://localhost:3000/api/webhooks/whatsapp \
-  -H "content-type: application/json" \
-  -d '{"chatId":"628@c.us","body":"salut coach","type":"text"}'
-# -> {"ok":true} ; le message est append à la session (voir logs).
+  -H "content-type: application/json" -H "x-openwa-signature: $SIG" -d "$BODY"
+# -> {"ok":true} ; le message est append à la session (voir logs). Sans signature : 401.
 
 # Lister les tools du MCP coaching-data :
 curl -X POST "http://localhost:3000/api/coaching-data/mcp" \

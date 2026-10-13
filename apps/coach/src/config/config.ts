@@ -15,7 +15,8 @@ export const configSchema = z.object({
   /**
    * Shared secret of the OpenWA `X-OpenWA-Signature` webhook HMAC (the same value as the
    * webhooks' signing secret in OpenWA). Required: the webhook is the only proof of who an
-   * athlete is, so an unsigned delivery is never accepted and coach refuses to run without it.
+   * athlete is, so an unsigned delivery is never accepted. Without it the config does not load, and
+   * every request that needs it (webhook, MCP endpoints, cron, admin) fails until it is set.
    */
   WHATSAPP_WEBHOOK_SECRET: z
     .string({ error: "WHATSAPP_WEBHOOK_SECRET is required" })

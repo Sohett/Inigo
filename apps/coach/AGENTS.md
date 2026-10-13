@@ -27,7 +27,7 @@ aura besoin de compute persistant (queue, batch long) — pas avant.
 ```
 proxy.ts                                # HTTP Basic sur /admin + /api/admin/* (Next 16 ; runtime Node imposé)
 app/
-  api/webhooks/whatsapp/route.ts        # entrée HTTP fine : (verif HMAC optionnelle) → parse → use-case → 200 (session.* → alerte, sinon routing)
+  api/webhooks/whatsapp/route.ts        # entrée HTTP fine : (verif HMAC obligatoire) → parse → use-case → 200 (session.* → alerte, sinon routing)
   api/cron/whatsapp-watchdog/route.ts   # GET appelé par le cron Vercel (vercel.json), Bearer CRON_SECRET → checkGatewaySession
   api/coaching-data/[transport]/route.ts # endpoint MCP coaching-data statique (/api/coaching-data/mcp), bearer requis
   api/intervals/[transport]/route.ts    # endpoint MCP Intervals.icu statique (/api/intervals/mcp), bearer requis
@@ -36,7 +36,7 @@ app/
   (admin)/admin/page.tsx                # la page admin (server component) + _components/ (client)
   layout.tsx, page.tsx, globals.css     # minimal + Tailwind
 src/
-  config/config.ts                 # env zod (ANTHROPIC_API_KEY, DATABASE_URL, DB_ENCRYPTION_KEY, WHATSAPP_WEBHOOK_SECRET?, MCP_BEARER_TOKEN, INTERVALS_BASE_URL?) — PAS les vars d'admin
+  config/config.ts                 # env zod (ANTHROPIC_API_KEY, DATABASE_URL, DB_ENCRYPTION_KEY, WHATSAPP_WEBHOOK_SECRET, MCP_BEARER_TOKEN, INTERVALS_BASE_URL?) — PAS les vars d'admin
   auth.ts                          # verifyWebhookSignature + verifyBearerToken + verifyBasicAuth (constant-time) + adminCredentials (lit/valide ADMIN_*)
   admin/guard.ts                   # requireAdmin(request) : re-vérif de l'en-tête dans chaque route admin
   lib/utils.ts                     # cn() (clsx + tailwind-merge)
@@ -98,7 +98,8 @@ src/
 ## Contrat de routing (le flux)
 
 1. `route.ts` lit le **corps brut** et vérifie **toujours** `X-OpenWA-Signature` (HMAC sur le corps
-   brut, clé `WHATSAPP_WEBHOOK_SECRET`, obligatoire : coach ne démarre pas sans) ; signature absente ou
+   brut, clé `WHATSAPP_WEBHOOK_SECRET`, obligatoire : sans elle la config ne se charge pas et toutes les
+   requêtes, webhook, MCP, cron et admin, échouent) ; signature absente ou
    fausse → `401 invalid_signature`, y compris pour les événements `session.*`. Puis parse le JSON.
 2. `routeInboundMessage.execute` : valide (zod), normalise l'enveloppe (wrappée
    `{event,data}` ou plate), **ignore** `fromMe` / groupes / non-message / messages sans texte.
