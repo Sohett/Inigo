@@ -403,4 +403,120 @@ describe("routeInboundMessage", () => {
     };
     await expect(createRouteInboundMessage(deps).execute(inbound)).rejects.toThrow("anthropic 500");
   });
+
+  /**
+   * Identification against payloads as OpenWA really delivers them (whatsapp-web.js engine). The
+   * LID one is the production delivery from INI-20, verbatim; the others keep its exact shape.
+   */
+  describe("identification from real OpenWA payloads", () => {
+    const LID_DELIVERY = {
+      event: "message.received",
+      timestamp: "2026-07-09T07:48:41.777Z",
+      sessionId: "a6ac74ad-fa50-4b7d-a367-5fa573841a75",
+      idempotencyKey: "msg_a6ac74ad-fa50-4b7d-a367-5fa573841a75_false_10325252415590@lid_3B09F11BD6042A8B69B0",
+      deliveryId: "dlv_b3724cb7-eaab-4edb-904b-f937fb5e476b",
+      data: {
+        id: "false_10325252415590@lid_3B09F11BD6042A8B69B0",
+        from: "10325252415590@lid",
+        to: "447882748102@c.us",
+        chatId: "10325252415590@lid",
+        body: "ok",
+        type: "text",
+        timestamp: 1783583321,
+        fromMe: false,
+        isGroup: false,
+        isStatusBroadcast: false,
+        isLidSender: true,
+        contact: { pushName: "Thomas Sohet", name: "Thomas" }
+      }
+    };
+    const PHONE_DELIVERY = {
+      ...LID_DELIVERY,
+      data: {
+        ...LID_DELIVERY.data,
+        id: "false_32475123456@c.us_3B09F11BD6042A8B69B0",
+        from: "32475123456@c.us",
+        chatId: "32475123456@c.us",
+        isLidSender: undefined
+      }
+    };
+
+    it("identifies a LID sender by their LID only, and replies to that LID chat", async () => {
+      const athlete = makeAthlete({ phoneNum: null, whatsappLid: "10325252415590@lid", chatId: "10325252415590@lid" });
+      const { deps, findByLid, findByPhone, appendUserMessage } = makeDeps(athlete);
+      const outcome = await createRouteInboundMessage(deps).execute(LID_DELIVERY);
+
+      expect(findByLid).toHaveBeenCalledWith("10325252415590@lid");
+      expect(findByPhone).not.toHaveBeenCalled();
+      expect(appendUserMessage).toHaveBeenCalledWith("sesn_abc", `${DATE_LINE}\ninigo_athlete_id: a-1\nmessage: ok`);
+      expect(outcome).toMatchObject({ status: "forwarded", chatId: "10325252415590@lid" });
+    });
+
+    it("identifies a phone sender by their E.164 number only", async () => {
+      const { deps, findByLid, findByPhone } = makeDeps(makeAthlete());
+      const outcome = await createRouteInboundMessage(deps).execute(PHONE_DELIVERY);
+
+      expect(findByPhone).toHaveBeenCalledWith("+32475123456");
+      expect(findByLid).not.toHaveBeenCalled();
+      expect(outcome).toMatchObject({ status: "forwarded", chatId: "32475123456@c.us" });
+    });
+
+    it("ignores the senderPhone OpenWA can attach to a LID sender (RESOLVE_LID_TO_PHONE)", async () => {
+      const { deps, findByLid, findByPhone } = makeDeps(makeAthlete({ whatsappLid: "10325252415590@lid" }));
+      await createRouteInboundMessage(deps).execute({
+        ...LID_DELIVERY,
+        data: { ...LID_DELIVERY.data, senderPhone: "32475123456" }
+      });
+
+      expect(findByLid).toHaveBeenCalledWith("10325252415590@lid");
+      expect(findByPhone).not.toHaveBeenCalled();
+    });
+
+    it("treats an athlete known by phone only as unknown when they write from a LID (known limit)", async () => {
+      const { deps, findByLid, findByPhone, register } = makeDeps(makeAthlete({ whatsappLid: null }));
+      findByLid.mockResolvedValueOnce(null);
+      const outcome = await createRouteInboundMessage(deps).execute(LID_DELIVERY);
+
+      expect(findByPhone).not.toHaveBeenCalled();
+      expect(register.execute).toHaveBeenCalledWith({
+        phoneNum: null,
+        whatsappLid: "10325252415590@lid",
+        chatId: "10325252415590@lid",
+        text: "ok"
+      });
+      expect(outcome.status).toBe("unknown_sender");
+    });
+
+    it("never identifies anyone from the account's own sends (message.sent)", async () => {
+      const { deps, findByLid, findByPhone } = makeDeps(makeAthlete());
+      const outcome = await createRouteInboundMessage(deps).execute({
+        ...LID_DELIVERY,
+        event: "message.sent",
+        data: { ...LID_DELIVERY.data, from: "447882748102@c.us", to: "243735870890225@lid", fromMe: true }
+      });
+
+      expect(outcome).toEqual({ status: "ignored", reason: "unhandled_event" });
+      expect(findByLid).not.toHaveBeenCalled();
+      expect(findByPhone).not.toHaveBeenCalled();
+    });
+
+    it("never takes a status poster's author for the sender", async () => {
+      const { deps, findByLid, findByPhone } = makeDeps(makeAthlete());
+      const outcome = await createRouteInboundMessage(deps).execute({
+        ...LID_DELIVERY,
+        data: {
+          ...LID_DELIVERY.data,
+          from: "status@broadcast",
+          chatId: "status@broadcast",
+          author: "32475123456@c.us",
+          isStatusBroadcast: true,
+          isLidSender: undefined
+        }
+      });
+
+      expect(outcome).toEqual({ status: "ignored", reason: "invalid_sender" });
+      expect(findByLid).not.toHaveBeenCalled();
+      expect(findByPhone).not.toHaveBeenCalled();
+    });
+  });
 });

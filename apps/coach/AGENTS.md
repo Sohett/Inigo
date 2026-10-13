@@ -128,6 +128,47 @@ src/
    de cette app (`send_whatsapp_message`). Le `chat_id` n'est **pas** dans l'enveloppe : il est
    persisté (`repo.setChatId`) et résolu côté serveur au moment de l'envoi.
 
+## Identification d'un athlète (WhatsApp)
+
+La seule preuve d'identité est **l'adresse WhatsApp de l'expéditeur**, telle qu'OpenWA la relaie.
+Pas de mot de passe, pas de session côté athlète : tout repose sur l'authenticité du webhook (HMAC
+`X-OpenWA-Signature`, actif seulement si `WHATSAPP_WEBHOOK_SECRET` est défini, à garder défini en prod :
+sans lui, n'importe qui peut poster un payload au nom d'un athlète).
+
+**Ce qu'OpenWA envoie** (moteur whatsapp-web.js, payload réel d'INI-20 rejoué dans
+`routeInboundMessage.spec.ts`) : `data.from` est le JID brut de l'expéditeur, `data.chatId` celui de
+la conversation (en 1:1, OpenWA pose `chatId = from` pour un message entrant). Le JID est soit
+`<chiffres>@c.us` (un numéro), soit `<chiffres>@lid` (un LID : identifiant opaque de l'adressage
+confidentiel de WhatsApp, **sans** numéro dans le payload). `isLidSender: true` accompagne un LID ;
+on ne le lit pas, le domaine du JID suffit.
+
+**Trois colonnes sur `athlete`, deux rôles :**
+
+| Colonne | Rôle | Valeur | Écrite par |
+|---|---|---|---|
+| `phone_num` | clé d'identification (unique) | E.164 `+32475123456`, tiré d'un JID `@c.us` / `@s.whatsapp.net` par `senderPhone` (domaine et suffixe `:device` retirés, `+` ajouté ; pas de normalisation) | l'inscription (INI-45), ou l'admin |
+| `whatsapp_lid` | clé d'identification (unique) | JID complet `10325252415590@lid` (`senderLid`, suffixe `:device` retiré, domaine gardé pour ne jamais le confondre avec un numéro) | l'inscription, ou à la main |
+| `chat_id` | **adresse de réponse**, pas une identité | le JID de la conversation tel que reçu (`replyChatId` : `chatId`, sinon `from`) | chaque message entrant s'il a changé (`setChatId`) |
+
+Au moins une des deux clés est posée (CHECK `athlete_routing_key_check`).
+
+**Règle de résolution** (`findSender`, aucune autre) : JID `@lid` → `findByLid` uniquement ; JID
+numéro → `findByPhone` uniquement ; tout autre domaine (groupe, `status@broadcast`, newsletter) →
+`invalid_sender`. L'`author` d'un message (posteur d'un statut ou d'un groupe) n'est **jamais** pris
+pour l'expéditeur. Aucun athlète trouvé → inscription par code d'accès (`registerNewAthlete`), qui
+enregistre la seule clé reçue.
+
+**Limites connues** (assumées à 1 ou 2 athlètes, épinglées par les tests) :
+- **Bascule numéro → LID.** Un athlète enregistré avec une seule clé qui écrit un jour avec l'autre
+  (WhatsApp migre progressivement les contacts vers le LID) est traité comme un **inconnu** : il reçoit
+  `NO_ACCESS_CODE_REPLY`. S'il renvoie le code, l'inscription crée un **second athlète** (aucune
+  contrainte ne relie un LID à un numéro). Correction manuelle : poser la clé manquante sur sa fiche.
+- **`senderPhone` ignoré.** OpenWA peut ajouter `senderPhone` (chiffres) à un expéditeur LID quand
+  `RESOLVE_LID_TO_PHONE=true` est activé côté passerelle (désactivé par défaut). On ne le lit pas :
+  c'est la piste pour lever la limite ci-dessus (retrouver par numéro puis apprendre le LID).
+- **`chat_id` est en pratique égal à la clé reçue** (`…@c.us` ou `…@lid`). On le stocke tel quel
+  plutôt que de le reconstruire : l'envoi part à l'adresse exacte de la conversation.
+
 ## MCP coaching-data (le brain lit/écrit la donnée coaching)
 
 Un serveur MCP hébergé **dans coach** (choix assumé : pas d'app séparée) donne au brain
@@ -405,7 +446,7 @@ coordinateur et en fait la session active de l'athlète dans `athlete_session`.
   (`repositories/athleteRepository.ts`), jamais de l'ORM. Deux couches seulement connaissent
   `@inigo/db` : l'adapter Drizzle du routing (rows → **modèles métier** `domain/`), et le
   repository MCP (`src/mcp/repository/athleteDataRepository.ts`) qui mappe rows→modèles (`domain/coaching.ts`).
-- **Multi-athlète** : le routing résout l'athlète + sa session par `phone_num` ou LID en base (Neon). Limite connue : un athlète connu par une seule clé qui écrit avec l'autre est traité comme un inconnu (aucune normalisation, cf. INI-5).
+- **Multi-athlète** : le routing résout l'athlète + sa session par `phone_num` ou LID en base (Neon). Règles et limites : voir « Identification d'un athlète (WhatsApp) ».
   Plus de session fixe en env ; pas de mapping en mémoire locale.
 - Secrets : env serveur uniquement, validés au boot, jamais en log.
 

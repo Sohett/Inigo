@@ -22,7 +22,7 @@ export interface Athlete {
    * a phone number; a routing key alongside `phoneNum`. Null until known.
    */
   whatsappLid: string | null;
-  /** WhatsApp chat id the agent replies to; null until the first inbound message. */
+  /** Where replies go (the conversation JID as received), never an identity; null until the first inbound message. */
   chatId: string | null;
   status: AthleteStatus;
   /**

@@ -41,6 +41,13 @@ inconnu qui envoie le code d'accès devient un athlète en onboarding avec sa pr
 code, il reçoit une réponse fixe (INI-45, réglages dans la Card « Onboarding » de `/admin`). Quand
 son onboarding est complet, son message suivant le fait passer au coordinateur (INI-49) : statut
 `active`, nouvelle session, et une ligne `passation:` qui déclenche le plan et la semaine 1.
+**Identification.** Un athlète est reconnu par son adresse WhatsApp : son numéro (`phone_num`) ou,
+quand WhatsApp masque le numéro, son LID (`whatsapp_lid`). `chat_id` n'est que l'adresse de réponse.
+Côté exploitation : garder `WHATSAPP_WEBHOOK_SECRET` défini en prod (c'est lui qui garantit que le
+webhook vient bien d'OpenWA), et si un athlète connu reçoit « envoie ton code », c'est qu'il écrit
+désormais avec l'autre identifiant : ajouter cette clé sur sa fiche. Détails et limites :
+`AGENTS.md`, section « Identification d'un athlète (WhatsApp) ».
+
 L'agent tourne côté Anthropic (les tools MCP s'exécutent server-side via le vault), donc **rien
 ici n'a besoin d'écouter la réponse** ni d'envoyer le message.
 
