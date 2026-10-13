@@ -1,4 +1,7 @@
+import { createHmac } from "node:crypto";
 import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
+
+const SECRET = "a-very-long-webhook-secret";
 
 /**
  * The WhatsApp webhook is the critical path: if it stops answering 200, athletes'
@@ -16,16 +19,19 @@ beforeAll(() => {
   process.env["MCP_BEARER_TOKEN"] = "a-very-long-mcp-bearer-token";
   process.env["ADMIN_USER"] = "x";
   process.env["ADMIN_PASSWORD"] = "short";
-  delete process.env["WHATSAPP_WEBHOOK_SECRET"];
+  process.env["WHATSAPP_WEBHOOK_SECRET"] = SECRET;
   delete process.env["SLACK_ALERT_WEBHOOK_URL"];
 });
 
-function post(body: string): Request {
-  return new Request("http://localhost/api/webhooks/whatsapp", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body
-  });
+/** A delivery as OpenWA sends it: signed with the shared secret, unless told otherwise. */
+function post(body: string, signature: string | null = sign(body)): Request {
+  const headers: Record<string, string> = { "content-type": "application/json" };
+  if (signature !== null) headers["x-openwa-signature"] = signature;
+  return new Request("http://localhost/api/webhooks/whatsapp", { method: "POST", headers, body });
+}
+
+function sign(body: string, secret: string = SECRET): string {
+  return `sha256=${createHmac("sha256", secret).update(body).digest("hex")}`;
 }
 
 describe("POST /api/webhooks/whatsapp", () => {
@@ -37,6 +43,26 @@ describe("POST /api/webhooks/whatsapp", () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ ok: true });
+  });
+
+  it.each([
+    ["no signature", null],
+    ["a signature made with another secret", sign("{}", "another-long-webhook-secret")],
+    ["a garbage signature", "sha256=nope"]
+  ])("refuses a delivery with %s, before reading it", async (_label, signature) => {
+    const { POST } = await import("./route");
+    const response = await POST(post("{}", signature));
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({ ok: false, error: "invalid_signature" });
+  });
+
+  it("refuses an unsigned session event too", async () => {
+    const { POST } = await import("./route");
+    const body = JSON.stringify({ event: "session.status", data: { sessionId: "s", status: "disconnected" } });
+    const response = await POST(post(body, null));
+
+    expect(response.status).toBe(401);
   });
 
   it("answers 400 on malformed JSON", async () => {

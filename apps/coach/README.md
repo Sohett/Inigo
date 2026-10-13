@@ -44,8 +44,9 @@ son onboarding est complet, son message suivant le fait passer au coordinateur (
 **Identification.** Un athlète est reconnu par son adresse WhatsApp : son numéro (`phone_num`) ou son
 LID (`whatsapp_lid`), deux alias du même compte, appris automatiquement au fil des messages.
 `chat_id` n'est que l'adresse de réponse. Côté exploitation :
-- garder `WHATSAPP_WEBHOOK_SECRET` défini en prod : c'est lui qui garantit que le webhook vient
-  bien d'OpenWA ;
+- `WHATSAPP_WEBHOOK_SECRET` (obligatoire, dans chaque environnement Vercel) doit être identique au
+  secret de signature de **chaque** webhook OpenWA qui pointe vers coach : c'est lui qui garantit que
+  le webhook vient bien d'OpenWA ;
 - garder `RESOLVE_LID_TO_PHONE=true` sur le service OpenWA : c'est lui qui relie un LID au numéro ;
 - un log `sender conflicts with athlete records` signale des alias contradictoires (deux fiches pour
   la même personne, ou un numéro recyclé par quelqu'un d'autre) : corriger les fiches à la main.
@@ -70,7 +71,7 @@ Validées au boot par `src/config/config.ts`. Copie `.env.example` → `.env` **
 | `ANTHROPIC_API_KEY` | Clé API Anthropic (server-side) |
 | `DATABASE_URL` | Connexion Neon (base coaching partagée via `@inigo/db`), server-side |
 | `DB_ENCRYPTION_KEY` | Clé base64 32 octets (AES-256-GCM) pour sceller les secrets par athlète |
-| `WHATSAPP_WEBHOOK_SECRET` | Optionnel : vérif HMAC `X-OpenWA-Signature` si renseigné |
+| `WHATSAPP_WEBHOOK_SECRET` | Obligatoire (min 16 car.) : clé HMAC de `X-OpenWA-Signature`, identique au secret des webhooks OpenWA. Sans elle, toutes les requêtes (webhook, les trois MCP, cron, admin) échouent en 500 |
 | `MCP_BEARER_TOKEN` | Bearer que le brain présente aux trois MCP (min 16 car., server-side) |
 | `INTERVALS_BASE_URL` | Optionnel : override de l'URL de l'API Intervals.icu (défaut `https://intervals.icu/api/v1`) |
 | `OPENWA_BASE_URL` | URL de la passerelle OpenWA vers laquelle le coach relaie les réponses |
@@ -170,11 +171,12 @@ pnpm dev:coach     # next dev (depuis la racine)
 
 # Admin : http://localhost:3000/admin — le navigateur demande ADMIN_USER / ADMIN_PASSWORD.
 
-# Tester le webhook (sans secret) :
+# Tester le webhook (livraison signée comme le fait OpenWA, avec le secret de apps/coach/.env) :
+BODY='{"chatId":"628@c.us","body":"salut coach","type":"text"}'
+SIG="sha256=$(printf %s "$BODY" | openssl dgst -sha256 -hmac "$WHATSAPP_WEBHOOK_SECRET" -hex | sed 's/^.* //')"
 curl -X POST http://localhost:3000/api/webhooks/whatsapp \
-  -H "content-type: application/json" \
-  -d '{"chatId":"628@c.us","body":"salut coach","type":"text"}'
-# -> {"ok":true} ; le message est append à la session (voir logs).
+  -H "content-type: application/json" -H "x-openwa-signature: $SIG" -d "$BODY"
+# -> {"ok":true} ; le message est append à la session (voir logs). Sans signature : 401.
 
 # Lister les tools du MCP coaching-data :
 curl -X POST "http://localhost:3000/api/coaching-data/mcp" \

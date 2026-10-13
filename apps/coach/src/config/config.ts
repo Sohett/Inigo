@@ -13,11 +13,14 @@ export const configSchema = z.object({
   /** Anthropic API key. Server-side only. */
   ANTHROPIC_API_KEY: z.string().min(1, "ANTHROPIC_API_KEY is required"),
   /**
-   * Optional shared secret to verify the OpenWA `X-OpenWA-Signature` webhook HMAC.
-   * When unset, signature verification is skipped (MVP relies on a non-guessable
-   * URL + the gateway's Sender filter).
+   * Shared secret of the OpenWA `X-OpenWA-Signature` webhook HMAC (the same value as the
+   * webhooks' signing secret in OpenWA). Required: the webhook is the only proof of who an
+   * athlete is, so an unsigned delivery is never accepted. Without it the config does not load, and
+   * every request that needs it (webhook, MCP endpoints, cron, admin) fails until it is set.
    */
-  WHATSAPP_WEBHOOK_SECRET: z.string().min(16).optional(),
+  WHATSAPP_WEBHOOK_SECRET: z
+    .string({ error: "WHATSAPP_WEBHOOK_SECRET is required" })
+    .min(16, "WHATSAPP_WEBHOOK_SECRET must be at least 16 characters"),
   /** Neon Postgres connection string (the shared coaching DB). Server-side only. */
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
   /**

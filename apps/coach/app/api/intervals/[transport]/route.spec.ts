@@ -6,6 +6,7 @@ beforeAll(() => {
   process.env["DATABASE_URL"] = "postgresql://user:pass@host/db?sslmode=require";
   process.env["DB_ENCRYPTION_KEY"] = Buffer.alloc(32).toString("base64");
   process.env["MCP_BEARER_TOKEN"] = "a-very-long-mcp-bearer-token";
+  process.env["WHATSAPP_WEBHOOK_SECRET"] = "a-very-long-webhook-secret";
   // Deliberately UNUSABLE admin credentials (a too-short password, the state that broke
   // production): the MCP endpoints must not depend on the admin. When these lived in the
   // shared config schema, this value turned a valid bearer into a 401.
