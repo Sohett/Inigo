@@ -48,36 +48,55 @@ describe.skipIf(!databaseUrl)("drizzleAthleteRepository (integration)", () => {
 
   it("finds an athlete by phone and maps it to the domain model", async () => {
     const repo = createDrizzleAthleteRepository(db);
-    const found = await repo.findByPhone(TEST_PHONE);
-    expect(found).not.toBeNull();
-    expect(found!.id).toBe(athleteId);
-    expect(found!.phoneNum).toBe(TEST_PHONE);
-    expect(found!.activeSession).toEqual({ sessionId: "sesn_test", agentId: "agent_test" });
+    const found = await repo.findBySender({ phone: TEST_PHONE, lid: null });
+    expect(found).toHaveLength(1);
+    expect(found[0]!.id).toBe(athleteId);
+    expect(found[0]!.phoneNum).toBe(TEST_PHONE);
+    expect(found[0]!.activeSession).toEqual({ sessionId: "sesn_test", agentId: "agent_test" });
   });
 
-  it("returns null for an unknown phone", async () => {
+  it("finds an athlete by WhatsApp LID", async () => {
     const repo = createDrizzleAthleteRepository(db);
-    expect(await repo.findByPhone("+329999999999")).toBeNull();
+    const found = await repo.findBySender({ phone: null, lid: TEST_LID });
+    expect(found.map(({ id }) => id)).toEqual([athleteId]);
   });
 
-  it("finds an athlete by WhatsApp LID and maps it to the domain model", async () => {
+  it("finds the athlete once when both aliases are theirs", async () => {
     const repo = createDrizzleAthleteRepository(db);
-    const found = await repo.findByLid(TEST_LID);
-    expect(found).not.toBeNull();
-    expect(found!.id).toBe(athleteId);
-    expect(found!.whatsappLid).toBe(TEST_LID);
+    const found = await repo.findBySender({ phone: TEST_PHONE, lid: TEST_LID });
+    expect(found.map(({ id }) => id)).toEqual([athleteId]);
   });
 
-  it("returns null for an unknown LID", async () => {
+  it("finds the athlete by one alias when the other is unknown", async () => {
     const repo = createDrizzleAthleteRepository(db);
-    expect(await repo.findByLid("000000000000000@lid")).toBeNull();
+    const found = await repo.findBySender({ phone: TEST_PHONE, lid: "000000000000000@lid" });
+    expect(found.map(({ id }) => id)).toEqual([athleteId]);
   });
 
-  it("persists chat_id", async () => {
+  it("finds nobody for unknown aliases, or none at all", async () => {
     const repo = createDrizzleAthleteRepository(db);
-    await repo.setChatId(athleteId, "320000000005@c.us");
-    const found = await repo.findByPhone(TEST_PHONE);
-    expect(found!.chatId).toBe("320000000005@c.us");
+    expect(await repo.findBySender({ phone: "+329999999999", lid: "000000000000000@lid" })).toEqual([]);
+    expect(await repo.findBySender({ phone: null, lid: null })).toEqual([]);
+  });
+
+  it("remembers a sender's aliases and reply address", async () => {
+    const repo = createDrizzleAthleteRepository(db);
+    await repo.rememberSender(athleteId, { chatId: "320000000005@c.us" });
+    const [found] = await repo.findBySender({ phone: TEST_PHONE, lid: null });
+    expect(found).toMatchObject({ chatId: "320000000005@c.us", whatsappLid: TEST_LID });
+  });
+
+  it("finds two athletes when the LID and the number belong to different ones", async () => {
+    const repo = createDrizzleAthleteRepository(db);
+    const otherLid = "990000000000009@lid"; // reserved test LID, never a real athlete
+    await db.delete(athlete).where(eq(athlete.whatsappLid, otherLid));
+    const [other] = await db.insert(athlete).values({ whatsappLid: otherLid }).returning({ id: athlete.id });
+    try {
+      const found = await repo.findBySender({ phone: TEST_PHONE, lid: otherLid });
+      expect(found.map(({ id }) => id).sort()).toEqual([athleteId, other!.id].sort());
+    } finally {
+      await db.delete(athlete).where(eq(athlete.whatsappLid, otherLid));
+    }
   });
 
   it("switches the live session while keeping the previous one in the history", async () => {

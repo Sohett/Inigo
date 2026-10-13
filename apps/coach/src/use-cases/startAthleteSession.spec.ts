@@ -50,9 +50,8 @@ function makeDeps(
 
   const deps: StartAthleteSessionDeps = {
     repo: {
-      findByPhone: vi.fn(),
-      findByLid: vi.fn(),
-      setChatId: vi.fn(),
+      findBySender: vi.fn(),
+      rememberSender: vi.fn(),
       findById: vi.fn(() =>
         Promise.resolve(overrides.athlete === undefined ? athlete : overrides.athlete)
       ),

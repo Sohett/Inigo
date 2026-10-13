@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { SenderIdentity } from "../domain/athlete";
 
 /**
  * A single inbound WhatsApp message as delivered by OpenWA.
@@ -19,7 +20,12 @@ export const inboundMessageSchema = z
     type: z.string().optional(),
     fromMe: z.boolean().optional(),
     isGroup: z.boolean().optional(),
-    isLidSender: z.boolean().optional()
+    isLidSender: z.boolean().optional(),
+    /**
+     * The number behind a LID sender, as digits, when the gateway resolves it
+     * (`RESOLVE_LID_TO_PHONE=true` on OpenWA); null when it cannot, absent when the option is off.
+     */
+    senderPhone: z.string().nullish()
   })
   .passthrough();
 
@@ -99,8 +105,8 @@ export function senderPhone(message: InboundMessage): string | null {
  * The sender's WhatsApp LID (`…@lid`) when identified by a linked id instead of a
  * phone number (WhatsApp's privacy addressing), else null. Returns the full JID
  * with any `:device` suffix stripped — the `@lid` domain is kept so a LID can never
- * be confused with a phone number. This is the routing key for LID senders, matched
- * against `athlete.whatsapp_lid` (see `findByLid`).
+ * be confused with a phone number. One of the sender's two aliases, matched
+ * against `athlete.whatsapp_lid` (see `senderIdentity`).
  */
 export function senderLid(message: InboundMessage): string | null {
   const jid = message.from ?? message.chatId;
@@ -152,4 +158,21 @@ export function isGatewaySessionEvent(payload: unknown): boolean {
   if (typeof payload !== "object" || payload === null) return false;
   const event = (payload as { event?: unknown }).event;
   return typeof event === "string" && event.startsWith("session.");
+}
+
+/**
+ * Both aliases of the sender as far as the payload tells (INI-64): the LID from a `@lid` JID, the
+ * number from a phone JID or, for a LID sender, from the gateway's `senderPhone`. A LID's own
+ * digits are never read as a number.
+ */
+export function senderIdentity(message: InboundMessage): SenderIdentity {
+  const lid = senderLid(message);
+  if (!lid) return { phone: senderPhone(message), lid: null };
+  return { phone: resolvedPhone(message.senderPhone), lid };
+}
+
+/** The gateway's resolved number (digits) as E.164, or null when it has none. */
+function resolvedPhone(digits: string | null | undefined): string | null {
+  const cleaned = (digits ?? "").replace(/\D/g, "");
+  return cleaned.length > 0 ? `+${cleaned}` : null;
 }

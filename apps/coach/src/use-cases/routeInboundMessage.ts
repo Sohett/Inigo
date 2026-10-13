@@ -1,6 +1,6 @@
 import type { ManagedAgentBrain } from "../brain/managedAgents";
 import { formatHandoffTurn, formatOnboardingTurn, formatTurn } from "../brain/taskEnvelope";
-import type { Athlete } from "../domain/athlete";
+import type { Athlete, SenderChanges, SenderIdentity } from "../domain/athlete";
 import type { AthleteRepository } from "../repositories/athleteRepository";
 import type { AssessOnboarding } from "./assessOnboarding";
 import type { HandOffToCoordinator } from "./handOffToCoordinator";
@@ -10,8 +10,7 @@ import {
   normaliseInbound,
   messageText,
   replyChatId,
-  senderPhone,
-  senderLid
+  senderIdentity
 } from "../mappers/whatsappPayload";
 
 /**
@@ -46,6 +45,11 @@ export type RouteOutcome =
   | { status: "handoff_not_configured"; athleteId: string; sessionId: string; chatId: string; reason: string }
   /** No athlete carries this phone or LID: the sender went through onboarding registration. */
   | { status: "unknown_sender"; registration: RegisterOutcome }
+  /**
+   * The sender's LID and number belong to two different athletes: nothing is forwarded, an
+   * operator must merge or fix the records (INI-64).
+   */
+  | { status: "ambiguous_sender"; athleteIds: string[] }
   | { status: "ignored"; reason: IgnoreReason };
 
 export interface RouteInboundMessageDeps {
@@ -65,15 +69,16 @@ export interface RouteInboundMessage {
 
 /**
  * The routing use-case: one public `execute`. It parses the OpenWA webhook payload,
- * filters what shouldn't reach the coach, resolves the athlete + session from the
- * sender's phone or WhatsApp LID, and appends the message to the *right* Managed Agent session.
+ * filters what shouldn't reach the coach, resolves the athlete + session from either alias of
+ * the sender (WhatsApp LID or number), records the alias or reply address it did not know yet,
+ * and appends the message to the *right* Managed Agent session.
  *
  * Routing decisions (unknown sender, no session, ended athlete…) are returned as outcomes.
  * Only infrastructure failures throw (repository, brain, and the onboarding assessment, which
  * reads the DB and Intervals.icu), so the route answers 200 for a handled delivery and 502 only
  * when something is actually broken. The turn is resolved first (its only side effect is the
  * hand-off to the coordinator, itself atomic), and the brain append is the last effect, so a
- * failed `setChatId` never leaves a half-appended message. A failed append after a hand-off is
+ * failed `rememberSender` never leaves a half-appended message. A failed append after a hand-off is
  * retried by OpenWA as an `active` athlete's turn, without the hand-off line. (The append itself is at-least-once: with no
  * idempotency key in V0, a dropped response after Anthropic recorded the event can
  * still re-append on an OpenWA retry.)
@@ -93,14 +98,19 @@ export function createRouteInboundMessage(deps: RouteInboundMessageDeps): RouteI
       const chatId = replyChatId(message);
       if (!text || !chatId) return ignored(IgnoreReason.NoText);
 
-      // The sender arrives either as a LID (WhatsApp privacy addressing) or a phone
-      // JID. A LID is an opaque token, not a phone, so each has its own routing key.
-      const lid = senderLid(message);
-      const phone = senderPhone(message);
-      if (!lid && !phone) return ignored(IgnoreReason.InvalidSender);
-      const athlete = await findSender(deps.repo, lid, phone);
+      // The LID and the number are two aliases of one WhatsApp account; either may be missing.
+      const sender = senderIdentity(message);
+      if (!sender.lid && !sender.phone) return ignored(IgnoreReason.InvalidSender);
+      const found = await deps.repo.findBySender(sender);
+      if (found.length > 1) return { status: "ambiguous_sender", athleteIds: found.map(({ id }) => id) };
+      const [athlete] = found;
       if (!athlete) {
-        const registration = await deps.register.execute({ phoneNum: phone, whatsappLid: lid, chatId, text });
+        const registration = await deps.register.execute({
+          phoneNum: sender.phone,
+          whatsappLid: sender.lid,
+          chatId,
+          text
+        });
         return { status: "unknown_sender", registration };
       }
       const { activeSession } = athlete;
@@ -109,10 +119,9 @@ export function createRouteInboundMessage(deps: RouteInboundMessageDeps): RouteI
       const turn = await resolveTurn(athlete, activeSession.sessionId, text, deps);
       if (turn === null) return ignored(IgnoreReason.AthleteEnded);
 
-      // Learn the reply target on first contact (or if it changed), then forward.
-      if (athlete.chatId !== chatId) {
-        await deps.repo.setChatId(athlete.id, chatId);
-      }
+      // Learn a new alias or reply address, then forward.
+      const changes = senderChanges(athlete, sender, chatId);
+      if (changes) await deps.repo.rememberSender(athlete.id, changes);
       await deps.brain.appendUserMessage(turn.sessionId, turn.text);
 
       return { ...turn.outcome, athleteId: athlete.id, sessionId: turn.sessionId, chatId };
@@ -182,15 +191,17 @@ async function resolveOnboardingTurn(
   }
 }
 
-/** The athlete behind a sender: by LID when WhatsApp hides the number, else by phone. */
-function findSender(
-  repo: AthleteRepository,
-  lid: string | null,
-  phone: string | null
-): Promise<Athlete | null> {
-  if (lid) return repo.findByLid(lid);
-  if (phone) return repo.findByPhone(phone);
-  return Promise.resolve(null);
+/**
+ * What this message teaches about a known athlete, or null when nothing differs: an alias the record
+ * lacks or that WhatsApp now reports differently, and the reply address. What the gateway reports is
+ * the account's current truth, so it replaces a stale value; a missing alias never erases one.
+ */
+function senderChanges(athlete: Athlete, sender: SenderIdentity, chatId: string): SenderChanges | null {
+  const changes: SenderChanges = {};
+  if (sender.phone && sender.phone !== athlete.phoneNum) changes.phoneNum = sender.phone;
+  if (sender.lid && sender.lid !== athlete.whatsappLid) changes.whatsappLid = sender.lid;
+  if (chatId !== athlete.chatId) changes.chatId = chatId;
+  return Object.keys(changes).length > 0 ? changes : null;
 }
 
 function ignored(reason: IgnoreReason): RouteOutcome {

@@ -1,4 +1,4 @@
-import type { Athlete, AthleteSession, NewOnboardingAthlete } from "../domain/athlete";
+import type { Athlete, AthleteSession, NewOnboardingAthlete, SenderChanges, SenderIdentity } from "../domain/athlete";
 
 /**
  * Port for athlete persistence. Business logic (the routing use-case) depends only
@@ -6,12 +6,13 @@ import type { Athlete, AthleteSession, NewOnboardingAthlete } from "../domain/at
  * providing a different adapter, with nothing else to change.
  */
 export interface AthleteRepository {
-  /** Resolve the athlete whose E.164 phone matches, or null if none is registered. */
-  findByPhone(phoneNum: string): Promise<Athlete | null>;
-  /** Resolve the athlete whose WhatsApp LID matches, or null if none is registered. */
-  findByLid(whatsappLid: string): Promise<Athlete | null>;
-  /** Persist the WhatsApp chat id learned on an inbound message. Idempotent. */
-  setChatId(athleteId: string, chatId: string): Promise<void>;
+  /**
+   * Every athlete carrying one of the sender's aliases (LID or number): none, one, or two when
+   * the aliases point at two different athletes. The caller decides what an ambiguity means.
+   */
+  findBySender(sender: SenderIdentity): Promise<Athlete[]>;
+  /** Record what a known sender's message taught us: a new alias, a new reply address. */
+  rememberSender(athleteId: string, changes: SenderChanges): Promise<void>;
   /** Resolve one athlete by internal id, or null if there is none. */
   findById(athleteId: string): Promise<Athlete | null>;
   /** Every athlete, oldest first — the admin roster. */
