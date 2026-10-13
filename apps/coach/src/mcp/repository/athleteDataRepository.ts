@@ -355,19 +355,26 @@ export function createAthleteDataRepository(db: Db) {
 
         /**
          * Update what the patch carries: `displayName` on `athlete`, the rest by upserting the
-         * 1:1 profile (PK = athlete_id). Only the provided fields change.
+         * 1:1 profile (PK = athlete_id). Only the provided fields change. Both writes go in one
+         * `db.batch` (a single Postgres transaction over Neon HTTP): all or nothing.
          */
         async updateProfile(patch: ProfilePatch): Promise<CoachProfile | null> {
           const { displayName, ...profilePatch } = patch;
-          if (displayName !== undefined) {
-            await db.update(athlete).set({ displayName }).where(eq(athlete.id, athleteId));
-          }
-          if (Object.keys(profilePatch).length > 0) {
-            await db
+          const upsertProfile = () =>
+            db
               .insert(athleteProfile)
               .values({ athleteId, ...profilePatch })
               .onConflictDoUpdate({ target: athleteProfile.athleteId, set: profilePatch });
+          if (displayName === undefined) {
+            await upsertProfile();
+            return this.getProfile();
           }
+          const renameAthlete = db.update(athlete).set({ displayName }).where(eq(athlete.id, athleteId));
+          if (Object.keys(profilePatch).length === 0) {
+            await renameAthlete;
+            return this.getProfile();
+          }
+          await db.batch([renameAthlete, upsertProfile()]);
           return this.getProfile();
         },
 

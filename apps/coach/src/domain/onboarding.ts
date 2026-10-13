@@ -48,7 +48,7 @@ export interface OnboardingFacts {
   motivation: string | null;
   trainingBackground: string | null;
   activeGoalCount: number;
-  /** Active goals whose target result and past experience are both told. */
+  /** Active main goals (priority A) whose target result and past experience are both told. */
   detailedGoalCount: number;
   pastCoaching: string | null;
   coachExpectations: string | null;

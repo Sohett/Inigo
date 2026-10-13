@@ -118,7 +118,7 @@ describe("assessOnboardingState", () => {
 });
 
 describe("assessOnboarding", () => {
-  function setup(facts: OnboardingFacts | null, intervalsFacts = INTERVALS_COMPLETE) {
+  function setup(facts: OnboardingFacts | null, intervalsFacts: IntervalsAthleteFacts | null = INTERVALS_COMPLETE) {
     const intervals = vi.fn<IntervalsAthleteReader>(async () => intervalsFacts);
     const useCase = createAssessOnboarding({
       facts: { getOnboardingFacts: vi.fn(async () => facts) },
@@ -138,6 +138,12 @@ describe("assessOnboarding", () => {
     const outcome = await useCase.execute(ATHLETE_ID);
     expect(intervals).toHaveBeenCalledWith(ATHLETE_ID);
     expect(outcome).toMatchObject({ status: "assessed", state: { complete: true } });
+  });
+
+  it("keeps the Intervals.icu checks missing when it cannot be read", async () => {
+    const { useCase } = setup({ ...COMPLETE, ftpStatus: "confirmed" }, null);
+    const outcome = await useCase.execute(ATHLETE_ID);
+    expect(outcome).toMatchObject({ status: "assessed", state: { missing: ["body", "ftp"] } });
   });
 
   it("does not call Intervals.icu while the account is not connected", async () => {

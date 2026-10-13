@@ -18,8 +18,11 @@ export interface IntervalsAthleteFacts {
   bodyComplete: boolean;
 }
 
-/** Port: read the athlete's Intervals.icu facts (only called once the account is connected). */
-export type IntervalsAthleteReader = (athleteId: string) => Promise<IntervalsAthleteFacts>;
+/**
+ * Port: read the athlete's Intervals.icu facts (only called once the account is connected), or
+ * null when Intervals.icu cannot be read right now (refusal, outage): its checks then stay missing.
+ */
+export type IntervalsAthleteReader = (athleteId: string) => Promise<IntervalsAthleteFacts | null>;
 
 /** Whether an athlete's onboarding could be assessed. */
 export const AssessStatus = {
@@ -89,7 +92,8 @@ function isDone(
 }
 
 /**
- * Pure assessment of the checklist. `intervals` is null while the account is not connected:
+ * Pure assessment of the checklist. `intervals` is null while the account is not connected or
+ * cannot be read:
  * the checks whose data lives on Intervals.icu (physiology, a confirmed FTP) are then not done.
  */
 export function assessOnboardingState(
@@ -104,7 +108,8 @@ export function assessOnboardingState(
 /**
  * Assess where an athlete stands in onboarding, from our data and, once the account is
  * connected, Intervals.icu (physiology, confirmed FTP). Nothing is stored: the state is
- * recomputed on every call. Infrastructure failures (DB, Intervals.icu) throw.
+ * recomputed on every call. A DB failure throws; an unreadable Intervals.icu leaves its checks
+ * missing (see `IntervalsAthleteReader`).
  */
 export function createAssessOnboarding(deps: {
   facts: OnboardingFactsReader;

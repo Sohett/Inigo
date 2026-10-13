@@ -69,14 +69,14 @@
       "idx": 9,
       "version": "7",
       "when": 1791896178169,
-      "tag": "0009_physiology_on_intervals",
+      "tag": "0009_goal_details_physiology_on_intervals",
       "breakpoints": true
     },
     {
       "idx": 10,
       "version": "7",
       "when": 1791896178596,
-      "tag": "0010_onboarding_goal_details",
+      "tag": "0010_profile_coaching_answers",
       "breakpoints": true
     }
   ]

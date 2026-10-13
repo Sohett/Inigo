@@ -59,8 +59,9 @@ describe.skipIf(!databaseUrl || !encryptionKey)("drizzleOnboardingFactsReader (i
       educationDone: true
     });
     await db.insert(goal).values([
-      { athleteId, title: "Gran Fondo", status: "active", targetResult: "sub 6h", experience: "Jamais fait" },
-      { athleteId, title: "Semi", status: "active", targetResult: "finir", experience: "  " },
+      { athleteId, title: "Gran Fondo", status: "active", priority: "A", targetResult: "sub 6h", experience: "Jamais fait" },
+      { athleteId, title: "Semi", status: "active", priority: "A", targetResult: "finir", experience: "  " },
+      { athleteId, title: "Trail", status: "active", priority: "B", targetResult: "finir", experience: "Aucun" },
       { athleteId, title: "Ancien objectif", status: "abandoned", targetResult: "x", experience: "y" }
     ]);
     await setIntervalsKey(
@@ -73,7 +74,7 @@ describe.skipIf(!databaseUrl || !encryptionKey)("drizzleOnboardingFactsReader (i
     expect(facts).toMatchObject({
       intervalsConnected: true,
       motivation: "Reprendre",
-      activeGoalCount: 2,
+      activeGoalCount: 3,
       detailedGoalCount: 1,
       ftpStatus: "to_test",
       educationDone: true
