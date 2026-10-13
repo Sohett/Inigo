@@ -35,7 +35,7 @@ Managed Agent (Anthropic) — session de l'athlète = mémoire ; MCP: coach (coa
 ```
 
 Le use-case dérive le numéro de l'expéditeur depuis le JID WhatsApp, résout l'athlète en base,
-formate `inigo_athlete_id: …\nmessage: …`, et **append** à **sa** session. Un numéro inconnu, un athlète
+formate l'enveloppe du tour (voir `AGENTS.md`, « Enveloppe d'un tour »), et **append** à **sa** session. Un numéro inconnu, un athlète
 sans session ou un sender illisible sont gérés explicitement (aucun forward, réponse 200). Un numéro
 inconnu qui envoie le code d'accès devient un athlète en onboarding avec sa propre session ; sans le
 code, il reçoit une réponse fixe (INI-45, réglages dans la Card « Onboarding » de `/admin`). Quand
@@ -95,7 +95,7 @@ webhook WhatsApp et les deux MCP avec elle. Elles sont lues et validées là où
    athlète arrivé avec le code d'accès a, lui, sa session d'onboarding ouverte automatiquement.
    > Les *deployments* Managed servent uniquement aux runs planifiés (cron) ; ici on n'en utilise pas : le coach pousse les messages à une session existante via l'API (`POST /v1/sessions/:id/events`).
 3. **Prompt système de l'agent** : « tu reçois des messages WhatsApp au format
-   `date_du_jour: …\ninigo_athlete_id: …\nmessage: …`. `inigo_athlete_id` est l'id athlète Inigo
+   `date_time: …\ninigo_athlete_id: …\nathlete_display_name: …\nlocale: …\nmessage: "…"`. `inigo_athlete_id` est l'id athlète Inigo
    (à utiliser pour les trois MCP ; ce n'est pas l'id Intervals.icu). Réponds en appelant
    `send_whatsapp_message(athleteId=<l'inigo_athlete_id>, text=…)` ; concis, adapté à
    WhatsApp ». Ni chat ni session de passerelle à fournir : le backend les résout.
