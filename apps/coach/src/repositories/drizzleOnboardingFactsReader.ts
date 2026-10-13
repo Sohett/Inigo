@@ -37,7 +37,7 @@ export function toOnboardingFacts(row: OnboardingFactsRow): OnboardingFacts {
 
 /**
  * Drizzle-backed `OnboardingFactsReader`: one query reads the athlete and its profile, counts
- * the active goals (and the main ones, priority A, with their target result and experience told) and checks for a usable Intervals.icu credential (key and Intervals athlete id,
+ * the active goals (and those with their target result and experience told) and checks for a usable Intervals.icu credential (key and Intervals athlete id,
  * the two things the Intervals resolver needs). The secret itself is never selected.
  */
 export function createDrizzleOnboardingFactsReader(db: Db): OnboardingFactsReader {
@@ -52,7 +52,6 @@ export function createDrizzleOnboardingFactsReader(db: Db): OnboardingFactsReade
         and(
           eq(goal.athleteId, athlete.id),
           eq(goal.status, "active"),
-          eq(goal.priority, "A"),
           ne(sql`trim(${goal.targetResult})`, ""),
           ne(sql`trim(${goal.experience})`, "")
         )

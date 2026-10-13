@@ -360,6 +360,8 @@ export function createAthleteDataRepository(db: Db) {
          */
         async updateProfile(patch: ProfilePatch): Promise<CoachProfile | null> {
           const { displayName, ...profilePatch } = patch;
+          const hasProfileFields = Object.keys(profilePatch).length > 0;
+          if (displayName === undefined && !hasProfileFields) return this.getProfile();
           const upsertProfile = () =>
             db
               .insert(athleteProfile)
@@ -370,7 +372,7 @@ export function createAthleteDataRepository(db: Db) {
             return this.getProfile();
           }
           const renameAthlete = db.update(athlete).set({ displayName }).where(eq(athlete.id, athleteId));
-          if (Object.keys(profilePatch).length === 0) {
+          if (!hasProfileFields) {
             await renameAthlete;
             return this.getProfile();
           }
