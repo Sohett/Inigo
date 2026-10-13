@@ -102,7 +102,13 @@ export const athleteSchema = z
   .object({
     id: id.nullish(),
     name: z.string().nullish(),
-    sportSettings: z.array(sportSettingsSchema).nullish()
+    sportSettings: z.array(sportSettingsSchema).nullish(),
+    // Physiology lives on Intervals.icu only (INI-62): onboarding checks it is filled in.
+    sex: z.string().nullish(),
+    icu_date_of_birth: z.string().nullish(),
+    height: z.number().nullish(),
+    icu_weight: z.number().nullish(),
+    weight: z.number().nullish()
   })
   .catchall(z.unknown());
 export type Athlete = z.infer<typeof athleteSchema>;

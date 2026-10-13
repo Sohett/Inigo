@@ -251,5 +251,26 @@ export function toCoachedEvents(raw: Record<string, unknown>[]): CoachedEvent[] 
  */
 export function toBikeFtp(athlete: Athlete): number | null {
   const ftp = athlete.sportSettings?.find((settings) => settings.types?.includes("Ride"))?.ftp;
-  return ftp !== null && ftp !== undefined && ftp > 0 ? ftp : null;
+  return isPositive(ftp) ? ftp : null;
+}
+
+function isPositive(value: number | null | undefined): value is number {
+  return value !== null && value !== undefined && value > 0;
+}
+
+function hasText(value: string | null | undefined): boolean {
+  return value !== null && value !== undefined && value.trim() !== "";
+}
+
+/**
+ * Whether the athlete's physiology is filled in on Intervals.icu: sex, birth date, height and
+ * a weight (the settings weight, or the Strava-synced one).
+ */
+export function toBodyComplete(athlete: Athlete): boolean {
+  return (
+    hasText(athlete.sex) &&
+    hasText(athlete.icu_date_of_birth) &&
+    isPositive(athlete.height) &&
+    (isPositive(athlete.icu_weight) || isPositive(athlete.weight))
+  );
 }
