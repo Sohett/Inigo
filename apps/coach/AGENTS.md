@@ -46,7 +46,7 @@ src/
     whatsappGateway.ts             # GatewaySession + GatewayAlert (santé de la passerelle, indépendants d'OpenWA)
     brain.ts                       # SessionElements / RunningSession / BrainInventory (indépendants du SDK)
     coaching.ts                    # modèles métier de la donnée coaching (contrat de sortie des tools MCP) + inputs
-    onboarding.ts                  # checklist « onboarding terminé » (7 items) + OnboardingFacts / OnboardingState + enum FtpStatus
+    onboarding.ts                  # checklist « onboarding terminé » (11 items) + OnboardingFacts / OnboardingState + enum FtpStatus
   repositories/
     athleteRepository.ts           # PORT AthleteRepository (findBySender, rememberSender, findById, listAll, setSession, listSessions, registerOnboardingAthlete, completeOnboarding)
     drizzleAthleteRepository.ts     # ADAPTER Drizzle (requête inline) + toAthlete(row→modèle)
@@ -64,7 +64,7 @@ src/
     checkGatewaySession.ts         # use-case watchdog : session enregistrée en Neon → GET OpenWA → alerte si pas ready
     registerNewAthlete.ts          # use-case : expéditeur inconnu → réponse fixe, ou athlète en onboarding + sa session (PORT ChatReplier)
     connectIntervals.ts            # use-case : clé + athlete id Intervals vérifiés puis stockés (outil connect_intervals, INI-50, transitoire avant OAuth)
-    assessOnboarding.ts            # use-case : état d'onboarding calculé (jamais stocké) ; PORTS OnboardingFactsReader + BikeFtpReader
+    assessOnboarding.ts            # use-case : état d'onboarding calculé (jamais stocké) ; PORTS OnboardingFactsReader + IntervalsAthleteReader
     handOffToCoordinator.ts        # use-case : onboarding complet → session du coordinateur + statut active, en un db.batch (INI-49)
   alerts/
     gatewayAlerter.ts              # PORT GatewayAlerter (notify ne throw jamais)
@@ -90,7 +90,7 @@ src/
     mcp-tools/{index,result,tools/*}.ts  # tools MCP Intervals fins ; chaque tool prend athleteId + résout un client par requête
     resolveClient.ts               # createIntervalsResolver(db, encKey, baseUrl) : getIntervalsKey → déchiffre → IntervalsIcuClient
     credentialVerifier.ts          # ADAPTER IntervalsCredentialVerifier : GET /athlete/{id} avec la clé (401/403/404 → issues, le reste throw)
-    bikeFtpReader.ts               # ADAPTER du port BikeFtpReader : profil Intervals → toBikeFtp (réglages Ride)
+    intervalsAthleteReader.ts      # ADAPTER du port IntervalsAthleteReader : un GET profil Intervals → toBikeFtp (réglages Ride) + toBodyComplete (sexe, naissance, taille, poids)
   deps.ts                          # singleton lazy { config, brain, db, repo, athleteData, intervalsResolver }
 # futur : src/services/…
 ```
@@ -244,11 +244,11 @@ Un serveur MCP hébergé **dans coach** (choix assumé : pas d'app séparée) do
 | `get_goals` | read | `goal` filtrés (`status?`, défaut active). |
 | `get_training_plan` | read | plan courant + `plan_block` ordonnés (weekly targets). |
 | `get_adaptation_log` | read | journal (`limit?` défaut 5, max 30, `since?`), plus récent d'abord. |
-| `update_profile` | write | upsert notes/prefs (`weightTargetKg`, `weeklyHours`, `equipment`, `constraintsNotes`, `healthNotes`, `coachingTargets`) + réponses d'onboarding (`motivation`, `trainingBackground`, `ftpStatus`, `educationDone`). |
+| `update_profile` | write | `displayName` (écrit sur `athlete`) + upsert notes/prefs (`weightTargetKg`, `weeklyHours`, `equipment`, `constraintsNotes`, `healthNotes`, `coachingTargets`) + réponses d'onboarding (`motivation`, `trainingBackground`, `pastCoaching`, `coachExpectations`, `ftpStatus`, `educationDone`). |
 | `upsert_constraint` | write | create / **replace-all** (`id`) d'une règle d'horaire : `kind` (`fixed_session` \| `unavailable` \| `limited`), récurrente (`weekday` 1-7) **ou** datée (`startDate`..`endDate`). Règle validée par le use-case `saveAthleteConstraint`, puis par les CHECKs DB. Pas de tool de lecture : `get_profile` la renvoie. |
 | `delete_constraint` | write | supprime une règle (scopée par athleteId). Une datée terminée n'a pas besoin d'être supprimée. |
 | `log_adaptation` | write | append au journal (`summary` requis). |
-| `upsert_goal` | write | create/update d'un `goal` (update scopé par athleteId). |
+| `upsert_goal` | write | create/update d'un `goal`, dont `targetResult` (ce qu'il vise) et `experience` (déjà fait ? tentatives ?) (update scopé par athleteId). |
 | `save_training_plan` | write | create (sans `id`) / update (`id`) du `training_plan` **+** ses `plan_block` en une écriture atomique (`db.batch`). Blocs en **replace-all** (`order_index` recalculé) ; `status=active` archive les autres plans actifs ; update scopé par athleteId (jamais le plan d'un autre). Dates I/O en `YYYY-MM-DD`. |
 
 **Frontière athlete-data ⟂ intervals-icu (à respecter dans les prompts d'agents) :**
@@ -256,7 +256,10 @@ Un serveur MCP hébergé **dans coach** (choix assumé : pas d'app séparée) do
   objectifs, macro-plan/blocs, contraintes, santé, cibles de coaching, journal d'adaptation.
 - **intervals-icu** = *vérité quantifiée live* : activités, PMC du jour (CTL/ATL/TSB via
   `get_fitness`), courbes puissance/FC/allure, **calendrier des séances planifiées**, FTP/zones
-  *calculées* par Intervals. Règle FTP : décision coaching = `athlete_threshold` (ce MCP) ;
+  *calculées* par Intervals, et la **physiologie** (sexe, date de naissance, taille, poids, FC
+  repos/max). INI-62 : Neon ne stocke que le coaching qu'Intervals n'a pas ; la physiologie n'est
+  **jamais** copiée dans `athlete_profile`. Si elle manque, l'agent d'onboarding la demande sur
+  WhatsApp et l'écrit sur Intervals (`update_athlete_body`). Règle FTP : décision coaching = `athlete_threshold` (ce MCP) ;
   Intervals reste le calcul live.
 
 ## MCP Intervals.icu (le brain lit/écrit Intervals via coach) — INI-7
