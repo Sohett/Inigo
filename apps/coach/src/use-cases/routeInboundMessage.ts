@@ -2,8 +2,8 @@ import type { ManagedAgentBrain } from "../brain/managedAgents";
 import { formatHandoffTurn, formatOnboardingTurn, formatTurn } from "../brain/taskEnvelope";
 import type { Athlete, SenderChanges, SenderIdentity } from "../domain/athlete";
 import type { AthleteRepository } from "../repositories/athleteRepository";
-import type { AssessOnboarding } from "./assessOnboarding";
-import type { HandOffToCoordinator } from "./handOffToCoordinator";
+import { AssessStatus, type AssessOnboarding } from "./assessOnboarding";
+import { HandOffStatus, type HandOffToCoordinator } from "./handOffToCoordinator";
 import type { RegisterNewAthlete, RegisterOutcome } from "./registerNewAthlete";
 import {
   webhookEnvelopeSchema,
@@ -34,24 +34,37 @@ export const IgnoreReason = {
 
 export type IgnoreReason = (typeof IgnoreReason)[keyof typeof IgnoreReason];
 
+/** What happened to an inbound delivery. */
+export const RouteStatus = {
+  Forwarded: "forwarded",
+  /** The athlete finished onboarding and was handed to the coordinator (INI-49). */
+  HandedOff: "handed_off",
+  HandoffNotConfigured: "handoff_not_configured",
+  UnknownSender: "unknown_sender",
+  SenderConflict: "sender_conflict",
+  Ignored: "ignored"
+} as const;
+
+export type RouteStatus = (typeof RouteStatus)[keyof typeof RouteStatus];
+
 export type RouteOutcome =
-  | { status: "forwarded"; athleteId: string; sessionId: string; chatId: string }
+  | { status: typeof RouteStatus.Forwarded; athleteId: string; sessionId: string; chatId: string }
   /** The athlete finished onboarding: now `active`, their message went to a new coordinator session. */
-  | { status: "handed_off"; athleteId: string; sessionId: string; chatId: string }
+  | { status: typeof RouteStatus.HandedOff; athleteId: string; sessionId: string; chatId: string }
   /**
    * The athlete finished onboarding but no coordinator can take them (`reason` says what to fix):
    * the message went to their onboarding session, as before.
    */
-  | { status: "handoff_not_configured"; athleteId: string; sessionId: string; chatId: string; reason: string }
+  | { status: typeof RouteStatus.HandoffNotConfigured; athleteId: string; sessionId: string; chatId: string; reason: string }
   /** No athlete carries this phone or LID: the sender went through onboarding registration. */
-  | { status: "unknown_sender"; registration: RegisterOutcome }
+  | { status: typeof RouteStatus.UnknownSender; registration: RegisterOutcome }
   /**
    * The sender's aliases contradict the records (INI-64): their LID and number belong to two
    * athletes, or their number belongs to an athlete whose known LID is another one (a recycled
    * number). Nothing is forwarded; an operator must fix the records.
    */
-  | { status: "sender_conflict"; athleteIds: string[] }
-  | { status: "ignored"; reason: IgnoreReason };
+  | { status: typeof RouteStatus.SenderConflict; athleteIds: string[] }
+  | { status: typeof RouteStatus.Ignored; reason: IgnoreReason };
 
 export interface RouteInboundMessageDeps {
   repo: AthleteRepository;
@@ -103,11 +116,11 @@ export function createRouteInboundMessage(deps: RouteInboundMessageDeps): RouteI
       const sender = senderIdentity(message);
       if (!sender.lid && !sender.phone) return ignored(IgnoreReason.InvalidSender);
       const found = await deps.repo.findBySender(sender);
-      if (found.length > 1) return { status: "sender_conflict", athleteIds: found.map(({ id }) => id) };
+      if (found.length > 1) return { status: RouteStatus.SenderConflict, athleteIds: found.map(({ id }) => id) };
       const [athlete] = found;
       // The LID is bound to the WhatsApp account, a number can be reassigned: another LID behind a
       // known number is someone else, never a reason to rewrite the record.
-      if (athlete && hasAnotherLid(athlete, sender)) return { status: "sender_conflict", athleteIds: [athlete.id] };
+      if (athlete && hasAnotherLid(athlete, sender)) return { status: RouteStatus.SenderConflict, athleteIds: [athlete.id] };
       if (!athlete) {
         const registration = await deps.register.execute({
           phoneNum: sender.phone,
@@ -115,7 +128,7 @@ export function createRouteInboundMessage(deps: RouteInboundMessageDeps): RouteI
           chatId,
           text
         });
-        return { status: "unknown_sender", registration };
+        return { status: RouteStatus.UnknownSender, registration };
       }
       const { activeSession } = athlete;
       if (!activeSession) return ignored(IgnoreReason.NoSession);
@@ -138,8 +151,8 @@ interface Turn {
   sessionId: string;
   text: string;
   outcome:
-    | { status: "forwarded" | "handed_off" }
-    | { status: "handoff_not_configured"; reason: string };
+    | { status: typeof RouteStatus.Forwarded | typeof RouteStatus.HandedOff }
+    | { status: typeof RouteStatus.HandoffNotConfigured; reason: string };
 }
 
 /**
@@ -159,7 +172,7 @@ async function resolveTurn(
       return resolveOnboardingTurn(athlete, sessionId, text, deps);
     case "active":
     case "paused":
-      return { sessionId, text: formatTurn(athlete.id, text), outcome: { status: "forwarded" } };
+      return { sessionId, text: formatTurn(athlete.id, text), outcome: { status: RouteStatus.Forwarded } };
     case "ended":
       return null;
   }
@@ -172,25 +185,25 @@ async function resolveOnboardingTurn(
   deps: Pick<RouteInboundMessageDeps, "assessOnboarding" | "handOff">
 ): Promise<Turn> {
   const assessed = await deps.assessOnboarding.execute(athlete.id);
-  if (assessed.status === "unknown_athlete") {
+  if (assessed.status === AssessStatus.UnknownAthlete) {
     throw new Error(`Athlete ${athlete.id} vanished while routing their message.`);
   }
   const onboardingTurn = formatOnboardingTurn(athlete.id, assessed.state, text);
-  if (!assessed.state.complete) return { sessionId, text: onboardingTurn, outcome: { status: "forwarded" } };
+  if (!assessed.state.complete) return { sessionId, text: onboardingTurn, outcome: { status: RouteStatus.Forwarded } };
 
   const handOff = await deps.handOff.execute(athlete);
   switch (handOff.status) {
-    case "handed_off":
+    case HandOffStatus.HandedOff:
       return {
         sessionId: handOff.sessionId,
         text: formatHandoffTurn(athlete.id, text),
-        outcome: { status: "handed_off" }
+        outcome: { status: RouteStatus.HandedOff }
       };
-    case "not_configured":
+    case HandOffStatus.NotConfigured:
       return {
         sessionId,
         text: onboardingTurn,
-        outcome: { status: "handoff_not_configured", reason: handOff.reason }
+        outcome: { status: RouteStatus.HandoffNotConfigured, reason: handOff.reason }
       };
   }
 }
@@ -214,5 +227,5 @@ function senderChanges(athlete: Athlete, sender: SenderIdentity, chatId: string)
 }
 
 function ignored(reason: IgnoreReason): RouteOutcome {
-  return { status: "ignored", reason };
+  return { status: RouteStatus.Ignored, reason };
 }

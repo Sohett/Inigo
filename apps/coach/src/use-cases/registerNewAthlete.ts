@@ -24,16 +24,27 @@ export interface UnknownSender {
   text: string;
 }
 
+/** What happened to a sender no athlete carries. */
+export const RegisterStatus = {
+  Registered: "registered",
+  Declined: "declined",
+  Disabled: "disabled",
+  AlreadyRegistered: "already_registered",
+  Misconfigured: "misconfigured"
+} as const;
+
+export type RegisterStatus = (typeof RegisterStatus)[keyof typeof RegisterStatus];
+
 export type RegisterOutcome =
-  | { status: "registered"; athleteId: string; sessionId: string }
+  | { status: typeof RegisterStatus.Registered; athleteId: string; sessionId: string }
   /** No access code in the message: the fixed answer was sent. */
-  | { status: "declined" }
+  | { status: typeof RegisterStatus.Declined }
   /** No onboarding agent or no access code set in the admin: unknown numbers stay ignored. */
-  | { status: "disabled" }
+  | { status: typeof RegisterStatus.Disabled }
   /** Another first message of the same sender won the race and registered them. */
-  | { status: "already_registered" }
+  | { status: typeof RegisterStatus.AlreadyRegistered }
   /** The control plane cannot host the session as configured; `reason` says what to fix. */
-  | { status: "misconfigured"; reason: string };
+  | { status: typeof RegisterStatus.Misconfigured; reason: string };
 
 export interface RegisterNewAthlete {
   execute(sender: UnknownSender): Promise<RegisterOutcome>;
@@ -64,15 +75,15 @@ export function createRegisterNewAthlete(deps: {
   return {
     async execute(sender: UnknownSender): Promise<RegisterOutcome> {
       const { onboardingAgentId, accessCode } = await deps.settings.get();
-      if (!onboardingAgentId || !accessCode) return { status: "disabled" };
+      if (!onboardingAgentId || !accessCode) return { status: RegisterStatus.Disabled };
 
       if (!carriesAccessCode(sender.text, accessCode)) {
         await deps.replier.replyToChat(sender.chatId, NO_ACCESS_CODE_REPLY);
-        return { status: "declined" };
+        return { status: RegisterStatus.Declined };
       }
 
       const elements = sessionElementsFrom(await deps.brain.listInventory(), onboardingAgentId);
-      if (typeof elements === "string") return { status: "misconfigured", reason: elements };
+      if (typeof elements === "string") return { status: RegisterStatus.Misconfigured, reason: elements };
 
       const created = await deps.brain.createSession({
         ...elements,
@@ -84,10 +95,10 @@ export function createRegisterNewAthlete(deps: {
         chatId: sender.chatId,
         session: { sessionId: created.sessionId, agentId: onboardingAgentId }
       });
-      if (!athlete) return { status: "already_registered" };
+      if (!athlete) return { status: RegisterStatus.AlreadyRegistered };
 
       await deps.brain.appendUserMessage(created.sessionId, formatOnboardingTurn(athlete.id, NOTHING_DONE, sender.text));
-      return { status: "registered", athleteId: athlete.id, sessionId: created.sessionId };
+      return { status: RegisterStatus.Registered, athleteId: athlete.id, sessionId: created.sessionId };
     }
   };
 }
