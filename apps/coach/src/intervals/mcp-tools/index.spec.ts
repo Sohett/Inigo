@@ -16,7 +16,8 @@ function createMockClient(): IntervalsIcuClient {
     getActivities: async () => [{ id: "i1", name: "Easy Run", type: "Run" }],
     getAthleteProfile: async () => ({ id: "i123", name: "Thomas" }),
     upsertEvent: async (event: Record<string, unknown>) => ({ id: 99, ...event }),
-    updateSportSettings: async (sport: string, patch: Record<string, unknown>) => ({ sport, patch })
+    updateSportSettings: async (sport: string, patch: Record<string, unknown>) => ({ sport, patch }),
+    updateAthlete: async (patch: Record<string, unknown>) => ({ patch })
   };
   return mock as unknown as IntervalsIcuClient;
 }
@@ -90,6 +91,7 @@ describe("registerIntervalsIcuTools", () => {
         "delete_event",
         "delete_events_by_range",
         "update_sport_settings",
+        "update_athlete_body",
         "connect_intervals"
       ])
     );
@@ -117,6 +119,28 @@ describe("registerIntervalsIcuTools", () => {
     const parsed = JSON.parse(content[0]!.text) as { sport: string; patch: Record<string, unknown> };
     expect(parsed.sport).toBe("Ride");
     expect(parsed.patch).toEqual({ ftp: 265 });
+  });
+
+  it("converts update_athlete_body args to Intervals.icu units (height in metres)", async () => {
+    const result = await mcpClient.callTool({
+      name: "update_athlete_body",
+      arguments: { athleteId: ATHLETE_ID, sex: "F", birthDate: "1990-04-12", heightCm: 168, weightKg: 61 }
+    });
+    const content = result.content as TextContent;
+    const parsed = JSON.parse(content[0]!.text) as { patch: Record<string, unknown> };
+    expect(parsed.patch).toEqual({ sex: "F", icu_date_of_birth: "1990-04-12", height: 1.68, icu_weight: 61 });
+  });
+
+  it.each([
+    ["no field", {}],
+    ["a height given in metres", { heightCm: 1.68 }],
+    ["a malformed birth date", { birthDate: "12/04/1990" }]
+  ])("rejects update_athlete_body with %s", async (_label, args) => {
+    const result = await mcpClient.callTool({
+      name: "update_athlete_body",
+      arguments: { athleteId: ATHLETE_ID, ...args }
+    });
+    expect(result.isError).toBe(true);
   });
 
   it("calls a tool and returns JSON content from the client", async () => {

@@ -163,6 +163,21 @@ describe("IntervalsIcuClient", () => {
     expect(methods).toEqual(["POST", "PUT"]);
   });
 
+  it("updates the athlete's physiology with a partial PUT on the athlete", async () => {
+    let putBody: Record<string, unknown> | null = null;
+    server.use(
+      http.put(`${BASE_URL}/athlete/${ATHLETE}`, async ({ request }) => {
+        putBody = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ id: ATHLETE, sex: "F", height: 1.68 });
+      })
+    );
+
+    const updated = await makeClient().updateAthlete({ sex: "F", height: 1.68 });
+
+    expect(putBody).toEqual({ sex: "F", height: 1.68 });
+    expect(updated.height).toBe(1.68);
+  });
+
   it("updates sport settings with a partial PUT of only the provided fields", async () => {
     let method = "";
     let putUrl: URL | null = null;

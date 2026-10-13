@@ -1,5 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import type { AthleteBodyPatch } from "../../client";
 import { athleteIdShape, runAthleteTool, type ResolveClient } from "../result";
 
 export function registerAthleteTools(server: McpServer, resolve: ResolveClient): void {
@@ -55,5 +56,36 @@ export function registerAthleteWriteTools(server: McpServer, resolve: ResolveCli
     },
     ({ athleteId, sport, ...patch }) =>
       runAthleteTool(resolve, athleteId, (client) => client.updateSportSettings(sport, patch))
+  );
+
+  server.registerTool(
+    "update_athlete_body",
+    {
+      title: "Update the athlete's physiology",
+      description:
+        "Write the athlete's sex, birth date, height and weight on Intervals.icu, the only place " +
+        "they are kept (never in the coaching profile). Pass only the fields to set; the others " +
+        "are left untouched. Use it to fill in what get_athlete_profile shows as missing.",
+      inputSchema: {
+        ...athleteIdShape,
+        sex: z.enum(["M", "F"]).optional().describe("M or F."),
+        birthDate: z.iso.date().optional().describe("Birth date, YYYY-MM-DD."),
+        heightCm: z.number().min(100).max(250).optional().describe("Height in centimetres."),
+        weightKg: z.number().min(25).max(300).optional().describe("Weight in kilograms.")
+      }
+    },
+    ({ athleteId, sex, birthDate, heightCm, weightKg }) =>
+      runAthleteTool(resolve, athleteId, async (client) => {
+        const patch: AthleteBodyPatch = {};
+        if (sex !== undefined) patch.sex = sex;
+        if (birthDate !== undefined) patch.icu_date_of_birth = birthDate;
+        // Intervals.icu keeps the height in metres.
+        if (heightCm !== undefined) patch.height = heightCm / 100;
+        if (weightKg !== undefined) patch.icu_weight = weightKg;
+        if (Object.keys(patch).length === 0) {
+          throw new Error("update_athlete_body requires at least one field to update.");
+        }
+        return client.updateAthlete(patch);
+      })
   );
 }

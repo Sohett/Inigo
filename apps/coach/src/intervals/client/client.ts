@@ -50,6 +50,20 @@ export interface CurveQuery {
 }
 
 /**
+ * The athlete's physiology on Intervals.icu, in Intervals units (checked on a live account):
+ * `sex` "M" | "F", birth date `YYYY-MM-DD`, height in **metres** (`height_units` is only the
+ * display unit), settings weight in kg. Only the fields provided change.
+ */
+export interface AthleteBodyPatch {
+  sex?: "M" | "F";
+  icu_date_of_birth?: string;
+  /** Metres. */
+  height?: number;
+  /** Kilograms. */
+  icu_weight?: number;
+}
+
+/**
  * The coach-controlled subset of sport settings. Every field is optional: only the ones
  * provided are overlaid onto the athlete's existing settings (a read-merge-write), so the
  * other ~50 fields Intervals.icu holds are left untouched.
@@ -108,6 +122,14 @@ export class IntervalsIcuClient {
 
   getAthleteProfile(): Promise<z.infer<typeof athleteSchema>> {
     return this.requestJson(`/athlete/${this.athleteId}`, athleteSchema);
+  }
+
+  /** Update the athlete's physiology with a partial PUT: only the fields in `patch` change. */
+  updateAthlete(patch: AthleteBodyPatch): Promise<z.infer<typeof athleteSchema>> {
+    return this.requestJson(`/athlete/${this.athleteId}`, athleteSchema, {
+      method: "PUT",
+      body: patch
+    });
   }
 
   getGear(): Promise<z.infer<typeof gearListSchema>> {
