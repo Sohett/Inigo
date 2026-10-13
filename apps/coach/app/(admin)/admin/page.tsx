@@ -172,7 +172,7 @@ export default async function AdminPage() {
                 <Badge variant={STATUS_VARIANT[athlete.status]}>{athlete.status}</Badge>
               </CardTitle>
               <CardDescription className="font-mono text-xs">
-                {athlete.phoneNum ?? athlete.whatsappLid}
+                {[athlete.phoneNum, athlete.whatsappLid].filter(Boolean).join(" · ")}
               </CardDescription>
             </CardHeader>
 
