@@ -84,12 +84,10 @@ export async function POST(request: Request): Promise<Response> {
   const rawBody = await request.text();
   const deps = getDeps();
 
-  // Optional HMAC: verify only when a secret is configured.
-  if (deps.config.WHATSAPP_WEBHOOK_SECRET) {
-    const signature = request.headers.get(OPENWA_SIGNATURE_HEADER);
-    if (!verifyWebhookSignature(rawBody, signature, deps.config.WHATSAPP_WEBHOOK_SECRET)) {
-      return json({ ok: false, error: "invalid_signature" }, 401);
-    }
+  // Every delivery is signed by OpenWA: the webhook is the only proof of who an athlete is.
+  const signature = request.headers.get(OPENWA_SIGNATURE_HEADER);
+  if (!verifyWebhookSignature(rawBody, signature, deps.config.WHATSAPP_WEBHOOK_SECRET)) {
+    return json({ ok: false, error: "invalid_signature" }, 401);
   }
 
   let payload: unknown;

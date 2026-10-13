@@ -97,8 +97,9 @@ src/
 
 ## Contrat de routing (le flux)
 
-1. `route.ts` lit le **corps brut** ; si `WHATSAPP_WEBHOOK_SECRET` est set, vérifie
-   `X-OpenWA-Signature` (HMAC sur le corps brut) ; sinon skip. Parse le JSON.
+1. `route.ts` lit le **corps brut** et vérifie **toujours** `X-OpenWA-Signature` (HMAC sur le corps
+   brut, clé `WHATSAPP_WEBHOOK_SECRET`, obligatoire : coach ne démarre pas sans) ; signature absente ou
+   fausse → `401 invalid_signature`, y compris pour les événements `session.*`. Puis parse le JSON.
 2. `routeInboundMessage.execute` : valide (zod), normalise l'enveloppe (wrappée
    `{event,data}` ou plate), **ignore** `fromMe` / groupes / non-message / messages sans texte.
 3. Résout l'athlète par l'un ou l'autre de ses alias WhatsApp (`senderIdentity` → `findBySender`,
@@ -154,8 +155,8 @@ spécialistes.
 
 La seule preuve d'identité est **l'adresse WhatsApp de l'expéditeur**, telle qu'OpenWA la relaie.
 Pas de mot de passe, pas de session côté athlète : tout repose sur l'authenticité du webhook (HMAC
-`X-OpenWA-Signature`, actif seulement si `WHATSAPP_WEBHOOK_SECRET` est défini, à garder défini en prod :
-sans lui, n'importe qui peut poster un payload au nom d'un athlète).
+`X-OpenWA-Signature` vérifié sur chaque livraison, `WHATSAPP_WEBHOOK_SECRET` obligatoire : sans lui,
+n'importe qui pourrait poster un payload au nom d'un athlète).
 
 **Ce qu'OpenWA envoie** (moteur whatsapp-web.js, payload réel d'INI-20 rejoué dans
 `routeInboundMessage.spec.ts`) : `data.from` est le JID brut de l'expéditeur, `data.chatId` celui de

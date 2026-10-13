@@ -5,14 +5,15 @@ const base: Record<string, string> = {
   ANTHROPIC_API_KEY: "sk-ant-xxx",
   DATABASE_URL: "postgresql://user:pass@host/db?sslmode=require",
   DB_ENCRYPTION_KEY: Buffer.alloc(32).toString("base64"),
-  MCP_BEARER_TOKEN: "a-very-long-mcp-bearer-token"
+  MCP_BEARER_TOKEN: "a-very-long-mcp-bearer-token",
+  WHATSAPP_WEBHOOK_SECRET: "a-very-long-webhook-secret"
 };
 
 describe("loadConfig", () => {
-  it("parses a valid minimal env (secret optional)", () => {
+  it("parses a valid minimal env", () => {
     const config = loadConfig(base);
     expect(config.ANTHROPIC_API_KEY).toBe("sk-ant-xxx");
-    expect(config.WHATSAPP_WEBHOOK_SECRET).toBeUndefined();
+    expect(config.WHATSAPP_WEBHOOK_SECRET).toBe("a-very-long-webhook-secret");
     expect(config.DATABASE_URL).toContain("postgresql://");
   });
 
@@ -28,9 +29,10 @@ describe("loadConfig", () => {
     );
   });
 
-  it("accepts an optional webhook secret", () => {
-    const config = loadConfig({ ...base, WHATSAPP_WEBHOOK_SECRET: "a-very-long-webhook-secret" });
-    expect(config.WHATSAPP_WEBHOOK_SECRET).toBe("a-very-long-webhook-secret");
+  it("throws when the webhook secret is missing: an unsigned webhook is never accepted", () => {
+    const { WHATSAPP_WEBHOOK_SECRET, ...rest } = base;
+    void WHATSAPP_WEBHOOK_SECRET;
+    expect(() => loadConfig(rest)).toThrow(/WHATSAPP_WEBHOOK_SECRET/);
   });
 
   it("throws when ANTHROPIC_API_KEY is missing", () => {

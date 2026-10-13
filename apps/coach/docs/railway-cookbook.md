@@ -166,9 +166,10 @@ curl -s -X POST "$OWA_URL/mcp" \
 ## 6. Enregistrer le webhook vers coach
 
 > À faire une fois `coach` déployé sur Vercel (tu connais alors son URL). Le `secret`
-> est **optionnel** en MVP ; si tu le mets, il doit être identique à `WHATSAPP_WEBHOOK_SECRET`
-> côté app (clé HMAC vérifiée sur l'entête `X-OpenWA-Signature`). Tu peux aussi le faire
-> depuis l'écran « Create Webhook » du dashboard OpenWA.
+> est **obligatoire** : identique à `WHATSAPP_WEBHOOK_SECRET` côté app (clé HMAC vérifiée sur
+> l'entête `X-OpenWA-Signature`), sur **chaque** webhook qui pointe vers coach (messages et
+> `session.*`). coach refuse toute livraison non signée. Tu peux aussi le faire depuis l'écran
+> « Create Webhook » du dashboard OpenWA (champ « Signing secret »).
 
 ```bash
 export COACH_URL="https://<coach>.vercel.app"   # ou ton domaine custom
@@ -194,7 +195,7 @@ curl "$OWA_URL/api/sessions/$OWA_SESSION_ID/webhooks" -H "X-API-Key: $OWA_API_KE
 ANTHROPIC_API_KEY        = sk-ant-…
 DATABASE_URL             = postgresql://…@…neon.tech/…?sslmode=require
 DB_ENCRYPTION_KEY        = <clé base64 32 octets>
-WHATSAPP_WEBHOOK_SECRET  = $OWA_WEBHOOK_SECRET   # optionnel
+WHATSAPP_WEBHOOK_SECRET  = $OWA_WEBHOOK_SECRET   # obligatoire
 OPENWA_BASE_URL          = $OWA_URL
 OPENWA_API_KEY           = $OWA_API_KEY
 ```
