@@ -5,8 +5,8 @@ import { ONBOARDING_ITEMS, type OnboardingState } from "../domain/onboarding";
 import type { AthleteRepository } from "../repositories/athleteRepository";
 import type { HandOffOutcome } from "./handOffToCoordinator";
 
-// A fixed instant so the `date_du_jour` the envelope carries is deterministic. In
-// Europe/Brussels (the default routing timezone) this is Thursday 2026-07-09.
+// A fixed instant so the `date_time` the envelope carries is deterministic. In the test
+// athlete's timezone (Europe/Brussels) this is Thursday 2026-07-09, 11:05.
 const FIXED_NOW = new Date("2026-07-09T09:05:56Z");
 const DATE_LINE = "date_time: 2026-07-09 11:05 (jeudi)";
 

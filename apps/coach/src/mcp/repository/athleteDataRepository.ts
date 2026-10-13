@@ -69,7 +69,7 @@ function toIsoString(value: Date | string): string {
 
 /** Today's calendar date (`YYYY-MM-DD`) in the athlete's IANA timezone, not the server's. */
 function todayIn(timezone: string): string {
-  // formatToParts, like `formatDateDuJour`: no reliance on a locale's output ordering.
+  // formatToParts, like `formatDateTime` (brain/taskEnvelope): no reliance on a locale's output ordering.
   const parts = new Intl.DateTimeFormat("en", {
     timeZone: timezone,
     year: "numeric",
