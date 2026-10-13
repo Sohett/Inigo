@@ -97,7 +97,7 @@ export function createRegisterNewAthlete(deps: {
       });
       if (!athlete) return { status: RegisterStatus.AlreadyRegistered };
 
-      await deps.brain.appendUserMessage(created.sessionId, formatOnboardingTurn(athlete.id, NOTHING_DONE, sender.text));
+      await deps.brain.appendUserMessage(created.sessionId, formatOnboardingTurn(athlete, NOTHING_DONE, sender.text));
       return { status: RegisterStatus.Registered, athleteId: athlete.id, sessionId: created.sessionId };
     }
   };

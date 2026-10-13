@@ -16,6 +16,8 @@ const athlete: Athlete = {
   whatsappLid: null,
   chatId: "32470000000@c.us",
   status: "active",
+  timezone: "Europe/Brussels",
+  locale: "fr",
   activeSession: { sessionId: "sesn_old", agentId: "agent_coord" }
 };
 

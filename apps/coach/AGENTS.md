@@ -130,6 +130,26 @@ src/
    de cette app (`send_whatsapp_message`). Le `chat_id` n'est **pas** dans l'enveloppe : il est
    persisté (`repo.rememberSender`) et résolu côté serveur au moment de l'envoi.
 
+### Enveloppe d'un tour (`brain/taskEnvelope.ts`)
+
+Chaque message transmis à un agent est une enveloppe ligne à ligne, construite depuis la fiche :
+
+```
+date_time: 2026-07-09 11:05 (jeudi)       # date et heure locales, fuseau de l'athlète (athlete.timezone)
+inigo_athlete_id: <uuid>                  # athlete.id, la clé de tous les outils MCP
+athlete_display_name: Thomas              # athlete.display_name, vide tant qu'inconnu
+locale: fr                                # athlete.locale (fr par défaut)
+<lignes propres au tour>                  # onboarding_fait / onboarding_manquant, ou passation:
+message: "texte de l'athlète"             # JSON.stringify : toujours la dernière ligne
+```
+
+Le message est encodé en JSON : guillemets et retours à la ligne sont échappés, donc ce qu'écrit
+l'athlète tient sur une ligne et ne peut jamais se faire passer pour une ligne d'enveloppe (par ex.
+un faux `inigo_athlete_id:`). Le contrat est décrit dans le prompt du coordinateur et de l'agent
+d'onboarding (« Contrat WhatsApp ») : toute modification de l'enveloppe se déploie avec ces deux
+prompts. Le coordinateur reporte la date dans ses task-envelopes sous `date_du_jour`, que lisent les
+spécialistes.
+
 ## Identification d'un athlète (WhatsApp)
 
 La seule preuve d'identité est **l'adresse WhatsApp de l'expéditeur**, telle qu'OpenWA la relaie.
