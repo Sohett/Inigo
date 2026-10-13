@@ -13,7 +13,6 @@ export type Sport = "bike" | "run" | "swim";
 
 /** `onboarding`: created from WhatsApp, not yet handed to the coordinator (INI-42). */
 export type AthleteStatus = "onboarding" | "active" | "paused" | "ended";
-export type Sex = "M" | "F" | "other";
 export type ThresholdSource = "test" | "estimated" | "manual";
 /**
  * How the athlete's bike FTP was settled during onboarding: confirmed (and written on

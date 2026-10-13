@@ -20,6 +20,10 @@ export const goal = pgTable(
     description: text("description"),
     type: text("type").$type<GoalType>(),
     targetDate: date("target_date"),
+    /** What the athlete aims for: a time, a ranking, "finish" (INI-62). */
+    targetResult: text("target_result"),
+    /** Past experience with this event or distance: done before, failed attempts, or races done otherwise. */
+    experience: text("experience"),
     priority: text("priority").$type<GoalPriority>(),
     status: text("status").$type<GoalStatus>().notNull().default("active"),
     /** Optional link to the matching Intervals.icu event. */

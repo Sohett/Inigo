@@ -83,6 +83,28 @@ describe.skipIf(!databaseUrl)("athleteDataRepository (integration)", () => {
     expect(profile!.profile?.healthNotes).toBe("updated health");
   });
 
+  it("writes the display name on the athlete and the coaching answers on the profile", async () => {
+    const store = createAthleteDataRepository(db).forAthlete(athleteId);
+    await store.updateProfile({
+      displayName: "Astrid",
+      pastCoaching: "TrainerRoad",
+      coachExpectations: "Un plan adapté"
+    });
+    const profile = await store.getProfile();
+    expect(profile!.displayName).toBe("Astrid");
+    expect(profile!.profile?.pastCoaching).toBe("TrainerRoad");
+    expect(profile!.profile?.coachExpectations).toBe("Un plan adapté");
+    expect(profile!.profile?.healthNotes).toBe("updated health");
+  });
+
+  it("updates only the display name when nothing else is passed", async () => {
+    const store = createAthleteDataRepository(db).forAthlete(athleteId);
+    await store.updateProfile({ displayName: "Store Integration" });
+    const profile = await store.getProfile();
+    expect(profile!.displayName).toBe("Store Integration");
+    expect(profile!.profile?.pastCoaching).toBe("TrainerRoad");
+  });
+
   it("stores weekly hours and equipment as profile columns", async () => {
     const store = createAthleteDataRepository(db).forAthlete(athleteId);
     await store.updateProfile({ weeklyHours: "12", equipment: ["home trainer", "power meter"] });
@@ -182,6 +204,17 @@ describe.skipIf(!databaseUrl)("athleteDataRepository (integration)", () => {
     expect(created?.id).toBeDefined();
     const updated = await store.upsertGoal({ id: created!.id, status: "achieved" });
     expect(updated?.status).toBe("achieved");
+  });
+
+  it("stores the goal details (target result, experience)", async () => {
+    const store = createAthleteDataRepository(db).forAthlete(athleteId);
+    const created = await store.upsertGoal({
+      title: "Detailed goal",
+      targetResult: "sub 5h30",
+      experience: "Jamais fait"
+    });
+    expect(created?.targetResult).toBe("sub 5h30");
+    expect(created?.experience).toBe("Jamais fait");
   });
 
   it("does not update another athlete's goal (scoping)", async () => {

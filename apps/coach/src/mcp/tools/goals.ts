@@ -40,6 +40,19 @@ export function registerGoalWriteTools(server: McpServer, store: AthleteDataRepo
         description: z.string().optional(),
         type: z.enum(["event", "performance", "health"]).optional(),
         targetDate: z.string().optional().describe("Target date, YYYY-MM-DD."),
+        targetResult: z
+          .string()
+          .min(1)
+          .optional()
+          .describe('What the athlete aims for: a time ("sub 5h30"), a ranking, or "finish".'),
+        experience: z
+          .string()
+          .min(1)
+          .optional()
+          .describe(
+            "Past experience with this event or distance: done before (results), failed attempts, " +
+              "or, if never done, the races already done (bike, run)."
+          ),
         priority: z.enum(["A", "B", "C"]).optional(),
         status: z.enum(["active", "achieved", "abandoned"]).optional(),
         intervalsEventId: z.string().optional().describe("Linked Intervals.icu event id, if any.")
@@ -53,6 +66,8 @@ export function registerGoalWriteTools(server: McpServer, store: AthleteDataRepo
         if (args.description !== undefined) input.description = args.description;
         if (args.type !== undefined) input.type = args.type;
         if (args.targetDate !== undefined) input.targetDate = args.targetDate;
+        if (args.targetResult !== undefined) input.targetResult = args.targetResult;
+        if (args.experience !== undefined) input.experience = args.experience;
         if (args.priority !== undefined) input.priority = args.priority;
         if (args.status !== undefined) input.status = args.status;
         if (args.intervalsEventId !== undefined) input.intervalsEventId = args.intervalsEventId;

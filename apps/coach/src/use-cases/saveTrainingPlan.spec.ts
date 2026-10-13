@@ -13,6 +13,8 @@ const activeGoal: Goal = {
   description: null,
   type: "event",
   targetDate: "2026-12-06",
+  targetResult: null,
+  experience: null,
   priority: "A",
   status: "active",
   intervalsEventId: null

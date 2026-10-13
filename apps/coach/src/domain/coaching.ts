@@ -1,20 +1,15 @@
 import type {
   AdaptationTrigger, AthleteStatus, CoachingTargets, ConstraintActivity, ConstraintKind, GoalPriority,
-  GoalStatus, GoalType, PhaseType, PlanAuthor, PlanStatus, Sex, Sport, ThresholdSource,
+  GoalStatus, GoalType, PhaseType, PlanAuthor, PlanStatus, Sport, ThresholdSource,
   WeeklyTarget, Zone
 } from "@inigo/db";
 import type { FtpStatus } from "./onboarding";
 
 /* ---------- Modèles métier (contrat de sortie des tools) ---------- */
 
+/** Coaching context only: physiology (sex, birth date, height, weight, HR) lives on Intervals.icu. */
 export interface ProfileDetails {
-  birthDate: string | null; // YYYY-MM-DD
-  sex: Sex | null;
-  heightCm: string | null;
-  weightKg: string | null;
   weightTargetKg: string | null;
-  restingHr: number | null;
-  maxHr: number | null;
   weeklyHours: string | null;
   equipment: string[] | null;
   constraintsNotes: string | null;
@@ -22,6 +17,8 @@ export interface ProfileDetails {
   coachingTargets: CoachingTargets | null;
   motivation: string | null;
   trainingBackground: string | null;
+  pastCoaching: string | null;
+  coachExpectations: string | null;
   ftpStatus: FtpStatus | null;
   educationDone: boolean;
 }
@@ -71,6 +68,8 @@ export interface Goal {
   description: string | null;
   type: GoalType | null;
   targetDate: string | null; // YYYY-MM-DD
+  targetResult: string | null;
+  experience: string | null;
   priority: GoalPriority | null;
   status: GoalStatus;
   intervalsEventId: string | null;
@@ -109,7 +108,9 @@ export interface AdaptationLogEntry {
 
 /* ---------- Inputs (écritures) ---------- */
 
+/** `displayName` lives on `athlete`, every other field on `athlete_profile`. */
 export interface ProfilePatch {
+  displayName?: string;
   weightTargetKg?: string;
   weeklyHours?: string;
   equipment?: string[];
@@ -118,6 +119,8 @@ export interface ProfilePatch {
   coachingTargets?: CoachingTargets;
   motivation?: string;
   trainingBackground?: string;
+  pastCoaching?: string;
+  coachExpectations?: string;
   ftpStatus?: FtpStatus;
   educationDone?: boolean;
 }
@@ -149,6 +152,8 @@ export interface GoalInput {
   description?: string;
   type?: GoalType;
   targetDate?: string;
+  targetResult?: string;
+  experience?: string;
   priority?: GoalPriority;
   status?: GoalStatus;
   intervalsEventId?: string;

@@ -64,6 +64,20 @@
       "when": 1791810869253,
       "tag": "0008_onboarding_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791896178169,
+      "tag": "0009_physiology_on_intervals",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791896178596,
+      "tag": "0010_onboarding_goal_details",
+      "breakpoints": true
     }
   ]
 }
