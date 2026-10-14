@@ -11,7 +11,8 @@ montre à quoi sert Intervals. Un athlète qui connaît déjà une notion n'a pa
 la lui réexplique : demande-lui plutôt s'il connaît, puis adapte.
 
 Règles :
-- Une notion par message, en mots simples, avec un exemple chiffré quand ça aide.
+- Une notion par message, en mots simples, avec un exemple chiffré quand ça aide. Seule
+  exception : la présentation de la méthode (`methode-inigo.md`), qui tient en un message.
 - Format WhatsApp : texte court, pas de tableau, pas de jargon non expliqué.
 - Jamais de promesse de résultat chiffré (« tu gagneras 20 W »).
 

@@ -9,11 +9,12 @@ C'est gratuit (un don est possible, pas obligatoire).
 ## S'il demande pourquoi (« tu peux pas juste prendre mon Garmin ou mon Strava ? »)
 
 Réponds en coach, en deux ou trois phrases, sans liste technique :
-- c'est là que j'écris tes séances, et elles partent ensuite sur ta montre ;
+- c'est là que j'écris tes séances (elles peuvent partir sur ta montre si elle y est
+  connectée en direct) ;
 - c'est là que je vois ce que tu as vraiment fait, avec toutes les données de ta montre
   (Strava en bloque une bonne partie), pour analyser chaque séance et ajuster la suite ;
-- tu ne changes rien à tes habitudes : tu roules avec ta montre, tout continue d'arriver
-  sur Strava, Intervals tourne en arrière-plan.
+- tu ne changes rien à tes habitudes : tu connectes ta montre à Intervals en direct, elle
+  continue d'envoyer tes sorties sur Strava comme avant, Intervals tourne en arrière-plan.
 
 ## Parcours A : l'athlète a déjà un compte
 
