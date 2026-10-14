@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
@@ -53,6 +53,10 @@ describe("registerAthleteDataTools", () => {
 
   beforeEach(async () => {
     client = await connect();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it("registers the read tools", async () => {
