@@ -109,7 +109,7 @@ describe("registerNewAthlete", () => {
       expect.stringContaining(
         "inigo_athlete_id: athlete-new\nathlete_display_name: \nlocale: fr\n" +
           "onboarding_fait: \nonboarding_manquant: identity, motivation, goal, goal_details, " +
-          "expectations, training_background, availability, intervals_connected, body, ftp, education\n" +
+          "expectations, training_background, availability, education, intervals_connected, body, ftp\n" +
           'message: "Salut Inigo, mon code : velo26"'
       )
     );

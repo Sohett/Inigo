@@ -11,7 +11,8 @@ montre à quoi sert Intervals. Un athlète qui connaît déjà une notion n'a pa
 la lui réexplique : demande-lui plutôt s'il connaît, puis adapte.
 
 Règles :
-- Une notion par message, en mots simples, avec un exemple chiffré quand ça aide.
+- Une notion par message, en mots simples, avec un exemple chiffré quand ça aide. Seule
+  exception : la présentation de la méthode (`methode-inigo.md`), qui tient en un message.
 - Format WhatsApp : texte court, pas de tableau, pas de jargon non expliqué.
 - Jamais de promesse de résultat chiffré (« tu gagneras 20 W »).
 
@@ -24,4 +25,4 @@ Ouvre la fiche qui correspond au moment de la conversation :
 | `reference/intervals-icu.md` | Connexion Intervals : compte existant ou pas, montre, Strava, clé API |
 | `reference/charge-et-forme.md` | Expliquer ce qu'Intervals mesure : TSS, CTL (condition, « Fitness »), ATL (fatigue), TSB (fraîcheur, « Form ») |
 | `reference/ftp.md` | Régler la FTP : eFTP, valeur connue, test, ou pas de capteur |
-| `reference/methode-inigo.md` | Récap de la méthode avant la clôture (`educationDone`) |
+| `reference/methode-inigo.md` | Présenter ta façon de travailler, une fois l'athlète connu, avant de lui proposer de bosser ensemble (`educationDone`) |

@@ -57,10 +57,10 @@ describe("assessOnboardingState", () => {
       "goal_details",
       "expectations",
       "training_background",
+      "education",
       "intervals_connected",
       "body",
-      "ftp",
-      "education"
+      "ftp"
     ]);
     expect(state.complete).toBe(false);
   });
