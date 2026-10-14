@@ -1,7 +1,8 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import {
   flexRender,
@@ -10,10 +11,8 @@ import {
   getSortedRowModel,
   useReactTable,
   type ColumnDef,
-  type FilterFn,
-  type SortingState
+  type FilterFn
 } from "@tanstack/react-table";
-import type { AthleteStatus } from "@/domain/athlete";
 import type { AdminAthleteRow } from "@/use-cases/listAdminAthletes";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,6 +26,14 @@ import {
   TableRow
 } from "@/components/ui/table";
 import {
+  matchesSearch,
+  matchesStatus,
+  readSort,
+  readStatus,
+  writeSort,
+  type StatusFilter
+} from "./roster-url";
+import {
   ATHLETE_STATUSES,
   ATTENTION_LABEL,
   contactOf,
@@ -38,46 +45,8 @@ import {
   STATUS_VARIANT
 } from "../../_components/labels";
 
-/** Newest athletes first until the admin picks another order. */
-const DEFAULT_SORT: SortingState = [{ id: "createdAt", desc: true }];
-
-/** The status filter: one lifecycle status, or every athlete that calls for a look. */
-type StatusFilter = AthleteStatus | "attention";
-
-/**
- * Filters and sort live in the URL (`?q=&status=&sort=`), so a view can be shared and the
- * back button restores it. `sort` is a column id, prefixed with `-` when descending.
- */
-function readSort(value: string | null): SortingState {
-  if (!value) return DEFAULT_SORT;
-  const desc = value.startsWith("-");
-  return [{ id: desc ? value.slice(1) : value, desc }];
-}
-
-function writeSort(sorting: SortingState): string | null {
-  const first = sorting[0];
-  if (!first) return null;
-  return first.desc ? `-${first.id}` : first.id;
-}
-
-function readStatus(value: string | null): StatusFilter | null {
-  if (value === "attention") return value;
-  return ATHLETE_STATUSES.find((status) => status === value) ?? null;
-}
-
-/** Search by name, number or LID, case-insensitively. */
-const matchesSearch: FilterFn<AdminAthleteRow> = (row, _columnId, query: string) => {
-  const needle = query.trim().toLowerCase();
-  if (!needle) return true;
-  const { displayName, phoneNum, whatsappLid } = row.original;
-  return [displayName, phoneNum, whatsappLid].some((value) => value?.toLowerCase().includes(needle));
-};
-
-function matchesStatus(row: AdminAthleteRow, filter: StatusFilter | null): boolean {
-  if (filter === null) return true;
-  if (filter === "attention") return row.attention !== null;
-  return row.status === filter;
-}
+const searchFilter: FilterFn<AdminAthleteRow> = (row, _columnId, query: string) =>
+  matchesSearch(row.original, query);
 
 const columns: ColumnDef<AdminAthleteRow>[] = [
   {
@@ -86,7 +55,11 @@ const columns: ColumnDef<AdminAthleteRow>[] = [
     accessorFn: (row) => row.displayName ?? "",
     cell: ({ row }) => (
       <div className="grid">
-        <Link href={`/admin/athletes/${row.original.id}`} className="font-medium hover:underline">
+        {/* Stretched over the whole row: one real link, so cmd click and middle click behave. */}
+        <Link
+          href={`/admin/athletes/${row.original.id}`}
+          className="font-medium after:absolute after:inset-0 hover:underline"
+        >
           {row.original.displayName ?? "Sans nom"}
         </Link>
         <span className="font-mono text-xs text-muted-foreground">{contactOf(row.original)}</span>
@@ -145,9 +118,11 @@ const columns: ColumnDef<AdminAthleteRow>[] = [
 ];
 
 export function AthletesTable({ rows }: { rows: AdminAthleteRow[] }) {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const query = searchParams.get("q") ?? "";
+  // The box follows the URL when it changes from outside (sidebar link, back button).
+  const [search, setSearch] = useState(query);
+  useEffect(() => setSearch(query), [query]);
   const statusFilter = readStatus(searchParams.get("status"));
   const sorting = readSort(searchParams.get("sort"));
 
@@ -169,7 +144,7 @@ export function AthletesTable({ rows }: { rows: AdminAthleteRow[] }) {
     state: { sorting, globalFilter: query },
     onSortingChange: (updater) =>
       setParam("sort", writeSort(typeof updater === "function" ? updater(sorting) : updater)),
-    globalFilterFn: matchesSearch,
+    globalFilterFn: searchFilter,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getSortedRowModel: getSortedRowModel()
@@ -187,8 +162,11 @@ export function AthletesTable({ rows }: { rows: AdminAthleteRow[] }) {
         <Input
           type="search"
           placeholder="Nom, numéro ou LID"
-          defaultValue={query}
-          onChange={(event) => setParam("q", event.target.value)}
+          value={search}
+          onChange={(event) => {
+            setSearch(event.target.value);
+            setParam("q", event.target.value);
+          }}
           className="max-w-xs"
         />
         <div className="flex flex-wrap gap-1">
@@ -237,11 +215,7 @@ export function AthletesTable({ rows }: { rows: AdminAthleteRow[] }) {
             </TableRow>
           ) : (
             table.getRowModel().rows.map((row) => (
-              <TableRow
-                key={row.id}
-                className="cursor-pointer"
-                onClick={() => router.push(`/admin/athletes/${row.original.id}`)}
-              >
+              <TableRow key={row.id} className="relative">
                 {row.getVisibleCells().map((cell) => (
                   <TableCell key={cell.id}>
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
