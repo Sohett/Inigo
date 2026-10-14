@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ArrowDown, ArrowUp } from "lucide-react";
@@ -124,7 +124,11 @@ export function AthletesTable({ rows }: { rows: AdminAthleteRow[] }) {
   const [search, setSearch] = useState(query);
   useEffect(() => setSearch(query), [query]);
   const statusFilter = readStatus(searchParams.get("status"));
-  const sorting = readSort(searchParams.get("sort"));
+  // Everything fed to the table keeps its reference across renders: TanStack recomputes its row
+  // models on a new `data` or `sorting` and resets the page index, which re-renders, which would
+  // build a new one again. Inlined, either froze the whole tab on the first re-render.
+  const sortParam = searchParams.get("sort");
+  const sorting = useMemo(() => readSort(sortParam), [sortParam]);
 
   /**
    * Update the URL in place. The native History API keeps `useSearchParams` in sync without
@@ -138,8 +142,10 @@ export function AthletesTable({ rows }: { rows: AdminAthleteRow[] }) {
     window.history.replaceState(null, "", search ? `?${search}` : window.location.pathname);
   }
 
+  const data = useMemo(() => rows.filter((row) => matchesStatus(row, statusFilter)), [rows, statusFilter]);
+
   const table = useReactTable({
-    data: rows.filter((row) => matchesStatus(row, statusFilter)),
+    data,
     columns,
     state: { sorting, globalFilter: query },
     onSortingChange: (updater) =>

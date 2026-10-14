@@ -500,6 +500,11 @@ coordinateur et en fait la session active de l'athlète dans `athlete_session`.
 - **Multi-athlète** : le routing résout l'athlète + sa session par `phone_num` ou LID en base (Neon). Règles et limites : voir « Identification d'un athlète (WhatsApp) ».
   Plus de session fixe en env ; pas de mapping en mémoire locale.
 - Secrets : env serveur uniquement, validés au boot, jamais en log.
+- **TanStack Table : tout ce qu'on lui passe garde sa référence entre deux rendus** : `data`,
+  `columns` et les valeurs de `state` (`sorting`…), en constante de module ou en `useMemo`. Un
+  tableau recréé à chaque rendu (`data: rows.filter(...)`, `sorting` relu de l'URL) relance le
+  calcul des lignes, qui remet la pagination à zéro, qui fait un rendu : boucle infinie, onglet
+  figé (prod, INI-52). `athletes-table.spec.tsx` le garde, avec et sans `?sort=`.
 
 ## Hypothèses à vérifier au bring-up (documentées, non devinées)
 
@@ -523,6 +528,8 @@ le skill Claude Code `managed-agents-api`.
 ## Tests
 
 - Vitest co-localisés (`*.spec.ts`). `pnpm --filter @inigo/coach run test`.
+- Composants client : `*.spec.tsx` avec `// @vitest-environment happy-dom` en tête de fichier
+  (le reste tourne en `node`), rendus avec `react-dom/client` + `act`, `next/navigation` mocké.
 - Couvre : config (dont `MCP_BEARER_TOKEN` ; et le fait qu'elle **ignore** les vars d'admin),
   auth (HMAC + bearer + Basic : en-tête absent/malformé, mauvais user, mauvais mot de passe,
   deux-points dans le mot de passe ; `adminCredentials` qui échoue fermé sur absent/trop court),
