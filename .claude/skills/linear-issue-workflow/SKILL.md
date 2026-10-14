@@ -158,6 +158,13 @@ short summary, the test plan, and a magic-word link (`Fixes INI-123`) so merging
 closes the issue. Base is `main`. Recipe: `references/recipes.md` →
 *Draft PR*.
 
+**If the branch changes an agent prompt** (the `system` of
+`tooling/brain/snapshot/agents/*.json`), post the readable prompt diff as a PR
+comment right away, and refresh it after every push that touches a prompt. This is
+not optional: GitHub shows the prompt as one unreadable JSON line, and this comment
+is how the user reviews the change. Recipe: `references/recipes.md` → *Prompt diff
+comment*.
+
 ### 3f — Link the PR to the Linear issue
 
 If you branched from Linear's name and put `Fixes INI-123` in the body, the
@@ -221,7 +228,7 @@ ready-for-review.
 ### 3i — Promote to ready-for-review
 
 Only when the branch is genuinely finished: plan fully implemented, `pnpm verify`
-green, the code-reviewer pass from 3g clean with its findings addressed, and the
+green, the prompt diff comment up to date with HEAD (if a prompt changed), the code-reviewer pass from 3g clean with its findings addressed, and the
 acceptance checklist from 3h all-✅ (or consciously waived).
 Then flip the draft to ready (`gh pr ready <number>`). Draft → ready is a
 deliberate act that means "I'd put my name on this" — treat it that way. Move the
