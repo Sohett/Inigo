@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ArrowDown, ArrowUp } from "lucide-react";
@@ -138,8 +138,13 @@ export function AthletesTable({ rows }: { rows: AdminAthleteRow[] }) {
     window.history.replaceState(null, "", search ? `?${search}` : window.location.pathname);
   }
 
+  // Must keep its reference across renders: TanStack recomputes its row model on a new `data`
+  // array and resets the page index, which re-renders, which would build a new array again.
+  // A filter inlined here froze the whole tab on the first re-render.
+  const data = useMemo(() => rows.filter((row) => matchesStatus(row, statusFilter)), [rows, statusFilter]);
+
   const table = useReactTable({
-    data: rows.filter((row) => matchesStatus(row, statusFilter)),
+    data,
     columns,
     state: { sorting, globalFilter: query },
     onSortingChange: (updater) =>
