@@ -33,14 +33,17 @@ app/
   api/intervals/[transport]/route.ts    # endpoint MCP Intervals.icu statique (/api/intervals/mcp), bearer requis
   api/whatsapp/[transport]/route.ts     # endpoint MCP WhatsApp statique (/api/whatsapp/mcp), bearer requis
   api/admin/athletes/[athleteId]/session/route.ts  # POST : ouvre une session et repointe l'athlète
-  (admin)/admin/page.tsx                # la page admin (server component) + _components/ (client)
+  (admin)/admin/layout.tsx              # sidebar shadcn (Athlètes, Réglages) ; /admin redirige vers /admin/athletes
+  (admin)/admin/athletes/page.tsx       # liste (data-table TanStack, filtres et tri dans l'URL : ?q=&status=&sort=)
+  (admin)/admin/athletes/[athleteId]/page.tsx  # fiche athlète : bloc session (live, première session, nouvelle session, historique)
+  (admin)/admin/settings/page.tsx       # passerelle WhatsApp + réglages d'onboarding ; chaque page a ses _components/ (client)
   layout.tsx, page.tsx, globals.css     # minimal + Tailwind
 src/
   config/config.ts                 # env zod (ANTHROPIC_API_KEY, DATABASE_URL, DB_ENCRYPTION_KEY, WHATSAPP_WEBHOOK_SECRET, MCP_BEARER_TOKEN, INTERVALS_BASE_URL?) — PAS les vars d'admin
   auth.ts                          # verifyWebhookSignature + verifyBearerToken + verifyBasicAuth (constant-time) + adminCredentials (lit/valide ADMIN_*)
   admin/guard.ts                   # requireAdmin(request) : re-vérif de l'en-tête dans chaque route admin
   lib/utils.ts                     # cn() (clsx + tailwind-merge)
-  components/ui/*                  # composants shadcn (button, card, table, badge, input, label)
+  components/ui/*                  # composants shadcn (button, card, table, badge, input, label, sidebar et ses dépendances)
   domain/
     athlete.ts                     # modèle métier Athlete + enum AthleteStatus (routing ; indépendants de @inigo/db)
     whatsappGateway.ts             # GatewaySession + GatewayAlert (santé de la passerelle, indépendants d'OpenWA)
@@ -53,11 +56,15 @@ src/
     onboardingSettingsRepository.ts # PORT : agent d'onboarding, coordinateur, code d'accès (singleton en base, édité dans l'admin)
     drizzleOnboardingSettingsRepository.ts # ADAPTER Drizzle du singleton onboarding_settings
     drizzleIntervalsCredentialStore.ts # ADAPTER IntervalsCredentialStore : setIntervalsKey (clé chiffrée, id en clair)
+    drizzleAthleteRosterReader.ts  # ADAPTER Drizzle du port AthleteRosterReader : athlètes + plan (actif, sinon le plus récent) + dernière proposition, une requête (joins latéraux)
     drizzleOnboardingFactsReader.ts # ADAPTER Drizzle du port OnboardingFactsReader (profil + goals actifs + credential, une requête) + toOnboardingFacts
   use-cases/
     routeInboundMessage.ts         # use-case de routing : une seule fonction publique execute()
     startAthleteSession.ts         # use-case admin : clone la session courante, repointe l'athlète
-    loadAdminOverview.ts           # use-case admin (lecture) : athlètes + sessions live + historique + inventaire
+    listAdminAthletes.ts           # use-case admin (lecture) : la liste + `attention` (switch exhaustif sur le statut) ; PORT AthleteRosterReader
+    loadAthleteSessions.ts         # use-case admin (lecture) : session live + historique + inventaire d'un athlète (null si inconnu)
+    loadAdminSettings.ts           # use-case admin (lecture) : session de passerelle + réglages d'onboarding + inventaire
+    settle.ts                      # settle(read) : une lecture qui échoue devient un message, pas une 500
     sendAthleteMessage.ts          # use-case : la seule façon de parler à l'athlète (chat + session de passerelle)
     readActivityStreams.ts         # use-case : fenêtre obligatoire + refus au-delà du plafond, jamais de troncature
     handleGatewaySessionEvent.ts   # use-case : webhook session.* OpenWA → alerte « down » / « recovered »
@@ -457,8 +464,8 @@ coordinateur et en fait la session active de l'athlète dans `athlete_session`.
 - **Seule la première session demande un choix**, fait dans des listes alimentées par
   `listInventory` (live). L'agent proposé par défaut est celui qui porte un roster
   `multiagent`. Les vaults s'appellent `display_name` là où tout le reste utilise `name`.
-- **Lectures résilientes** : `loadAdminOverview` capture les erreurs **par athlète**
-  (`sessionError`) au lieu d'avorter — un pointeur vers une session supprimée est justement
+- **Lectures résilientes** : `loadAthleteSessions` et `loadAdminSettings` capturent chaque
+  lecture externe (`settle`) au lieu d'avorter — un pointeur vers une session supprimée est justement
   la dérive que cette page doit rendre visible. Même règle que les lectures de `@inigo/brain`.
 - **Ordre des effets** : la session est créée **avant** l'écriture du pointeur, donc un échec
   Anthropic laisse l'athlète sur sa session précédente plutôt que orphelin. `setSession` écrit
@@ -526,8 +533,9 @@ le skill Claude Code `managed-agents-api`.
   listInventory), **`startAthleteSession`** (clone nominal, éléments ignorés quand il y a une
   session, ressources reportées telles quelles, première session depuis des éléments choisis,
   préfixes d'ids refusés, athlète inconnu, échec de lecture ou de création qui n'écrit rien) et
-  **`loadAdminOverview`** (session cassée isolée sur sa ligne, inventaire injoignable qui
-  dégrade au lieu de casser, historique sans la session active). Route admin : 401 sans/avec mauvais identifiants, 400 UUID
+  **`loadAthleteSessions`** (athlète inconnu, session cassée rendue visible, inventaire injoignable qui
+  dégrade au lieu de casser, historique sans la session active), **`loadAdminSettings`** (chaque
+  réglage illisible dégrade seul) et **`listAdminAthletes`** (`attention` par statut, plan et proposition). Route admin : 401 sans/avec mauvais identifiants, 400 UUID
   invalide, 200 clone, 200 première session, 409 sans rien à cloner, 404, 502. Côté MCP :
   intégration `InMemoryTransport` (reads + writes présents dont
   `save_training_plan`, un call renvoie du JSON, validation de date rejetée), route (401 sans

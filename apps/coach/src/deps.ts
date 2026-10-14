@@ -6,6 +6,8 @@ import {
   createDrizzleAthleteRepository
 } from "./repositories/drizzleAthleteRepository";
 import type { AthleteRepository } from "./repositories/athleteRepository";
+import { createDrizzleAthleteRosterReader } from "./repositories/drizzleAthleteRosterReader";
+import type { AthleteRosterReader } from "./use-cases/listAdminAthletes";
 import {
   createAthleteDataRepository,
   type AthleteDataRepository
@@ -25,6 +27,8 @@ export interface Deps {
   brain: ManagedAgentBrain;
   db: Db;
   repo: AthleteRepository;
+  /** Every athlete with their plan and latest proposition, for the admin roster. */
+  athleteRoster: AthleteRosterReader;
   athleteData: AthleteDataRepository;
   /** Resolves a per-athlete Intervals.icu client (key fetched + decrypted from Neon). */
   intervalsResolver: ResolveClient;
@@ -61,6 +65,7 @@ export function getDeps(): Deps {
       brain: createManagedAgentBrain(anthropic),
       db,
       repo: createDrizzleAthleteRepository(db),
+      athleteRoster: createDrizzleAthleteRosterReader(db),
       athleteData: createAthleteDataRepository(db),
       intervalsResolver: createIntervalsResolver(
         db,
