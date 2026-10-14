@@ -15,6 +15,7 @@ identifier — substitute the real one.
 - [Branching](#branching)
 - [Committing](#committing)
 - [Draft PR](#draft-pr)
+- [Prompt diff comment](#prompt-diff-comment)
 - [Linking the PR](#linking-the-pr)
 - [Review](#review)
 - [Acceptance check](#acceptance-check)
@@ -164,6 +165,23 @@ EOF
 - Issue ID in the title + `Fixes INI-123` in the body → GitHub↔Linear links it
   and merging will close the issue. To link without auto-closing on merge, use a
   contributing magic word instead (`Part of INI-123`, `Related to INI-123`).
+
+## Prompt diff comment
+
+**Mandatory whenever the branch touches the `system` of an agent snapshot**
+(`tooling/brain/snapshot/agents/*.json`). GitHub renders the prompt as one giant JSON
+line, so the user cannot review it in the PR diff. Post a readable diff as a PR comment:
+
+```bash
+python3 .claude/skills/linear-issue-workflow/scripts/prompt_diff.py --post <pr-number>
+```
+
+- One sentence per line, a ```diff block per changed agent, base `main` (`--base` to change).
+- The comment carries a marker, so re-running **updates** it instead of adding a new one.
+  Re-run it after **every push** that changes a prompt, so it always matches HEAD.
+- Run without `--post` to preview the markdown.
+- GitHub only, not in the chat: the user reads it on the PR.
+- Skill markdown files (`tooling/agent-skills/**`) are readable in the normal PR diff: no comment needed.
 
 ## Linking the PR
 
