@@ -6,6 +6,7 @@ import { registerGoalReadTools, registerGoalWriteTools } from "./goals";
 import { registerConstraintWriteTools } from "./constraints";
 import { registerPlanTools, registerPlanWriteTools } from "./plan";
 import { registerAdaptationLogReadTools, registerAdaptationLogWriteTools } from "./adaptationLog";
+import { registerBlockTool } from "./block";
 
 /**
  * Register all athlete-data tools on the given MCP server. Every tool takes an `athleteId`
@@ -26,6 +27,7 @@ export function registerAthleteDataTools(server: McpServer, store: AthleteDataRe
   registerConstraintWriteTools(server, store);
   registerAdaptationLogWriteTools(server, store);
   registerPlanWriteTools(server, store);
+  registerBlockTool(server, store);
 }
 
 export { jsonResult, errorResult, runTool, runAthleteTool, type ToolResult } from "./result";

@@ -43,6 +43,7 @@ export function attentionOf(entry: AthleteRosterEntry): AttentionReason | null {
     case "onboarding":
     case "paused":
     case "ended":
+    case "blocked":
       return null;
     case "active":
       if (entry.plan?.status !== "active") return "no_active_plan";

@@ -4,20 +4,22 @@ import type { AttentionReason } from "@/use-cases/listAdminAthletes";
 
 /** Shared wording of the admin pages, so the roster and the athlete page say the same thing. */
 
-export const ATHLETE_STATUSES: readonly AthleteStatus[] = ["onboarding", "active", "paused", "ended"];
+export const ATHLETE_STATUSES: readonly AthleteStatus[] = ["onboarding", "active", "paused", "ended", "blocked"];
 
 export const STATUS_LABEL: Record<AthleteStatus, string> = {
   onboarding: "Onboarding",
   active: "Actif",
   paused: "En pause",
-  ended: "Terminé"
+  ended: "Terminé",
+  blocked: "Bloqué"
 };
 
-export const STATUS_VARIANT: Record<AthleteStatus, "default" | "secondary" | "outline"> = {
+export const STATUS_VARIANT: Record<AthleteStatus, "default" | "secondary" | "outline" | "destructive"> = {
   onboarding: "secondary",
   active: "default",
   paused: "secondary",
-  ended: "outline"
+  ended: "outline",
+  blocked: "destructive"
 };
 
 export const ATTENTION_LABEL: Record<AttentionReason, string> = {

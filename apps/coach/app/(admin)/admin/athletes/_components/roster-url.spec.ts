@@ -40,7 +40,7 @@ describe("readSort / writeSort", () => {
 });
 
 describe("readStatus", () => {
-  it.each(["attention", "onboarding", "active", "paused", "ended"])("keeps %s", (value) => {
+  it.each(["attention", "onboarding", "active", "paused", "ended", "blocked"])("keeps %s", (value) => {
     expect(readStatus(value)).toBe(value);
   });
 

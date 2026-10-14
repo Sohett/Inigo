@@ -40,7 +40,7 @@ describe("attentionOf", () => {
     expect(attentionOf({ ...onTrack, latestProposition: null })).toBeNull();
   });
 
-  it.each(["onboarding", "paused", "ended"] as const)(
+  it.each(["onboarding", "paused", "ended", "blocked"] as const)(
     "expects no plan from a %s athlete",
     (status) => {
       expect(attentionOf({ ...onTrack, status, plan: null, latestProposition: null })).toBeNull();

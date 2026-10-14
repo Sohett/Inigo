@@ -283,13 +283,20 @@ describe("routeInboundMessage", () => {
     );
   });
 
-  it("ignores an ended athlete without touching anything", async () => {
-    const { deps, appendUserMessage, rememberSender } = makeDeps(makeAthlete({ status: "ended", chatId: null }));
+  it.each([
+    ["ended", "athlete_ended"],
+    ["blocked", "athlete_blocked"]
+  ] as const)("ignores a %s athlete without touching anything", async (status, reason) => {
+    const { deps, appendUserMessage, rememberSender, assessOnboarding, handOff } = makeDeps(
+      makeAthlete({ status, chatId: null })
+    );
     const outcome = await createRouteInboundMessage(deps).execute(inbound);
 
-    expect(outcome).toEqual({ status: "ignored", reason: "athlete_ended" });
+    expect(outcome).toEqual({ status: "ignored", reason });
     expect(appendUserMessage).not.toHaveBeenCalled();
     expect(rememberSender).not.toHaveBeenCalled();
+    expect(assessOnboarding.execute).not.toHaveBeenCalled();
+    expect(handOff.execute).not.toHaveBeenCalled();
   });
 
   it("forwards nothing when the onboarding assessment fails (infra → 502 upstream)", async () => {

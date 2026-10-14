@@ -29,7 +29,9 @@ export const IgnoreReason = {
   /** (b) The athlete exists but has no Managed Agent session yet. */
   NoSession: "no_session",
   /** The coaching relationship is over: nothing reaches an agent any more. */
-  AthleteEnded: "athlete_ended"
+  AthleteEnded: "athlete_ended",
+  /** The coach blocked the athlete for a hijack attempt (INI-66): nothing reaches an agent any more. */
+  AthleteBlocked: "athlete_blocked"
 } as const;
 
 export type IgnoreReason = (typeof IgnoreReason)[keyof typeof IgnoreReason];
@@ -87,7 +89,7 @@ export interface RouteInboundMessage {
  * the sender (WhatsApp LID or number), records the alias or reply address it did not know yet,
  * and appends the message to the *right* Managed Agent session.
  *
- * Routing decisions (unknown sender, no session, ended athlete…) are returned as outcomes.
+ * Routing decisions (unknown sender, no session, ended or blocked athlete…) are returned as outcomes.
  * Only infrastructure failures throw (repository, brain, and the onboarding assessment, which
  * reads the DB and Intervals.icu), so the route answers 200 for a handled delivery and 502 only
  * when something is actually broken. The turn is resolved first (its only side effect is the
@@ -134,7 +136,7 @@ export function createRouteInboundMessage(deps: RouteInboundMessageDeps): RouteI
       if (!activeSession) return ignored(IgnoreReason.NoSession);
 
       const turn = await resolveTurn(athlete, activeSession.sessionId, text, deps);
-      if (turn === null) return ignored(IgnoreReason.AthleteEnded);
+      if (typeof turn === "string") return ignored(turn);
 
       // Learn a new alias or reply address, then forward.
       const changes = senderChanges(athlete, sender, chatId);
@@ -156,17 +158,17 @@ interface Turn {
 }
 
 /**
- * The turn an athlete's message becomes, by lifecycle status, or null when nothing should reach
- * an agent. An athlete in onboarding gets their checklist with it, until it is complete: their
- * message then goes to the coordinator, with the hand-off line. A paused one still talks to the
- * coach (they may be coming back).
+ * The turn an athlete's message becomes, by lifecycle status, or why nothing should reach an agent.
+ * An athlete in onboarding gets their checklist with it, until it is complete: their message then
+ * goes to the coordinator, with the hand-off line. A paused one still talks to the coach (they may
+ * be coming back). An ended or blocked one is stopped here, before any side effect.
  */
 async function resolveTurn(
   athlete: Athlete,
   sessionId: string,
   text: string,
   deps: Pick<RouteInboundMessageDeps, "assessOnboarding" | "handOff">
-): Promise<Turn | null> {
+): Promise<Turn | IgnoreReason> {
   switch (athlete.status) {
     case "onboarding":
       return resolveOnboardingTurn(athlete, sessionId, text, deps);
@@ -174,7 +176,9 @@ async function resolveTurn(
     case "paused":
       return { sessionId, text: formatTurn(athlete, text), outcome: { status: RouteStatus.Forwarded } };
     case "ended":
-      return null;
+      return IgnoreReason.AthleteEnded;
+    case "blocked":
+      return IgnoreReason.AthleteBlocked;
   }
 }
 
