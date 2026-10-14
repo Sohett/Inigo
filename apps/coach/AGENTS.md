@@ -72,6 +72,7 @@ src/
     registerNewAthlete.ts          # use-case : expéditeur inconnu → réponse fixe, ou athlète en onboarding + sa session (PORT ChatReplier)
     connectIntervals.ts            # use-case : clé + athlete id Intervals vérifiés puis stockés (outil connect_intervals, INI-50, transitoire avant OAuth)
     assessOnboarding.ts            # use-case : état d'onboarding calculé (jamais stocké) ; PORTS OnboardingFactsReader + IntervalsAthleteReader
+    blockAthlete.ts                # use-case : statut blocked + log de la raison (outil block_athlete, INI-66)
     handOffToCoordinator.ts        # use-case : onboarding complet → session du coordinateur + statut active, en un db.batch (INI-49)
   alerts/
     gatewayAlerter.ts              # PORT GatewayAlerter (notify ne throw jamais)
@@ -84,7 +85,7 @@ src/
   brain/managedAgents.ts           # FRONTIÈRE cerveau : appendUserMessage + readSession + createSession + listInventory
   mcp/
     repository/athleteDataRepository.ts  # accès Neon scopé par athlete (createDb → forAthlete(id)), mappe rows→modèles (domain/coaching) ; seul autre layer @inigo/db-aware
-    tools/{index,result,profile,thresholds,goals,plan,adaptationLog}.ts  # tools MCP fins (reads + writes gated)
+    tools/{index,result,profile,thresholds,goals,plan,adaptationLog,constraints,block}.ts  # tools MCP fins (reads + writes gated)
   whatsapp/
     client/                        # client REST OpenWA typé (POST send-text ; zéro retry, un envoi n'est pas idempotent ; GET session pour le watchdog)
     credentials.ts                 # lit OPENWA_BASE_URL/API_KEY dans l'env — JAMAIS dans configSchema (cf. §Admin)
@@ -114,7 +115,7 @@ src/
    voir « Identification d'un athlète »). Les
    décisions métier sont **retournées** en `RouteOutcome` (union) : athlète sans session
    (`no_session`), sender illisible (`invalid_sender`), alias en conflit avec les fiches (`sender_conflict`,
-   loggé en erreur), athlète terminé (`athlete_ended`) → route
+   loggé en erreur), athlète terminé (`athlete_ended`) ou bloqué (`athlete_blocked`) → route
    en 200. Seules les erreurs infra (Neon / Anthropic / passerelle / Intervals.icu pour l'état
    d'onboarding) throw → 502.
    **Expéditeur inconnu** (INI-45) → `registerNewAthlete` (`unknown_sender`) :
@@ -126,7 +127,7 @@ src/
 4. Sur un athlète résolu avec session, l'enveloppe dépend du **statut** (INI-46, switch exhaustif) :
    `onboarding` → `formatOnboardingTurn` (ajoute `onboarding_fait:` / `onboarding_manquant:`, calculés
    par `assessOnboarding` à chaque message) ; `active` et `paused` → `formatTurn` ; `ended` → ignoré
-   (`athlete_ended`). **Onboarding complet** (INI-49) → `handOffToCoordinator` : session du coordinateur
+   (`athlete_ended`) ; `blocked` → ignoré (`athlete_blocked`, INI-66), sans aucun effet de bord. **Onboarding complet** (INI-49) → `handOffToCoordinator` : session du coordinateur
    (`onboarding_settings.coordinator_agent_id`), puis statut `active` + bascule de session en **un**
    `db.batch` (`completeOnboarding`), et le message part à la nouvelle session via `formatHandoffTurn`
    (ligne `passation:`, ce tour seulement) → `handed_off`. Sans coordinateur utilisable → le message
@@ -254,6 +255,7 @@ Un serveur MCP hébergé **dans coach** (choix assumé : pas d'app séparée) do
 | `update_profile` | write | `displayName` (écrit sur `athlete`) + upsert notes/prefs (`weightTargetKg`, `weeklyHours`, `equipment`, `constraintsNotes`, `healthNotes`, `coachingTargets`) + réponses d'onboarding (`motivation`, `trainingBackground`, `pastCoaching`, `coachExpectations`, `ftpStatus`, `educationDone`). |
 | `upsert_constraint` | write | create / **replace-all** (`id`) d'une règle d'horaire : `kind` (`fixed_session` \| `unavailable` \| `limited`), récurrente (`weekday` 1-7) **ou** datée (`startDate`..`endDate`). Règle validée par le use-case `saveAthleteConstraint`, puis par les CHECKs DB. Pas de tool de lecture : `get_profile` la renvoie. |
 | `delete_constraint` | write | supprime une règle (scopée par athleteId). Une datée terminée n'a pas besoin d'être supprimée. |
+| `block_athlete` | write | passe l'athlète en `blocked` (INI-66) : tentative de détournement ou demande hors coaching, décidée par l'agent après son message de clôture. `reason` requis, loggé (`[coach] athlete … blocked: …`), pas stocké. Ensuite le routing n'envoie plus rien. Déblocage : UPDATE manuel du statut. |
 | `log_adaptation` | write | append au journal (`summary` requis). |
 | `upsert_goal` | write | create/update d'un `goal`, dont `targetResult` (ce qu'il vise) et `experience` (déjà fait ? tentatives ?) (update scopé par athleteId). |
 | `save_training_plan` | write | create (sans `id`) / update (`id`) du `training_plan` **+** ses `plan_block` en une écriture atomique (`db.batch`). Blocs en **replace-all** (`order_index` recalculé) ; `status=active` archive les autres plans actifs ; update scopé par athleteId (jamais le plan d'un autre). Dates I/O en `YYYY-MM-DD`. |
