@@ -8,9 +8,10 @@ const renders = { count: 0 };
 
 vi.mock("next/navigation", () => ({
   useSearchParams: () => {
-    // Called once per render of the table: counting it counts the renders.
+    // Called once per render of the table: counting it counts the renders. Read from the real
+    // (happy-dom) URL, so the table's own `replaceState` feeds back like it does under Next.
     renders.count += 1;
-    return new URLSearchParams();
+    return new URLSearchParams(window.location.search);
   }
 }));
 
@@ -69,7 +70,13 @@ async function settle() {
   await act(() => new Promise((resolve) => setTimeout(resolve, 50)));
 }
 
-describe("AthletesTable", () => {
+// Each starting URL feeds the table a different `sorting`: the default constant, or one read
+// from the URL. Both must keep their reference across renders.
+describe.each(["", "?sort=-name", "?status=active&sort=plan"])("AthletesTable at %j", (search) => {
+  beforeEach(() => {
+    window.history.replaceState(null, "", `/admin/athletes${search}`);
+  });
+
   it("settles after a re-render instead of looping (prod freeze, INI-52)", { timeout: 5000 }, async () => {
     act(() => root.render(<AthletesTable rows={rows} />));
     await settle();
@@ -81,10 +88,9 @@ describe("AthletesTable", () => {
 
     expect(renders.count).toBeLessThan(5);
     expect(container.textContent).toContain("Thomas");
-    expect(container.textContent).toContain("Julie");
   });
 
-  it("settles while the admin types in the search box", { timeout: 5000 }, async () => {
+  it("settles while the admin types in the search box, and filters", { timeout: 5000 }, async () => {
     act(() => root.render(<AthletesTable rows={rows} />));
     await settle();
 
@@ -93,12 +99,14 @@ describe("AthletesTable", () => {
     if (!input) throw new Error("search box not rendered");
     act(() => {
       // React listens to the native setter, not to a plain assignment.
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(input, "jul");
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(input, "zzz");
       input.dispatchEvent(new Event("input", { bubbles: true }));
     });
     await settle();
 
     expect(renders.count).toBeLessThan(5);
-    expect(input.value).toBe("jul");
+    expect(new URLSearchParams(window.location.search).get("q")).toBe("zzz");
+    expect(container.textContent).not.toContain("Thomas");
+    expect(container.textContent).toContain("Aucun athlète ne correspond.");
   });
 });
