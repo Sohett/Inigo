@@ -11,8 +11,11 @@
 /** Sports we coach. Multisport from day one via a plain text field. */
 export type Sport = "bike" | "run" | "swim";
 
-/** `onboarding`: created from WhatsApp, not yet handed to the coordinator (INI-42). */
-export type AthleteStatus = "onboarding" | "active" | "paused" | "ended";
+/**
+ * `onboarding`: created from WhatsApp, not yet handed to the coordinator (INI-42).
+ * `blocked`: the coach caught a hijack attempt or an off-coaching request (INI-66); like `ended`, nothing is routed.
+ */
+export type AthleteStatus = "onboarding" | "active" | "paused" | "ended" | "blocked";
 export type ThresholdSource = "test" | "estimated" | "manual";
 /**
  * How the athlete's bike FTP was settled during onboarding: confirmed (and written on

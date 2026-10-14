@@ -1,0 +1,2 @@
+ALTER TABLE "athlete" DROP CONSTRAINT "athlete_status_check";--> statement-breakpoint
+ALTER TABLE "athlete" ADD CONSTRAINT "athlete_status_check" CHECK ("athlete"."status" in ('onboarding', 'active', 'paused', 'ended', 'blocked'));

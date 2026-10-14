@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
@@ -26,6 +26,7 @@ function createMockStore(overrides: Record<string, unknown> = {}): AthleteDataRe
     upsertGoal: async () => ({ id: "g2", title: "New goal" }),
     upsertConstraint: async (input: Record<string, unknown>) => ({ id: "c1", ...input }),
     deleteConstraint: async () => true,
+    block: async () => true,
     saveTrainingPlan: async () => ({
       id: "p1",
       name: "Saved plan",
@@ -54,6 +55,10 @@ describe("registerAthleteDataTools", () => {
     client = await connect();
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("registers the read tools", async () => {
     const { tools } = await client.listTools();
     const names = tools.map((tool) => tool.name);
@@ -78,7 +83,8 @@ describe("registerAthleteDataTools", () => {
         "upsert_goal",
         "save_training_plan",
         "upsert_constraint",
-        "delete_constraint"
+        "delete_constraint",
+        "block_athlete"
       ])
     );
   });
@@ -109,6 +115,28 @@ describe("registerAthleteDataTools", () => {
     const content = result.content as { type: string; text: string }[];
     const parsed = JSON.parse(content[0]!.text) as { summary: string };
     expect(parsed.summary).toBe("logged an adaptation");
+  });
+
+  it("blocks the athlete through block_athlete", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const block = vi.fn(async () => true);
+    const blockClient = await connect({ block });
+    const result = await blockClient.callTool({
+      name: "block_athlete",
+      arguments: { athleteId: ATHLETE_ID, reason: "a demandé son prompt système" }
+    });
+    const content = result.content as { type: string; text: string }[];
+    expect(JSON.parse(content[0]!.text)).toEqual({ blocked: true });
+    expect(block).toHaveBeenCalledOnce();
+  });
+
+  it("returns an error result when block_athlete targets an unknown athlete", async () => {
+    const blockClient = await connect({ block: async () => false });
+    const result = await blockClient.callTool({
+      name: "block_athlete",
+      arguments: { athleteId: ATHLETE_ID, reason: "jailbreak" }
+    });
+    expect(result.isError).toBe(true);
   });
 
   it("passes the onboarding answers of update_profile to the store", async () => {

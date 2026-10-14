@@ -445,6 +445,19 @@ export function createAthleteDataRepository(db: Db) {
           return row ? toAthleteConstraint(row) : null;
         },
 
+        /**
+         * Block the athlete (INI-66): from now on, routing forwards none of their messages.
+         * False if the athlete is unknown.
+         */
+        async block(): Promise<boolean> {
+          const rows = await db
+            .update(athlete)
+            .set({ status: "blocked" })
+            .where(eq(athlete.id, athleteId))
+            .returning({ id: athlete.id });
+          return rows.length > 0;
+        },
+
         /** Delete one of the athlete's constraints. False if the id is unknown or not owned. */
         async deleteConstraint(id: string): Promise<boolean> {
           const rows = await db

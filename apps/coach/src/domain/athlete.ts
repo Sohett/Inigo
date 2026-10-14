@@ -6,8 +6,11 @@
  * logic. The Drizzle adapter maps a DB row onto this model (see `toAthlete`).
  */
 
-/** Lifecycle of an athlete. Mirrors the DB CHECK values, redeclared here so the domain owns its own enum. */
-export type AthleteStatus = "onboarding" | "active" | "paused" | "ended";
+/**
+ * Lifecycle of an athlete. Mirrors the DB CHECK values, redeclared here so the domain owns its own enum.
+ * `blocked`: the coach caught a hijack attempt or an off-coaching request (INI-66).
+ */
+export type AthleteStatus = "onboarding" | "active" | "paused" | "ended" | "blocked";
 
 export interface Athlete {
   id: string;
