@@ -19,10 +19,10 @@ export type OnboardingItem =
   | "expectations"
   | "training_background"
   | "availability"
+  | "education"
   | "intervals_connected"
   | "body"
-  | "ftp"
-  | "education";
+  | "ftp";
 
 /** Every item, in the order the conversation usually covers them. */
 export const ONBOARDING_ITEMS: readonly OnboardingItem[] = [
@@ -33,10 +33,10 @@ export const ONBOARDING_ITEMS: readonly OnboardingItem[] = [
   "expectations",
   "training_background",
   "availability",
+  "education",
   "intervals_connected",
   "body",
-  "ftp",
-  "education"
+  "ftp"
 ];
 
 /** What our own data says about an athlete's onboarding (Intervals.icu data comes separately). */

@@ -75,7 +75,7 @@ describe("formatOnboardingTurn", () => {
     const turn = formatOnboardingTurn(ATHLETE, NOTHING_DONE, "salut", FIXED_NOW);
     expect(turn).toContain("\nonboarding_fait: \n");
     expect(turn).toContain(
-      "onboarding_manquant: identity, motivation, goal, goal_details, expectations, training_background, availability, intervals_connected, body, ftp, education"
+      "onboarding_manquant: identity, motivation, goal, goal_details, expectations, training_background, availability, education, intervals_connected, body, ftp"
     );
   });
 });
