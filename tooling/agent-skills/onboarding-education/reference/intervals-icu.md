@@ -6,6 +6,15 @@ Intervals.icu est la plateforme où arrivent toutes tes sorties et où Inigo éc
 Tu y vois tes séances prévues, ce que tu as réellement fait, et l'évolution de ta condition et de ta fraîcheur.
 C'est gratuit (un don est possible, pas obligatoire).
 
+## S'il demande pourquoi (« tu peux pas juste prendre mon Garmin ou mon Strava ? »)
+
+Réponds en coach, en deux ou trois phrases, sans liste technique :
+- c'est là que j'écris tes séances, et elles partent ensuite sur ta montre ;
+- c'est là que je vois ce que tu as vraiment fait, avec toutes les données de ta montre
+  (Strava en bloque une bonne partie), pour analyser chaque séance et ajuster la suite ;
+- tu ne changes rien à tes habitudes : tu roules avec ta montre, tout continue d'arriver
+  sur Strava, Intervals tourne en arrière-plan.
+
 ## Parcours A : l'athlète a déjà un compte
 
 1. Vérifier que ses sorties y arrivent bien (montre ou compteur connecté).

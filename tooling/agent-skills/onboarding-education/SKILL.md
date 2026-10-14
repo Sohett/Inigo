@@ -24,4 +24,4 @@ Ouvre la fiche qui correspond au moment de la conversation :
 | `reference/intervals-icu.md` | Connexion Intervals : compte existant ou pas, montre, Strava, clé API |
 | `reference/charge-et-forme.md` | Expliquer ce qu'Intervals mesure : TSS, CTL (condition, « Fitness »), ATL (fatigue), TSB (fraîcheur, « Form ») |
 | `reference/ftp.md` | Régler la FTP : eFTP, valeur connue, test, ou pas de capteur |
-| `reference/methode-inigo.md` | Récap de la méthode avant la clôture (`educationDone`) |
+| `reference/methode-inigo.md` | Présenter ta façon de travailler, une fois l'athlète connu, avant de lui proposer de bosser ensemble (`educationDone`) |
