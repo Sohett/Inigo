@@ -35,7 +35,7 @@ export const athlete = pgTable(
     ...timestamps()
   },
   (t) => [
-    check("athlete_status_check", sql`${t.status} in ('onboarding', 'active', 'paused', 'ended')`),
+    check("athlete_status_check", sql`${t.status} in ('onboarding', 'active', 'paused', 'ended', 'blocked')`),
     check(
       "athlete_routing_key_check",
       sql`${t.phoneNum} is not null or ${t.whatsappLid} is not null`
