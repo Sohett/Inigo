@@ -13,8 +13,9 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Connecter Intervals.icu · Inigo",
   robots: { index: false, follow: false },
-  // The link token is in this page's URL: never hand it to another site as a referrer.
-  referrer: "no-referrer"
+  // The link token is in this page's URL: never hand it to another site as a referrer. Same origin
+  // only, so `/connect/intervals/start` can tell the click came from here.
+  referrer: "same-origin"
 };
 
 /**

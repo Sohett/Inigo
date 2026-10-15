@@ -23,3 +23,21 @@ export function readBrowserNonce(request: Request): string | undefined {
   }
   return undefined;
 }
+
+/**
+ * Whether this request is the click on our own page's button. Without it, anyone could send
+ * `/connect/intervals/start?t=<their token>` and skip the page that says whose account the link
+ * connects. `Sec-Fetch-Site` when the browser sends it; otherwise the `Referer`, which the page
+ * keeps for same origin requests only (`referrer: same-origin`).
+ */
+export function cameFromOurPage(request: Request): boolean {
+  const fetchSite = request.headers.get("sec-fetch-site");
+  if (fetchSite !== null) return fetchSite === "same-origin";
+  const referer = request.headers.get("referer");
+  if (!referer) return false;
+  try {
+    return new URL(referer).origin === new URL(request.url).origin;
+  } catch {
+    return false;
+  }
+}

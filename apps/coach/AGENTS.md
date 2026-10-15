@@ -327,7 +327,10 @@ Règles :
   `state`, donc le callback sait quel athlète et que le flow part d'un lien émis par nous.
 - **Liaison au navigateur (anti login CSRF)** : le jeton seul prouve « lien émis par Inigo », pas
   « ce navigateur est cet athlète ». Le nonce du cookie, lié dans le `state`, empêche qu'une URL
-  d'autorisation forgée avec le jeton d'un autre, ouverte ailleurs, relie un compte. Un lien
+  d'autorisation forgée avec le jeton d'un autre, ouverte ailleurs, relie un compte. Et
+  `/start` n'accepte que le clic depuis la page (`Sec-Fetch-Site: same-origin`, sinon `Referer` de
+  même origine, la page étant en `referrer: same-origin`) : un lien direct vers `/start` est renvoyé
+  à la page, qui montre le titulaire. Un lien
   transféré reste un risque résiduel : la page affiche donc le titulaire, et un compte Intervals
   déjà relié n'est jamais remplacé par un autre.
 - **Credentials de l'app hors `configSchema`** (`intervals/oauth/credentials.ts`) :

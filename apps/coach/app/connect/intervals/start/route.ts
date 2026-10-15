@@ -2,7 +2,7 @@ import { getDeps } from "../../../../src/deps";
 import { ConnectionResult } from "../../../../src/domain/intervalsConnection";
 import { intervalsOAuthConfig } from "../../../../src/intervals/oauth/credentials";
 import { createStartIntervalsConnection } from "../../../../src/use-cases/startIntervalsConnection";
-import { browserNonceCookie } from "../_components/browser-nonce";
+import { browserNonceCookie, cameFromOurPage } from "../_components/browser-nonce";
 
 export const dynamic = "force-dynamic";
 
@@ -15,10 +15,16 @@ function redirect(location: string, cookie?: string): Response {
 /**
  * The "Connecter Intervals.icu" button (INI-69): checks the link again, sets the browser nonce
  * cookie, and sends the athlete to Intervals.icu with the link bound to that nonce as `state`.
- * A link that cannot be used goes to the result page instead.
+ * A link that cannot be used goes to the result page instead, and a request that did not come
+ * from the page goes back to it, so the athlete always sees whose account they connect.
  */
 export async function GET(request: Request): Promise<Response> {
   const token = new URL(request.url).searchParams.get("t") ?? undefined;
+  if (!cameFromOurPage(request)) {
+    const page = new URL("/connect/intervals", request.url);
+    if (token) page.searchParams.set("t", token);
+    return redirect(page.toString());
+  }
   const done = (result: ConnectionResult) => {
     const url = new URL("/connect/intervals/done", request.url);
     url.searchParams.set("result", result);
