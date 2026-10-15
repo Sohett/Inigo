@@ -33,6 +33,9 @@ app/
   api/intervals/[transport]/route.ts    # endpoint MCP Intervals.icu statique (/api/intervals/mcp), bearer requis
   api/whatsapp/[transport]/route.ts     # endpoint MCP WhatsApp statique (/api/whatsapp/mcp), bearer requis
   api/admin/athletes/[athleteId]/session/route.ts  # POST : ouvre une session et repointe l'athlète
+  connect/intervals/page.tsx            # page publique d'un lien de connexion Intervals.icu (INI-69) → bouton vers l'autorisation
+  connect/intervals/callback/route.ts   # GET : retour OAuth d'Intervals.icu → use-case → 303 vers done
+  connect/intervals/done/page.tsx       # résultat de la connexion + bouton « Retourner sur WhatsApp »
   (admin)/admin/layout.tsx              # sidebar shadcn (Athlètes, Réglages) ; /admin redirige vers /admin/athletes
   (admin)/admin/athletes/page.tsx       # liste (data-table TanStack, filtres et tri dans l'URL : ?q=&status=&sort=)
   (admin)/admin/athletes/[athleteId]/page.tsx  # fiche athlète : bloc session (live, première session, nouvelle session, historique)
@@ -55,7 +58,7 @@ src/
     drizzleAthleteRepository.ts     # ADAPTER Drizzle (requête inline) + toAthlete(row→modèle)
     onboardingSettingsRepository.ts # PORT : agent d'onboarding, coordinateur, code d'accès (singleton en base, édité dans l'admin)
     drizzleOnboardingSettingsRepository.ts # ADAPTER Drizzle du singleton onboarding_settings
-    drizzleIntervalsCredentialStore.ts # ADAPTER IntervalsCredentialStore : setIntervalsKey (clé chiffrée, id en clair)
+    drizzleIntervalsCredentialStore.ts # ADAPTER IntervalsCredentialStore : setIntervalsCredential (secret chiffré, id en clair)
     drizzleAthleteRosterReader.ts  # ADAPTER Drizzle du port AthleteRosterReader : athlètes + plan (actif, sinon le plus récent) + dernière proposition, une requête (joins latéraux)
     drizzleOnboardingFactsReader.ts # ADAPTER Drizzle du port OnboardingFactsReader (profil + goals actifs + credential, une requête) + toOnboardingFacts
   use-cases/
@@ -70,7 +73,10 @@ src/
     handleGatewaySessionEvent.ts   # use-case : webhook session.* OpenWA → alerte « down » / « recovered »
     checkGatewaySession.ts         # use-case watchdog : session enregistrée en Neon → GET OpenWA → alerte si pas ready
     registerNewAthlete.ts          # use-case : expéditeur inconnu → réponse fixe, ou athlète en onboarding + sa session (PORT ChatReplier)
-    connectIntervals.ts            # use-case : clé + athlete id Intervals vérifiés puis stockés (outil connect_intervals, INI-50, transitoire avant OAuth)
+    connectIntervals.ts            # use-case : clé + athlete id Intervals vérifiés puis stockés (outil connect_intervals, INI-50, repli tant que l'OAuth est fermé)
+    createIntervalsConnectLink.ts  # use-case : lien de connexion OAuth signé (outil get_intervals_connect_link, INI-69)
+    startIntervalsConnection.ts    # use-case : ce que montre la page d'un lien (bouton vers Intervals, ou pourquoi le lien est inutilisable)
+    completeIntervalsConnection.ts # use-case : callback OAuth → token chiffré + tour `evenement: intervals_connecte` à l'agent d'onboarding
     assessOnboarding.ts            # use-case : état d'onboarding calculé (jamais stocké) ; PORTS OnboardingFactsReader + IntervalsAthleteReader
     blockAthlete.ts                # use-case : statut blocked + log de la raison (outil block_athlete, INI-66)
     handOffToCoordinator.ts        # use-case : onboarding complet → session du coordinateur + statut active, en un db.batch (INI-49)
@@ -96,7 +102,8 @@ src/
     client/                        # client REST Intervals.icu typé — transport seul, ajoute fields/limit, ne projette rien
     mappers/project.ts             # projection objet brut Intervals → modèle du coach (aucune décision)
     mcp-tools/{index,result,tools/*}.ts  # tools MCP Intervals fins ; chaque tool prend athleteId + résout un client par requête
-    resolveClient.ts               # createIntervalsResolver(db, encKey, baseUrl) : getIntervalsKey → déchiffre → IntervalsIcuClient
+    resolveClient.ts               # createIntervalsResolver(db, encKey, baseUrl) : getIntervalsCredential → déchiffre → IntervalsIcuClient (Basic ou Bearer)
+    oauth/                         # INI-69 : credentials de l'app (hors configSchema), jeton de lien HMAC, URL d'autorisation, échange du code
     credentialVerifier.ts          # ADAPTER IntervalsCredentialVerifier : GET /athlete/{id} avec la clé (401/403/404 → issues, le reste throw)
     intervalsAthleteReader.ts      # ADAPTER du port IntervalsAthleteReader : un GET profil Intervals → toBikeFtp (réglages Ride) + toBodyComplete (sexe, naissance, taille, poids)
   deps.ts                          # singleton lazy { config, brain, db, repo, athleteData, intervalsResolver }
@@ -281,7 +288,7 @@ plus une seule clé en env, mais **une par athlète** stockée chiffrée dans Ne
 
 - **Clé par athlète, résolue au moment de l'usage** : chaque tool prend un `athleteId` (le même
   `inigo_athlete_id` que coach-data — l'id Inigo, **pas** l'id Intervals). Le handler résout un
-  client **par requête** via `createIntervalsResolver` : `getIntervalsKey(db, athleteId, DB_ENCRYPTION_KEY)`
+  client **par requête** via `createIntervalsResolver` : `getIntervalsCredential(db, athleteId, DB_ENCRYPTION_KEY)`
   → déchiffre la clé + lit l'id Intervals externe → `new IntervalsIcuClient(...)`. Le secret est
   déchiffré **dans coach**, jamais renvoyé au brain ni au LLM.
 - **Absence de clé** : le resolver `throw` (message clair, sans secret) → `errorResult` du tool.
@@ -290,9 +297,45 @@ plus une seule clé en env, mais **une par athlète** stockée chiffrée dans Ne
   full) inchangées. Seule l'URL du serveur `intervals-icu` bascule (ops, post-deploy) vers
   `https://app.inigo-coach.com/api/intervals/mcp`.
 - **Auth** : même bearer global `MCP_BEARER_TOKEN` que coach-data (`withMcpAuth({ required: true })`).
-- **Écriture d'une clé** : `setIntervalsKey` (`@inigo/db`) — écriture chiffrée + rotation
-  (`rotatedAt`). Pendant l'onboarding, l'agent l'enregistre via l'outil `connect_intervals` (INI-50,
-  transitoire avant OAuth) : clé et athlete id vérifiés auprès d'Intervals.icu, puis stockés.
+- **Écriture d'un credential** : `setIntervalsCredential` (`@inigo/db`) — écriture chiffrée +
+  rotation (`rotatedAt`), `auth_type` `api_key` (HTTP Basic) ou `oauth` (Bearer). Pendant
+  l'onboarding : le lien OAuth (INI-69, voir plus bas), ou en repli l'outil `connect_intervals`
+  (INI-50) : clé et athlete id vérifiés auprès d'Intervals.icu, puis stockés.
+
+## Connexion Intervals.icu par OAuth — INI-69
+
+L'athlète connecte son compte depuis un lien, sans jamais coller de clé dans WhatsApp.
+
+1. L'agent d'onboarding appelle `get_intervals_connect_link(athleteId)` et envoie le lien.
+2. `GET /connect/intervals?t=<jeton>` (page publique, hors `proxy.ts`) : `startIntervalsConnection`
+   vérifie le jeton et rend le bouton vers `intervals.icu/oauth/authorize` (scopes
+   `ACTIVITY:READ,WELLNESS:READ,CALENDAR:WRITE,SETTINGS:WRITE`, `state` = le jeton).
+3. `GET /connect/intervals/callback?code&state` : `completeIntervalsConnection` vérifie le `state`,
+   échange le code (`POST /api/oauth/token`, form-encoded, moins de 2 min), exige tous les scopes,
+   stocke le token (`athlete_credential.auth_type = oauth`, remplace une clé API), puis réveille
+   l'agent d'onboarding (tour `evenement: intervals_connecte`, `message` vide). Puis 303 vers
+   `/connect/intervals/done?result=<ConnectionResult>`, qui propose `wa.me/<numéro d'Inigo>`.
+
+Règles :
+- **Jeton sans état** (`intervals/oauth/connectLinkToken.ts`) : `{athleteId, expiration}` signé
+  HMAC-SHA256 (clé dérivée du client secret), 72 h. Pas de table de liens. Le même jeton sert de
+  `state`, donc le callback sait quel athlète et que le flow part d'un lien émis par nous.
+- **Credentials de l'app hors `configSchema`** (`intervals/oauth/credentials.ts`) :
+  `INTERVALS_OAUTH_CLIENT_ID`, `INTERVALS_OAUTH_CLIENT_SECRET`, `COACH_PUBLIC_URL`. Absents → l'outil
+  répond `oauth_unavailable` (l'agent repasse à la clé), les pages disent « indisponible ». Le
+  webhook et les MCP ne sont jamais touchés.
+- **Rien n'est écrit** si : refus (`access_denied`), jeton faux ou expiré, athlète inconnu,
+  `ended` ou `blocked`, code refusé, scope décoché. Une panne (Intervals, Neon) throw → la route
+  logge et affiche `failed`, jamais une 500.
+- **Le réveil de l'agent ne fait jamais échouer la connexion** : elle est déjà stockée. Seul un
+  athlète `onboarding` est réveillé (le coordinateur ne connaît pas l'événement, cf. INI-71).
+- **Pas de refresh token** chez Intervals.icu, ni d'expiration documentée. Révocation détectée au
+  premier 401 : INI-71. L'athlete id renvoyé par le token est normalisé en `i…`.
+- **Redirect URI** : `<COACH_PUBLIC_URL>/connect/intervals/callback`, à enregistrer sur l'app
+  (pas de wildcard chez Intervals, donc pas de flow complet sur les previews Vercel ; `localhost`
+  est toujours autorisé).
+- **Numéro WhatsApp d'Inigo** : `onboarding_settings.whatsapp_number`, édité dans /admin, Réglages.
+  Absent ou Neon illisible → la page n'a simplement pas de bouton.
 
 ## MCP WhatsApp (le brain répond à l'athlète) — INI-37
 

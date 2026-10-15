@@ -16,7 +16,7 @@ export interface IntervalsOAuthConfig {
 
 const envSchema = z.object({
   INTERVALS_OAUTH_CLIENT_ID: z.string().trim().min(1),
-  INTERVALS_OAUTH_CLIENT_SECRET: z.string().trim().min(16),
+  INTERVALS_OAUTH_CLIENT_SECRET: z.string().trim().min(1),
   COACH_PUBLIC_URL: z.url().transform((url) => url.replace(/\/+$/, ""))
 });
 
