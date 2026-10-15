@@ -16,7 +16,8 @@ const SELECT_CLASS =
 const ERROR_COPY: Record<string, string> = {
   unauthorized: "Session admin expirée. Recharge la page pour te réidentifier.",
   invalid_json: "Requête malformée.",
-  invalid_onboarding_settings: "Réglages invalides : le code fait au moins 4 caractères.",
+  invalid_onboarding_settings:
+    "Réglages invalides : le code fait au moins 4 caractères, le numéro commence par + et l'indicatif du pays.",
   admin_not_configured: "Admin non configuré côté serveur. Voir les logs.",
   onboarding_settings_update_failed: "La base a refusé l'écriture. Voir les logs du serveur."
 };
@@ -63,7 +64,8 @@ export function OnboardingSettingsForm({ current, inventory, inventoryError }: O
         body: JSON.stringify({
           onboardingAgentId: read("onboardingAgentId"),
           coordinatorAgentId: read("coordinatorAgentId"),
-          accessCode: read("accessCode")
+          accessCode: read("accessCode"),
+          whatsappNumber: read("whatsappNumber")
         })
       });
     } catch {
@@ -98,7 +100,7 @@ export function OnboardingSettingsForm({ current, inventory, inventoryError }: O
 
   return (
     <form onSubmit={(event) => void submit(event)} className="grid gap-2">
-      <div className="grid gap-2 sm:grid-cols-3">
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
         {agentSelect("onboardingAgentId", "Agent d'onboarding", current.onboardingAgentId)}
         {agentSelect("coordinatorAgentId", "Coordinateur (après l'onboarding)", current.coordinatorAgentId)}
         <div className="grid gap-1">
@@ -113,6 +115,18 @@ export function OnboardingSettingsForm({ current, inventory, inventoryError }: O
             className="h-8 font-mono text-xs"
           />
         </div>
+        <div className="grid gap-1">
+          <Label htmlFor="whatsappNumber" className="text-xs">
+            Numéro WhatsApp d'Inigo
+          </Label>
+          <Input
+            id="whatsappNumber"
+            name="whatsappNumber"
+            defaultValue={current.whatsappNumber ?? ""}
+            placeholder="ex. +32470123456"
+            className="h-8 font-mono text-xs"
+          />
+        </div>
       </div>
       <div className="flex items-center gap-2">
         <Button type="submit" disabled={pending}>
@@ -124,7 +138,8 @@ export function OnboardingSettingsForm({ current, inventory, inventoryError }: O
       <p className="text-xs text-muted-foreground">
         Un numéro inconnu qui envoie le code devient un athlète en onboarding, avec une session de
         l'agent d'onboarding. Sans code, il reçoit la réponse fixe. Sans agent ou sans code,
-        l'onboarding est coupé et les inconnus sont ignorés.
+        l'onboarding est coupé et les inconnus sont ignorés. Le numéro WhatsApp sert au bouton qui
+        ramène l'athlète dans la conversation après la connexion Intervals.icu.
       </p>
       {message ? <p className="text-xs text-destructive">{message}</p> : null}
     </form>

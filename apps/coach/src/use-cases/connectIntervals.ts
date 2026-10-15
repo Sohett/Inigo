@@ -1,3 +1,5 @@
+import type { IntervalsAuth } from "../intervals/client";
+
 /** What Intervals.icu says about a key and an athlete id, tried together. */
 export type IntervalsCredentialCheck =
   | { status: "valid"; athleteName: string | null }
@@ -13,9 +15,12 @@ export interface IntervalsCredentialVerifier {
   check(apiKey: string, intervalsAthleteId: string): Promise<IntervalsCredentialCheck>;
 }
 
-/** Port: store an athlete's Intervals.icu credential (key encrypted at rest, id in clear). */
+/**
+ * Port: store an athlete's Intervals.icu credential (secret encrypted at rest, id in clear). One
+ * per athlete: an OAuth connection replaces an API key, and the other way round.
+ */
 export interface IntervalsCredentialStore {
-  save(athleteId: string, apiKey: string, intervalsAthleteId: string): Promise<void>;
+  save(athleteId: string, auth: IntervalsAuth, intervalsAthleteId: string): Promise<void>;
 }
 
 /** Never carries the key: this goes back to the agent as is. */
@@ -58,7 +63,7 @@ export function createConnectIntervals(deps: {
             reason: `The key works but no athlete ${intervalsAthleteId} exists: ask for the athlete id shown next to the key.`
           };
         case "valid":
-          await deps.store.save(athleteId, apiKey, intervalsAthleteId);
+          await deps.store.save(athleteId, { type: "api_key", apiKey }, intervalsAthleteId);
           return { status: "connected", intervalsAthleteId, athleteName: check.athleteName };
       }
     }

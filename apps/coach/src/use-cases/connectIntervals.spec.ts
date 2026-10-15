@@ -17,7 +17,7 @@ describe("connectIntervals", () => {
     const outcome = await useCase.execute(ATHLETE_ID, KEY, "i42");
 
     expect(verify).toHaveBeenCalledWith(KEY, "i42");
-    expect(save).toHaveBeenCalledWith(ATHLETE_ID, KEY, "i42");
+    expect(save).toHaveBeenCalledWith(ATHLETE_ID, { type: "api_key", apiKey: KEY }, "i42");
     expect(outcome).toEqual({ status: "connected", intervalsAthleteId: "i42", athleteName: "Thomas" });
   });
 

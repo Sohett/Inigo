@@ -1,5 +1,6 @@
-export { IntervalsIcuClient } from "./client";
+export { IntervalsIcuClient, authorizationHeader } from "./client";
 export type {
+  IntervalsAuth,
   IntervalsIcuClientOptions,
   DateRange,
   CurveQuery,

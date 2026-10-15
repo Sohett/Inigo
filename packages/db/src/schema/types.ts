@@ -45,6 +45,11 @@ export type ConstraintKind = "fixed_session" | "unavailable" | "limited";
 export type ConstraintActivity = "strength" | Sport;
 
 export type CredentialProvider = "intervals_icu";
+/**
+ * How a credential authenticates (INI-69): a personal API key the athlete pasted (HTTP Basic), or
+ * an OAuth access token Intervals.icu issued to the Inigo app (Bearer).
+ */
+export type CredentialAuthType = "api_key" | "oauth";
 
 /** A single training zone bound (Coggan-style). */
 export interface Zone {

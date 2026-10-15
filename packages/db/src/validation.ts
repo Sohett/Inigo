@@ -12,7 +12,7 @@ import { planBlock, trainingPlan } from "./schema/plan";
  * CHECK constraints; these schemas guard shape/required-ness before a write.
  *
  * The encrypted-credential path is intentionally excluded — secrets go through
- * `setIntervalsKey`, never a raw insert schema.
+ * `setIntervalsCredential`, never a raw insert schema.
  */
 export const insertAthleteSchema = createInsertSchema(athlete);
 export const selectAthleteSchema = createSelectSchema(athlete);
