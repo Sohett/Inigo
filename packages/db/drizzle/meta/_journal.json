@@ -85,6 +85,13 @@
       "when": 1791975270442,
       "tag": "0011_athlete_blocked",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1792051636974,
+      "tag": "0012_intervals_oauth",
+      "breakpoints": true
     }
   ]
 }

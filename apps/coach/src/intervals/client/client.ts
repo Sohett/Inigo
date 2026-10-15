@@ -16,9 +16,25 @@ import {
   type SportSettings
 } from "./schemas";
 
+/**
+ * How the client authenticates: a personal API key (HTTP Basic, username `API_KEY`) or an OAuth
+ * access token issued to the Inigo app (Bearer, INI-69).
+ */
+export type IntervalsAuth = { type: "api_key"; apiKey: string } | { type: "oauth"; accessToken: string };
+
+/** The `Authorization` header for an auth, as Intervals.icu expects it. */
+export function authorizationHeader(auth: IntervalsAuth): string {
+  switch (auth.type) {
+    case "api_key":
+      return `Basic ${Buffer.from(`API_KEY:${auth.apiKey}`).toString("base64")}`;
+    case "oauth":
+      return `Bearer ${auth.accessToken}`;
+  }
+}
+
 export interface IntervalsIcuClientOptions {
-  /** Intervals.icu API key (used as the HTTP Basic password). */
-  apiKey: string;
+  /** API key or OAuth access token. */
+  auth: IntervalsAuth;
   /** Athlete id, e.g. "i123456". */
   athleteId: string;
   /** Defaults to https://intervals.icu/api/v1 */
@@ -96,8 +112,8 @@ const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
 /**
  * Thin, typed client over the Intervals.icu REST API.
  *
- * Authentication is HTTP Basic with the literal username `API_KEY` and the
- * account API key as the password, per the Intervals.icu API conventions.
+ * Authentication is either HTTP Basic with the literal username `API_KEY` and the account API key
+ * as the password, or a Bearer OAuth access token (see `authorizationHeader`).
  */
 export class IntervalsIcuClient {
   private readonly athleteId: string;
@@ -115,7 +131,7 @@ export class IntervalsIcuClient {
     this.maxRetries = options.maxRetries ?? 2;
     this.retryDelayMs = options.retryDelayMs ?? 250;
     this.fetchImpl = options.fetchImpl ?? fetch;
-    this.authHeader = `Basic ${Buffer.from(`API_KEY:${options.apiKey}`).toString("base64")}`;
+    this.authHeader = authorizationHeader(options.auth);
   }
 
   // ----- Athlete -----

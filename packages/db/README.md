@@ -19,14 +19,15 @@ Intervals.icu MCP.
 ## Usage
 
 ```ts
-import { createDb, athlete, getIntervalsKey, setIntervalsKey } from "@inigo/db";
+import { createDb, athlete, getIntervalsCredential, setIntervalsCredential } from "@inigo/db";
 
 const db = createDb(process.env.DATABASE_URL!);
 const rows = await db.select().from(athlete).where(eq(athlete.phoneNum, "+32..."));
 
 // Per-athlete secrets are sealed with AES-256-GCM (never stored in plaintext):
-await setIntervalsKey(db, { athleteId, apiKey, externalAthleteId }, process.env.DB_ENCRYPTION_KEY!);
-const key = await getIntervalsKey(db, athleteId, process.env.DB_ENCRYPTION_KEY!);
+// authType: "api_key" (HTTP Basic) or "oauth" (Bearer access token, INI-69).
+await setIntervalsCredential(db, { athleteId, authType: "oauth", secret, externalAthleteId }, process.env.DB_ENCRYPTION_KEY!);
+const credential = await getIntervalsCredential(db, athleteId, process.env.DB_ENCRYPTION_KEY!);
 ```
 
 ## Migrations

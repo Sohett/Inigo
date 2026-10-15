@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { athlete, athleteProfile, createDb, goal, setIntervalsKey, type Db } from "@inigo/db";
+import { athlete, athleteProfile, createDb, goal, setIntervalsCredential, type Db } from "@inigo/db";
 import { createDrizzleOnboardingFactsReader } from "./drizzleOnboardingFactsReader";
 
 /**
@@ -63,9 +63,9 @@ describe.skipIf(!databaseUrl || !encryptionKey)("drizzleOnboardingFactsReader (i
       { athleteId, title: "Semi", status: "active", priority: "A", targetResult: "finir", experience: "  " },
       { athleteId, title: "Ancien objectif", status: "abandoned", targetResult: "x", experience: "y" }
     ]);
-    await setIntervalsKey(
+    await setIntervalsCredential(
       db,
-      { athleteId, apiKey: "test-key", externalAthleteId: "i000006" },
+      { athleteId, authType: "api_key", secret: "test-key", externalAthleteId: "i000006" },
       encryptionKey as string
     );
 

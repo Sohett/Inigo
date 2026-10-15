@@ -4,6 +4,7 @@ import {
   formatDateTime,
   formatOnboardingTurn,
   formatHandoffTurn,
+  formatIntervalsConnectedTurn,
   type EnvelopeAthlete
 } from "./taskEnvelope";
 import { NOTHING_DONE, type OnboardingState } from "../domain/onboarding";
@@ -56,6 +57,15 @@ describe("formatTurn", () => {
   // identifier it had no use for. `send_whatsapp_message` resolves it from the athlete now.
   it("does not carry the WhatsApp chat id", () => {
     expect(formatTurn(ATHLETE, "salut", FIXED_NOW)).not.toContain("chat_id");
+  });
+});
+
+describe("formatIntervalsConnectedTurn", () => {
+  it("carries the checklist and the event line, with an empty message last", () => {
+    const state: OnboardingState = { done: ["intervals_connected"], missing: ["body"], complete: false };
+    expect(formatIntervalsConnectedTurn(ATHLETE, state, FIXED_NOW)).toBe(
+      `${HEADER}\nonboarding_fait: intervals_connected\nonboarding_manquant: body\nevenement: intervals_connecte\nmessage: ""`
+    );
   });
 });
 

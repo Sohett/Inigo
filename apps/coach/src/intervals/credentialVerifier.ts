@@ -10,7 +10,7 @@ import type { IntervalsCredentialVerifier } from "../use-cases/connectIntervals"
 export function createIntervalsCredentialVerifier(baseUrl: string): IntervalsCredentialVerifier {
   return {
     async check(apiKey, intervalsAthleteId) {
-      const client = new IntervalsIcuClient({ apiKey, athleteId: intervalsAthleteId, baseUrl });
+      const client = new IntervalsIcuClient({ auth: { type: "api_key", apiKey }, athleteId: intervalsAthleteId, baseUrl });
       try {
         const athlete = await client.getAthleteProfile();
         return { status: "valid", athleteName: athlete.name ?? null };

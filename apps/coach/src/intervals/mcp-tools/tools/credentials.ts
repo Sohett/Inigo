@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { ConnectIntervals } from "../../../use-cases/connectIntervals";
+import type { CreateIntervalsConnectLink } from "../../../use-cases/createIntervalsConnectLink";
 import { assertAthleteId, athleteIdShape, runTool } from "../result";
 
 /** An Intervals.icu athlete id, `i123456`; a capital `I` (phone keyboards) or a bare number is mended. */
@@ -12,11 +13,34 @@ const intervalsAthleteIdShape = z
   .transform((id) => (id.startsWith("i") ? id : `i${id}`));
 
 /**
+ * `get_intervals_connect_link` (INI-69): the OAuth link the onboarding agent sends the athlete.
  * `connect_intervals`: the onboarding agent registers the key and athlete id the athlete gave
- * it (INI-50, transitional until OAuth). The decision lives in `connectIntervals`; this only
+ * it (INI-50, the fallback while OAuth is not set up, removed by INI-72). The decision lives in `connectIntervals`; this only
  * validates the input and never echoes the key back.
  */
-export function registerCredentialTools(server: McpServer, connectIntervals: ConnectIntervals): void {
+export function registerCredentialTools(
+  server: McpServer,
+  connectIntervals: ConnectIntervals,
+  connectLink: CreateIntervalsConnectLink
+): void {
+  server.registerTool(
+    "get_intervals_connect_link",
+    {
+      title: "Get the athlete's Intervals.icu connection link",
+      description:
+        "A personal link (valid 72 hours) the athlete opens to connect Intervals.icu to Inigo " +
+        "by OAuth, without any API key. Send it as is on WhatsApp. When the athlete is done, you " +
+        "receive a turn with `evenement: intervals_connecte`. `oauth_unavailable` means OAuth " +
+        "is not set up yet: fall back to the API key (connect_intervals).",
+      inputSchema: { ...athleteIdShape }
+    },
+    (args) =>
+      runTool(async () => {
+        assertAthleteId(args.athleteId);
+        return connectLink.execute(args.athleteId);
+      })
+  );
+
   server.registerTool(
     "connect_intervals",
     {
