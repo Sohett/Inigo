@@ -3,7 +3,11 @@ import { ConnectionResult } from "../../../../src/domain/intervalsConnection";
 import { intervalsOAuthConfig } from "../../../../src/intervals/oauth/credentials";
 import { createIntervalsTokenExchanger } from "../../../../src/intervals/oauth/intervalsOAuth";
 import { createIntervalsAthleteReader } from "../../../../src/intervals/intervalsAthleteReader";
-import { createDrizzleIntervalsCredentialStore } from "../../../../src/repositories/drizzleIntervalsCredentialStore";
+import {
+  createDrizzleIntervalsAccountReader,
+  createDrizzleIntervalsCredentialStore
+} from "../../../../src/repositories/drizzleIntervalsCredentialStore";
+import { clearBrowserNonceCookie, readBrowserNonce } from "../_components/browser-nonce";
 import { createDrizzleOnboardingFactsReader } from "../../../../src/repositories/drizzleOnboardingFactsReader";
 import { createAssessOnboarding } from "../../../../src/use-cases/assessOnboarding";
 import { createCompleteIntervalsConnection } from "../../../../src/use-cases/completeIntervalsConnection";
@@ -23,7 +27,8 @@ export async function GET(request: Request): Promise<Response> {
   const callback = {
     state: params.get("state") ?? undefined,
     code: params.get("code") ?? undefined,
-    error: params.get("error") ?? undefined
+    error: params.get("error") ?? undefined,
+    browserNonce: readBrowserNonce(request)
   };
 
   let result: ConnectionResult;
@@ -34,6 +39,7 @@ export async function GET(request: Request): Promise<Response> {
       oauth: config ? { config, exchanger: createIntervalsTokenExchanger(config) } : null,
       repo: deps.repo,
       store: createDrizzleIntervalsCredentialStore(deps.db, deps.config.DB_ENCRYPTION_KEY),
+      connectedAccount: createDrizzleIntervalsAccountReader(deps.db),
       assessOnboarding: createAssessOnboarding({
         facts: createDrizzleOnboardingFactsReader(deps.db),
         intervals: createIntervalsAthleteReader(deps.intervalsResolver)
@@ -50,6 +56,12 @@ export async function GET(request: Request): Promise<Response> {
   done.searchParams.set("result", result);
   return new Response(null, {
     status: 303,
-    headers: { location: done.toString(), "cache-control": "no-store", "referrer-policy": "no-referrer" }
+    headers: {
+      location: done.toString(),
+      "cache-control": "no-store",
+      "referrer-policy": "no-referrer",
+      // The binding is single use: whatever the result, a retry starts again from the link.
+      "set-cookie": clearBrowserNonceCookie()
+    }
   });
 }

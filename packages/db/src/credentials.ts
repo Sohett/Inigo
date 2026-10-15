@@ -91,3 +91,16 @@ export async function setIntervalsCredential(
       }
     });
 }
+
+/**
+ * The Intervals.icu athlete id an athlete is connected to, or null when none is stored. Reads no
+ * secret: enough to refuse silently swapping the account behind an athlete (INI-69).
+ */
+export async function getIntervalsAccountId(db: Db, athleteId: string): Promise<string | null> {
+  const rows = await db
+    .select({ externalAthleteId: athleteCredential.externalAthleteId })
+    .from(athleteCredential)
+    .where(and(eq(athleteCredential.athleteId, athleteId), eq(athleteCredential.provider, DEFAULT_PROVIDER)))
+    .limit(1);
+  return rows[0]?.externalAthleteId ?? null;
+}

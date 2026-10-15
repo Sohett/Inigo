@@ -33,7 +33,8 @@ app/
   api/intervals/[transport]/route.ts    # endpoint MCP Intervals.icu statique (/api/intervals/mcp), bearer requis
   api/whatsapp/[transport]/route.ts     # endpoint MCP WhatsApp statique (/api/whatsapp/mcp), bearer requis
   api/admin/athletes/[athleteId]/session/route.ts  # POST : ouvre une session et repointe l'athlète
-  connect/intervals/page.tsx            # page publique d'un lien de connexion Intervals.icu (INI-69) → bouton vers l'autorisation
+  connect/intervals/page.tsx            # page publique d'un lien de connexion Intervals.icu (INI-69) : à qui est le lien + bouton
+  connect/intervals/start/route.ts      # GET : pose le cookie nonce (liaison au navigateur) → 303 vers l'autorisation Intervals
   connect/intervals/callback/route.ts   # GET : retour OAuth d'Intervals.icu → use-case → 303 vers done
   connect/intervals/done/page.tsx       # résultat de la connexion + bouton « Retourner sur WhatsApp »
   (admin)/admin/layout.tsx              # sidebar shadcn (Athlètes, Réglages) ; /admin redirige vers /admin/athletes
@@ -308,24 +309,33 @@ L'athlète connecte son compte depuis un lien, sans jamais coller de clé dans W
 
 1. L'agent d'onboarding appelle `get_intervals_connect_link(athleteId)` et envoie le lien.
 2. `GET /connect/intervals?t=<jeton>` (page publique, hors `proxy.ts`) : `startIntervalsConnection`
-   vérifie le jeton et rend le bouton vers `intervals.icu/oauth/authorize` (scopes
-   `ACTIVITY:READ,WELLNESS:READ,CALENDAR:WRITE,SETTINGS:WRITE`, `state` = le jeton).
-3. `GET /connect/intervals/callback?code&state` : `completeIntervalsConnection` vérifie le `state`,
-   échange le code (`POST /api/oauth/token`, form-encoded, moins de 2 min), exige tous les scopes,
-   stocke le token (`athlete_credential.auth_type = oauth`, remplace une clé API), puis réveille
+   vérifie le jeton et l'athlète, la page dit **à qui** est le lien (prénom, deux derniers chiffres
+   du WhatsApp) et propose le bouton.
+3. `GET /connect/intervals/start?t=` : pose un cookie nonce (HttpOnly, Secure, Lax, 15 min, path
+   `/connect/intervals`) et redirige vers `intervals.icu/oauth/authorize` (scopes
+   `ACTIVITY:READ,WELLNESS:READ,CALENDAR:WRITE,SETTINGS:WRITE`, `state` = `<jeton>~<nonce>`).
+4. `GET /connect/intervals/callback?code&state` : `completeIntervalsConnection` exige le nonce du
+   cookie (`session_mismatch` sinon), vérifie le jeton, échange le code (`POST /api/oauth/token`,
+   form-encoded, moins de 2 min), exige tous les scopes, refuse un **autre** compte Intervals que
+   celui déjà relié (`other_account`), stocke le token (`athlete_credential.auth_type = oauth`, remplace une clé API), puis réveille
    l'agent d'onboarding (tour `evenement: intervals_connecte`, `message` vide). Puis 303 vers
    `/connect/intervals/done?result=<ConnectionResult>`, qui propose `wa.me/<numéro d'Inigo>`.
 
 Règles :
 - **Jeton sans état** (`intervals/oauth/connectLinkToken.ts`) : `{athleteId, expiration}` signé
-  HMAC-SHA256 (clé dérivée du client secret), 72 h. Pas de table de liens. Le même jeton sert de
+  HMAC-SHA256 (clé dérivée du client secret), 72 h. Pas de table de liens. Il voyage dans le
   `state`, donc le callback sait quel athlète et que le flow part d'un lien émis par nous.
+- **Liaison au navigateur (anti login CSRF)** : le jeton seul prouve « lien émis par Inigo », pas
+  « ce navigateur est cet athlète ». Le nonce du cookie, lié dans le `state`, empêche qu'une URL
+  d'autorisation forgée avec le jeton d'un autre, ouverte ailleurs, relie un compte. Un lien
+  transféré reste un risque résiduel : la page affiche donc le titulaire, et un compte Intervals
+  déjà relié n'est jamais remplacé par un autre.
 - **Credentials de l'app hors `configSchema`** (`intervals/oauth/credentials.ts`) :
   `INTERVALS_OAUTH_CLIENT_ID`, `INTERVALS_OAUTH_CLIENT_SECRET`, `COACH_PUBLIC_URL`. Absents → l'outil
   répond `oauth_unavailable` (l'agent repasse à la clé), les pages disent « indisponible ». Le
   webhook et les MCP ne sont jamais touchés.
-- **Rien n'est écrit** si : refus (`access_denied`), jeton faux ou expiré, athlète inconnu,
-  `ended` ou `blocked`, code refusé, scope décoché. Une panne (Intervals, Neon) throw → la route
+- **Rien n'est écrit** si : refus (`access_denied`), jeton faux ou expiré, autre navigateur,
+  athlète inconnu, `ended` ou `blocked`, code refusé, scope décoché, autre compte Intervals. Une panne (Intervals, Neon) throw → la route
   logge et affiche `failed`, jamais une 500.
 - **Le réveil de l'agent ne fait jamais échouer la connexion** : elle est déjà stockée. Seul un
   athlète `onboarding` est réveillé (le coordinateur ne connaît pas l'événement, cf. INI-71).

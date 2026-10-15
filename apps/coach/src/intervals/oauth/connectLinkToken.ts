@@ -1,10 +1,11 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { UUID_PATTERN } from "../../mcp/athleteId";
 
 /**
  * The token in a connection link (INI-69): which athlete, and until when. Stateless, signed with
- * HMAC-SHA256, so no table holds pending links. The same token travels as the OAuth `state`, so
- * the callback knows which athlete connected and that the flow started from a link we issued.
+ * HMAC-SHA256, so no table holds pending links. The same token travels in the OAuth `state`, so
+ * the callback knows which athlete connected and that the flow started from a link we issued
+ * (and, with the browser nonce below, from this browser).
  *
  * Format: `<base64url payload>.<base64url signature>`, payload `{"a":athleteId,"e":expiry seconds}`.
  * Signed with a key derived from the OAuth client secret, so it needs no secret of its own; a
@@ -48,6 +49,39 @@ export function verifyConnectLinkToken(token: string | undefined, clientSecret: 
   if (!claims) return { status: "invalid" };
   if (claims.e * 1000 <= now.getTime()) return { status: "expired" };
   return { status: "valid", athleteId: claims.a, expiresAt: new Date(claims.e * 1000) };
+}
+
+/**
+ * The OAuth `state` binds the link token to the browser that started the flow: `<token>~<nonce>`,
+ * the nonce also set in an HttpOnly cookie by `/connect/intervals/start`. The callback requires
+ * both to match, so a raw authorize URL carrying someone else's token, opened in another browser,
+ * never connects an account (OAuth login CSRF).
+ */
+export const BROWSER_NONCE_COOKIE = "inigo_intervals_connect";
+
+/** How long the browser binding lives: the time to log in on Intervals.icu and grant access. */
+export const BROWSER_NONCE_TTL_SECONDS = 15 * 60;
+
+export function newBrowserNonce(): string {
+  return randomBytes(18).toString("base64url");
+}
+
+export function bindState(token: string, nonce: string): string {
+  return `${token}~${nonce}`;
+}
+
+export function readState(state: string | undefined): { token: string; nonce: string } | null {
+  const [token, nonce, extra] = (state ?? "").split("~");
+  if (!token || !nonce || extra !== undefined) return null;
+  return { token, nonce };
+}
+
+/** Constant time comparison of the state's nonce with the cookie's. */
+export function sameNonce(fromState: string, fromCookie: string | undefined): boolean {
+  if (!fromCookie) return false;
+  const a = Buffer.from(fromState);
+  const b = Buffer.from(fromCookie);
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 function readClaims(payload: string): { a: string; e: number } | null {

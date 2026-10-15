@@ -1,6 +1,7 @@
-import { setIntervalsCredential, type Db } from "@inigo/db";
+import { getIntervalsAccountId, setIntervalsCredential, type Db } from "@inigo/db";
 import type { IntervalsAuth } from "../intervals/client";
 import type { IntervalsCredentialStore } from "../use-cases/connectIntervals";
+import type { IntervalsAccountReader } from "../use-cases/completeIntervalsConnection";
 
 /** The secret an auth carries, whichever kind it is. */
 function secretOf(auth: IntervalsAuth): string {
@@ -41,4 +42,9 @@ export function createDrizzleIntervalsCredentialStore(db: Db, masterKeyBase64: s
       }
     }
   };
+}
+
+/** `IntervalsAccountReader` over `getIntervalsAccountId`: which Intervals.icu account, no secret read. */
+export function createDrizzleIntervalsAccountReader(db: Db): IntervalsAccountReader {
+  return (athleteId) => getIntervalsAccountId(db, athleteId);
 }

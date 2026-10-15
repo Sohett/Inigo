@@ -25,6 +25,14 @@ export const RESULT_COPY: Record<ConnectionResult, { title: string; body: string
     title: "Ce lien ne fonctionne pas",
     body: "Il est incomplet ou n'est plus valable. Demande un nouveau lien à Inigo sur WhatsApp."
   },
+  [ConnectionResult.SessionMismatch]: {
+    title: "Recommence depuis ton lien",
+    body: "La connexion doit se faire de bout en bout dans le même navigateur. Rouvre le lien reçu sur WhatsApp et va jusqu'au bout sans changer d'application."
+  },
+  [ConnectionResult.OtherAccount]: {
+    title: "Un autre compte est déjà relié",
+    body: "Ton compte Inigo est déjà relié à un autre compte Intervals.icu, rien n'a été changé. Écris à Inigo sur WhatsApp si tu veux changer de compte."
+  },
   [ConnectionResult.Unavailable]: {
     title: "Connexion indisponible",
     body: "La connexion à Intervals.icu n'est pas encore ouverte. Inigo t'explique sur WhatsApp comment faire autrement."

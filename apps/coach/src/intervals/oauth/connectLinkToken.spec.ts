@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { CONNECT_LINK_TTL_SECONDS, signConnectLinkToken, verifyConnectLinkToken } from "./connectLinkToken";
+import {
+  bindState,
+  CONNECT_LINK_TTL_SECONDS,
+  newBrowserNonce,
+  readState,
+  sameNonce,
+  signConnectLinkToken,
+  verifyConnectLinkToken
+} from "./connectLinkToken";
 
 const SECRET = "client-secret-0123456789";
 const ATHLETE = "550e8400-e29b-41d4-a716-446655440000";
@@ -31,5 +39,23 @@ describe("connect link token", () => {
 
   it.each([undefined, "", "abc", "a.b.c", "....", "x.y"])("refuses a malformed token %j", (token) => {
     expect(verifyConnectLinkToken(token, SECRET, NOW)).toEqual({ status: "invalid" });
+  });
+});
+
+describe("OAuth state", () => {
+  it("binds a token to a browser nonce and reads both back", () => {
+    expect(readState(bindState("payload.sig", "nonce"))).toEqual({ token: "payload.sig", nonce: "nonce" });
+  });
+
+  it.each([undefined, "", "payload.sig", "a~", "~b", "a~b~c"])("refuses a state without exactly one binding: %j", (state) => {
+    expect(readState(state)).toBeNull();
+  });
+
+  it("matches a nonce only against the same cookie value", () => {
+    const nonce = newBrowserNonce();
+    expect(sameNonce(nonce, nonce)).toBe(true);
+    expect(sameNonce(nonce, newBrowserNonce())).toBe(false);
+    expect(sameNonce(nonce, undefined)).toBe(false);
+    expect(sameNonce(nonce, `${nonce}x`)).toBe(false);
   });
 });

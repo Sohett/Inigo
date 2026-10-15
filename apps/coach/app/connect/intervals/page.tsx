@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { getDeps } from "@/deps";
+import { ConnectionResult } from "@/domain/intervalsConnection";
 import { intervalsOAuthConfig } from "@/intervals/oauth/credentials";
-import { createStartIntervalsConnection } from "@/use-cases/startIntervalsConnection";
+import { createStartIntervalsConnection, type StartConnectionOutcome } from "@/use-cases/startIntervalsConnection";
 import { ActionLink, BackToWhatsapp, ConnectShell } from "./_components/connect-shell";
 import { RESULT_COPY } from "./_components/result-copy";
 import { loadWhatsappNumber } from "./_components/whatsapp-number";
@@ -16,12 +18,15 @@ export const metadata: Metadata = {
 };
 
 /**
- * The page a connection link opens (INI-69): what Inigo will do with Intervals.icu, and the
- * button to grant it there. A link that cannot be used says why instead.
+ * The page a connection link opens (INI-69): whose Inigo account the link connects, what Inigo
+ * will do with Intervals.icu, and the button to grant it there. A link that cannot be used says
+ * why instead. The button goes through `/connect/intervals/start`, which binds the flow to this
+ * browser before leaving for Intervals.icu.
  */
 export default async function ConnectIntervalsPage({ searchParams }: { searchParams: Promise<{ t?: string | string[] }> }) {
   const { t } = await searchParams;
-  const outcome = createStartIntervalsConnection({ oauth: intervalsOAuthConfig() }).execute(typeof t === "string" ? t : undefined);
+  const token = typeof t === "string" ? t : undefined;
+  const outcome = await startOutcome(token);
 
   if (outcome.status !== "ready") {
     const copy = RESULT_COPY[outcome.status];
@@ -44,10 +49,25 @@ export default async function ConnectIntervalsPage({ searchParams }: { searchPar
         <li>Écrire tes séances planifiées dans ton calendrier</li>
         <li>Mettre à jour tes seuils (FTP, zones) et tes données corporelles</li>
       </ul>
-      <ActionLink href={outcome.authorizeUrl}>Connecter Intervals.icu</ActionLink>
+      <p className="rounded-lg bg-muted px-3 py-2 text-sm">
+        Compte Inigo de <strong>{outcome.holder.displayName ?? "ce numéro"}</strong>
+        {outcome.holder.phoneHint ? <>, WhatsApp finissant par {outcome.holder.phoneHint}</> : null}. Si ce n&apos;est
+        pas toi, ne va pas plus loin.
+      </p>
+      <ActionLink href={`/connect/intervals/start?t=${encodeURIComponent(token ?? "")}`}>Connecter Intervals.icu</ActionLink>
       <p className="text-xs text-muted-foreground">
         Tu peux retirer cet accès à tout moment depuis Intervals.icu, dans Settings, Apps.
       </p>
     </ConnectShell>
   );
+}
+
+/** A page about a link must never be a 500: an unreadable database reads as a failed attempt. */
+async function startOutcome(token: string | undefined): Promise<StartConnectionOutcome | { status: typeof ConnectionResult.Failed }> {
+  try {
+    return await createStartIntervalsConnection({ oauth: intervalsOAuthConfig(), repo: getDeps().repo }).execute(token);
+  } catch (error) {
+    console.error("[coach] could not read the Intervals.icu connection link", error);
+    return { status: ConnectionResult.Failed };
+  }
 }

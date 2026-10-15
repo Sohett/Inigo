@@ -1,8 +1,8 @@
 import type { ManagedAgentBrain } from "../brain/managedAgents";
 import { formatIntervalsConnectedTurn } from "../brain/taskEnvelope";
 import type { Athlete } from "../domain/athlete";
-import { ConnectionResult, missingScopes } from "../domain/intervalsConnection";
-import { verifyConnectLinkToken } from "../intervals/oauth/connectLinkToken";
+import { canConnectIntervals, ConnectionResult, missingScopes } from "../domain/intervalsConnection";
+import { readState, sameNonce, verifyConnectLinkToken } from "../intervals/oauth/connectLinkToken";
 import type { IntervalsOAuthConfig } from "../intervals/oauth/credentials";
 import type { IntervalsTokenExchanger } from "../intervals/oauth/intervalsOAuth";
 import type { AthleteRepository } from "../repositories/athleteRepository";
@@ -14,7 +14,12 @@ export interface ConnectionCallback {
   state?: string;
   code?: string;
   error?: string;
+  /** The nonce from the cookie `/connect/intervals/start` set in this browser. */
+  browserNonce?: string;
 }
+
+/** Port: the Intervals.icu athlete id an athlete is already connected to, or null. Reads no secret. */
+export type IntervalsAccountReader = (athleteId: string) => Promise<string | null>;
 
 /** Whether the athlete's agent heard about the connection (only an onboarding athlete's does). */
 export const AgentNotice = {
@@ -40,6 +45,7 @@ export interface CompleteIntervalsConnectionDeps {
   oauth: { config: IntervalsOAuthConfig; exchanger: IntervalsTokenExchanger } | null;
   repo: Pick<AthleteRepository, "findById">;
   store: IntervalsCredentialStore;
+  connectedAccount: IntervalsAccountReader;
   assessOnboarding: AssessOnboarding;
   brain: Pick<ManagedAgentBrain, "appendUserMessage">;
   now?: () => Date;
@@ -47,9 +53,10 @@ export interface CompleteIntervalsConnectionDeps {
 
 /**
  * The OAuth callback (INI-69): Intervals.icu sends the athlete back with a code, or a refusal.
- * Nothing is stored unless the link is ours and still valid, the athlete can still be coached,
- * the code trades for a token, and every scope the coach needs was granted. Then the token is
- * stored (encrypted, replacing any API key), and an athlete in onboarding gets a turn so their
+ * Nothing is stored unless the link is ours and still valid, the flow comes back to the browser
+ * that started it, the athlete can still be coached, the code trades for a token, every scope
+ * the coach needs was granted, and the account is the one already connected, if any (never
+ * swapped silently). Then the token is stored (encrypted, replacing any API key), and an athlete in onboarding gets a turn so their
  * agent confirms on WhatsApp without waiting for them to write.
  *
  * Refusals are returned; outages (Intervals.icu down, Neon down) throw, and the route shows the
@@ -61,9 +68,14 @@ export function createCompleteIntervalsConnection(deps: CompleteIntervalsConnect
     async execute(callback) {
       if (!deps.oauth) return { result: ConnectionResult.Unavailable };
       // Intervals.icu sends `error=access_denied` when the athlete declines.
-      if (callback.error) return { result: callback.error === "access_denied" ? ConnectionResult.Denied : ConnectionResult.Failed };
+      if (callback.error === "access_denied") return { result: ConnectionResult.Denied };
+      if (callback.error) return { result: ConnectionResult.Failed };
 
-      const link = verifyConnectLinkToken(callback.state, deps.oauth.config.clientSecret, now());
+      const state = readState(callback.state);
+      if (!state) return { result: ConnectionResult.InvalidLink };
+      if (!sameNonce(state.nonce, callback.browserNonce)) return { result: ConnectionResult.SessionMismatch };
+
+      const link = verifyConnectLinkToken(state.token, deps.oauth.config.clientSecret, now());
       switch (link.status) {
         case "invalid":
           return { result: ConnectionResult.InvalidLink };
@@ -75,7 +87,7 @@ export function createCompleteIntervalsConnection(deps: CompleteIntervalsConnect
       if (!callback.code) return { result: ConnectionResult.Failed };
 
       const athlete = await deps.repo.findById(link.athleteId);
-      if (!athlete || !canConnect(athlete)) return { result: ConnectionResult.InvalidLink };
+      if (!athlete || !canConnectIntervals(athlete.status)) return { result: ConnectionResult.InvalidLink };
 
       const exchange = await deps.oauth.exchanger.exchange(callback.code);
       if (exchange.status === "rejected") {
@@ -89,24 +101,17 @@ export function createCompleteIntervalsConnection(deps: CompleteIntervalsConnect
         return { result: ConnectionResult.MissingScopes };
       }
 
+      const current = await deps.connectedAccount(athlete.id);
+      if (current !== null && current !== token.intervalsAthleteId) {
+        console.warn(`[coach] athlete ${athlete.id} tried to connect Intervals.icu ${token.intervalsAthleteId} over ${current}: refused`);
+        return { result: ConnectionResult.OtherAccount };
+      }
+
       await deps.store.save(athlete.id, { type: "oauth", accessToken: token.accessToken }, token.intervalsAthleteId);
       console.info(`[coach] athlete ${athlete.id} connected Intervals.icu ${token.intervalsAthleteId} by OAuth`);
       return { result: ConnectionResult.Connected, agent: await notifyAgent(athlete, deps, now()) };
     }
   };
-}
-
-/** Whether this athlete may connect: anyone still coached, not one the coach let go or blocked. */
-function canConnect(athlete: Athlete): boolean {
-  switch (athlete.status) {
-    case "onboarding":
-    case "active":
-    case "paused":
-      return true;
-    case "ended":
-    case "blocked":
-      return false;
-  }
 }
 
 /**

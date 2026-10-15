@@ -1,7 +1,28 @@
+import type { AthleteStatus } from "./athlete";
+
 /**
  * Connecting an athlete's Intervals.icu account by OAuth (INI-69): what the coach asks for, and
  * what can come out of a connection attempt. Independent of the HTTP and OAuth plumbing.
  */
+
+/** Whether an athlete may connect Intervals.icu: anyone still coached, not one let go or blocked. */
+export function canConnectIntervals(status: AthleteStatus): boolean {
+  switch (status) {
+    case "onboarding":
+    case "active":
+    case "paused":
+      return true;
+    case "ended":
+    case "blocked":
+      return false;
+  }
+}
+
+/** The last two digits of a WhatsApp number, so the athlete recognises their link without exposing it. */
+export function phoneHint(phoneNum: string | null): string | null {
+  const digits = phoneNum?.replace(/\D/g, "") ?? "";
+  return digits.length >= 2 ? digits.slice(-2) : null;
+}
 
 /**
  * The scopes Inigo asks for, from what the coach's Intervals tools actually call:
@@ -37,6 +58,13 @@ export const ConnectionResult = {
   ExpiredLink: "expired_link",
   /** The link or state was tampered with, truncated, or names no athlete. */
   InvalidLink: "invalid_link",
+  /**
+   * The callback came back to another browser than the one that opened the link (no matching
+   * cookie): either the athlete switched browser midway, or someone sent a raw authorize URL.
+   */
+  SessionMismatch: "session_mismatch",
+  /** This Inigo athlete is already connected to another Intervals.icu account: never swapped silently. */
+  OtherAccount: "other_account",
   /** OAuth is not configured on this deployment. */
   Unavailable: "unavailable",
   /** Intervals.icu refused or failed the code exchange: try again from the link. */

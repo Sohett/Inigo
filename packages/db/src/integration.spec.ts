@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createDb, type Db } from "./client";
-import { getIntervalsCredential, setIntervalsCredential } from "./credentials";
+import { getIntervalsAccountId, getIntervalsCredential, setIntervalsCredential } from "./credentials";
 import { athlete, athleteCredential } from "./schema";
 
 /**
@@ -61,6 +61,7 @@ describe.skipIf(!databaseUrl || !encryptionKey)("coach <-> Neon round-trip (inte
     expect(recovered?.authType).toBe("api_key");
     expect(recovered?.secret).toBe(apiKey);
     expect(recovered?.externalAthleteId).toBe("i123456");
+    expect(await getIntervalsAccountId(db, athleteId)).toBe("i123456");
 
     const creds = await db
       .select({ ciphertext: athleteCredential.secretCiphertext })

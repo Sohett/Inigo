@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Athlete } from "../domain/athlete";
 import { ConnectionResult } from "../domain/intervalsConnection";
-import { signConnectLinkToken } from "../intervals/oauth/connectLinkToken";
+import { bindState, signConnectLinkToken } from "../intervals/oauth/connectLinkToken";
 import type { IntervalsOAuthConfig } from "../intervals/oauth/credentials";
 import type { CodeExchange } from "../intervals/oauth/intervalsOAuth";
 import { AssessStatus, type AssessOnboardingOutcome } from "./assessOnboarding";
-import { AgentNotice, createCompleteIntervalsConnection } from "./completeIntervalsConnection";
+import { AgentNotice, createCompleteIntervalsConnection, type ConnectionCallback } from "./completeIntervalsConnection";
 import { createCreateIntervalsConnectLink } from "./createIntervalsConnectLink";
 import { createStartIntervalsConnection } from "./startIntervalsConnection";
 
@@ -32,7 +32,11 @@ const EXCHANGED: CodeExchange = {
   token: { accessToken: "token-123", scopes: ALL_SCOPES, intervalsAthleteId: "i42", athleteName: "Thomas" }
 };
 
-const state = (now = NOW) => signConnectLinkToken(ATHLETE.id, CONFIG.clientSecret, now).token;
+const NONCE = "browser-nonce-1";
+/** The link token, as in the link sent on WhatsApp. */
+const link = (now = NOW) => signConnectLinkToken(ATHLETE.id, CONFIG.clientSecret, now).token;
+/** The OAuth state: the link token bound to the browser nonce. */
+const state = (now = NOW) => bindState(link(now), NONCE);
 
 beforeEach(() => {
   vi.spyOn(console, "info").mockImplementation(() => undefined);
@@ -51,7 +55,7 @@ describe("createIntervalsConnectLink", () => {
     expect(outcome).toEqual({ status: "link", url: expect.any(String), expiresAt: "2026-10-18T10:00:00.000Z" });
     const url = new URL(outcome.status === "link" ? outcome.url : "");
     expect(`${url.origin}${url.pathname}`).toBe("https://app.inigo-coach.com/connect/intervals");
-    expect(url.searchParams.get("t")).toBe(state());
+    expect(url.searchParams.get("t")).toBe(link());
   });
 
   it("says OAuth is unavailable when the app is not configured, so the agent falls back to the key", async () => {
@@ -66,30 +70,44 @@ describe("createIntervalsConnectLink", () => {
 });
 
 describe("startIntervalsConnection", () => {
-  const start = (oauth: IntervalsOAuthConfig | null = CONFIG) => createStartIntervalsConnection({ oauth, now: () => NOW });
+  const start = (oauth: IntervalsOAuthConfig | null = CONFIG, athlete: Athlete | null = ATHLETE) =>
+    createStartIntervalsConnection({ oauth, repo: { findById: vi.fn(async () => athlete) }, now: () => NOW });
 
-  it("hands a valid link over to Intervals.icu, with the link as state", () => {
-    const outcome = start().execute(state());
-    expect(outcome.status).toBe("ready");
-    const url = new URL(outcome.status === "ready" ? outcome.authorizeUrl : "");
-    expect(url.searchParams.get("state")).toBe(state());
+  it("says whose account the link connects, and binds the link to a fresh browser nonce in the state", async () => {
+    const outcome = await start().execute(link());
+    if (outcome.status !== "ready") throw new Error(`expected ready, got ${outcome.status}`);
+
+    expect(outcome.holder).toEqual({ displayName: "Thomas", phoneHint: "01" });
+    expect(outcome.browserNonce).toMatch(/^[\w-]{20,}$/);
+    expect(new URL(outcome.authorizeUrl).searchParams.get("state")).toBe(bindState(link(), outcome.browserNonce));
+    const again = await start().execute(link());
+    expect(again.status === "ready" && again.browserNonce).not.toBe(outcome.browserNonce);
   });
 
   it.each([
-    ["an expired link", state(new Date("2026-10-10T10:00:00Z")), ConnectionResult.ExpiredLink],
-    ["a forged link", `${state()}x`, ConnectionResult.InvalidLink],
+    ["an expired link", link(new Date("2026-10-10T10:00:00Z")), ConnectionResult.ExpiredLink],
+    ["a forged link", `${link()}x`, ConnectionResult.InvalidLink],
     ["no link at all", undefined, ConnectionResult.InvalidLink]
-  ])("refuses %s", (_label, token, status) => {
-    expect(start().execute(token)).toEqual({ status });
+  ])("refuses %s", async (_label, token, status) => {
+    expect(await start().execute(token)).toEqual({ status });
   });
 
-  it("says when OAuth is not configured", () => {
-    expect(start(null).execute(state())).toEqual({ status: ConnectionResult.Unavailable });
+  it.each([
+    ["is gone", null],
+    ["is blocked", { ...ATHLETE, status: "blocked" as const }]
+  ])("refuses a link whose athlete %s", async (_label, athlete) => {
+    expect(await start(CONFIG, athlete).execute(link())).toEqual({ status: ConnectionResult.InvalidLink });
+  });
+
+  it("says when OAuth is not configured", async () => {
+    expect(await start(null).execute(link())).toEqual({ status: ConnectionResult.Unavailable });
   });
 });
 
 describe("completeIntervalsConnection", () => {
-  function setup(overrides: { athlete?: Athlete | null; exchange?: CodeExchange; assessFails?: boolean; oauth?: null } = {}) {
+  function setup(
+    overrides: { athlete?: Athlete | null; exchange?: CodeExchange; assessFails?: boolean; oauth?: null; connectedTo?: string } = {}
+  ) {
     const calls: string[] = [];
     const exchanger = {
       exchange: vi.fn(async () => {
@@ -107,14 +125,19 @@ describe("completeIntervalsConnection", () => {
       if (overrides.assessFails) throw new Error("Intervals.icu down");
       return { status: AssessStatus.Assessed, state: { done: ["intervals_connected"], missing: ["body"], complete: false } };
     });
-    const useCase = createCompleteIntervalsConnection({
+    const completeConnection = createCompleteIntervalsConnection({
       oauth: overrides.oauth === null ? null : { config: CONFIG, exchanger },
       repo: { findById: vi.fn(async () => (overrides.athlete === undefined ? ATHLETE : overrides.athlete)) },
       store: { save },
+      connectedAccount: vi.fn(async () => overrides.connectedTo ?? null),
       assessOnboarding: { execute: assess },
       brain: { appendUserMessage },
       now: () => NOW
     });
+    // This browser carries the nonce the start route set, unless a case says otherwise.
+    const useCase = {
+      execute: (callback: ConnectionCallback) => completeConnection.execute({ browserNonce: NONCE, ...callback })
+    };
     return { useCase, exchanger, save, appendUserMessage, calls };
   }
 
@@ -130,6 +153,12 @@ describe("completeIntervalsConnection", () => {
     const [sessionId, turn] = appendUserMessage.mock.calls[0] as unknown as [string, string];
     expect(sessionId).toBe("sesn_onboarding");
     expect(turn).toContain("onboarding_fait: intervals_connected\nonboarding_manquant: body\nevenement: intervals_connecte\nmessage: \"\"");
+  });
+
+  it("reconnects the same Intervals.icu account, e.g. from an API key to OAuth", async () => {
+    const { useCase, save } = setup({ connectedTo: "i42" });
+    expect((await useCase.execute({ state: state(), code: "code-1" })).result).toBe(ConnectionResult.Connected);
+    expect(save).toHaveBeenCalled();
   });
 
   it("keeps the connection when the agent cannot be told", async () => {
@@ -153,7 +182,11 @@ describe("completeIntervalsConnection", () => {
   it.each([
     ["the athlete declined", { error: "access_denied", state: state() }, {}, ConnectionResult.Denied],
     ["Intervals.icu sent another error", { error: "server_error", state: state() }, {}, ConnectionResult.Failed],
-    ["the state is forged", { state: "forged.state", code: "code-1" }, {}, ConnectionResult.InvalidLink],
+    ["the state is forged", { state: `forged.state~${NONCE}`, code: "code-1" }, {}, ConnectionResult.InvalidLink],
+    ["the state carries no browser binding", { state: link(), code: "code-1" }, {}, ConnectionResult.InvalidLink],
+    ["this browser did not start the flow", { state: state(), code: "code-1", browserNonce: undefined }, {}, ConnectionResult.SessionMismatch],
+    ["the cookie holds another nonce", { state: state(), code: "code-1", browserNonce: "other-nonce-12345" }, {}, ConnectionResult.SessionMismatch],
+    ["another Intervals.icu account is already connected", { state: state(), code: "code-1" }, { connectedTo: "i99" }, ConnectionResult.OtherAccount],
     ["the link expired", { state: state(new Date("2026-10-01T10:00:00Z")), code: "code-1" }, {}, ConnectionResult.ExpiredLink],
     ["no code came back", { state: state() }, {}, ConnectionResult.Failed],
     ["the athlete is gone", { state: state(), code: "code-1" }, { athlete: null }, ConnectionResult.InvalidLink],

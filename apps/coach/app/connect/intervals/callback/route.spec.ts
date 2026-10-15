@@ -21,8 +21,10 @@ beforeEach(() => {
 });
 afterEach(() => vi.restoreAllMocks());
 
-function callback(query: string): Request {
-  return new Request(`https://app.inigo-coach.com/connect/intervals/callback?${query}`);
+function callback(query: string, cookie?: string): Request {
+  return new Request(`https://app.inigo-coach.com/connect/intervals/callback?${query}`, {
+    headers: cookie ? { cookie } : {}
+  });
 }
 
 describe("GET /connect/intervals/callback", () => {
@@ -30,12 +32,14 @@ describe("GET /connect/intervals/callback", () => {
     execute.mockResolvedValue({ result: "connected", agent: "notified" });
     const { GET } = await import("./route");
 
-    const response = await GET(callback("code=abc&state=s.t"));
+    const response = await GET(callback("code=abc&state=s.t~n", "inigo_intervals_connect=n"));
 
-    expect(execute).toHaveBeenCalledWith({ code: "abc", state: "s.t", error: undefined });
+    expect(execute).toHaveBeenCalledWith({ code: "abc", state: "s.t~n", error: undefined, browserNonce: "n" });
     expect(response.status).toBe(303);
     expect(response.headers.get("location")).toBe("https://app.inigo-coach.com/connect/intervals/done?result=connected");
     expect(response.headers.get("cache-control")).toBe("no-store");
+    // The binding is single use.
+    expect(response.headers.get("set-cookie")).toMatch(/^inigo_intervals_connect=; Max-Age=0; /);
   });
 
   it("passes a refusal through", async () => {
@@ -44,7 +48,7 @@ describe("GET /connect/intervals/callback", () => {
 
     const response = await GET(callback("error=access_denied&state=s.t"));
 
-    expect(execute).toHaveBeenCalledWith({ code: undefined, state: "s.t", error: "access_denied" });
+    expect(execute).toHaveBeenCalledWith({ code: undefined, state: "s.t", error: "access_denied", browserNonce: undefined });
     expect(response.headers.get("location")).toContain("result=denied");
   });
 
