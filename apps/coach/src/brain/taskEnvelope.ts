@@ -76,6 +76,34 @@ export function formatOnboardingTurn(
   );
 }
 
+/**
+ * The line telling the onboarding agent the athlete just connected Intervals.icu from the link
+ * (INI-69). Nothing was written: the turn exists so the agent confirms on WhatsApp and moves on
+ * without waiting for the athlete to speak.
+ */
+export const INTERVALS_CONNECTED_LINE = "evenement: intervals_connecte";
+
+/**
+ * A turn the athlete did not write: their onboarding checklist, the event line, and an empty
+ * `message` (still the last line, so the envelope contract holds).
+ */
+export function formatIntervalsConnectedTurn(
+  athlete: EnvelopeAthlete,
+  state: OnboardingState,
+  now: Date = new Date()
+): string {
+  return formatEnvelope(
+    athlete,
+    [
+      `onboarding_fait: ${state.done.join(", ")}`,
+      `onboarding_manquant: ${state.missing.join(", ")}`,
+      INTERVALS_CONNECTED_LINE
+    ],
+    "",
+    now
+  );
+}
+
 /** The line telling the coordinator an athlete just finished onboarding (INI-49). */
 export const HANDOFF_LINE = "passation: onboarding terminé, planifie la semaine 1";
 
