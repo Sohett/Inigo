@@ -52,8 +52,12 @@ export type CallbackOutcome =
   | { status: "error" }
   /** The response does not belong to the flow this browser started. */
   | { status: "state_mismatch" }
-  /** Intervals.icu refused the code (4xx): expired after the 2 minutes, already used, wrong verifier. */
-  | { status: "rejected"; httpStatus: number }
+  /**
+   * Intervals.icu refused the code (4xx): expired after the 2 minutes, already used, wrong
+   * verifier. `error` is the OAuth error code when there is one (`invalid_grant`,
+   * `unsupported_grant_type`…), never secret, so it can be logged.
+   */
+  | { status: "rejected"; httpStatus: number; error?: string }
   | { status: "exchanged"; token: ExchangedToken };
 
 /** Port: the two ends of the flow. Outages throw; everything else is an outcome. */
@@ -141,7 +145,13 @@ export function createIntervalsOAuthClient(
       try {
         body = await oauth.processAuthorizationCodeResponse(AUTHORIZATION_SERVER, client, response);
       } catch (error) {
-        if (response.status >= 400 && response.status < 500) return { status: "rejected", httpStatus: response.status };
+        if (response.status >= 400 && response.status < 500) {
+          return {
+            status: "rejected",
+            httpStatus: response.status,
+            ...(error instanceof oauth.ResponseBodyError ? { error: error.error } : {})
+          };
+        }
         const reason = error instanceof Error ? error.message : "unreadable response";
         throw new Error(`Intervals.icu token endpoint answered ${response.status}: ${reason}`);
       }

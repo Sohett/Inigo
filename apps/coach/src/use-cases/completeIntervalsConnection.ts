@@ -66,6 +66,9 @@ export function createCompleteIntervalsConnection(deps: CompleteIntervalsConnect
   return {
     async execute(callback) {
       if (!deps.oauth) return { result: ConnectionResult.Unavailable };
+      // A refusal stores nothing, so it needs no check: say "denied" even when the cookie is lost
+      // (another browser) or Intervals.icu does not echo the state.
+      if (callback.query.get("error") === "access_denied") return { result: ConnectionResult.Denied };
       const { flow } = callback;
       if (!flow) return { result: ConnectionResult.SessionMismatch };
 
@@ -90,7 +93,9 @@ export function createCompleteIntervalsConnection(deps: CompleteIntervalsConnect
         case "state_mismatch":
           return { result: ConnectionResult.SessionMismatch };
         case "rejected":
-          console.warn(`[coach] Intervals.icu refused the OAuth code for athlete ${athlete.id} (HTTP ${outcome.httpStatus})`);
+          console.warn(
+            `[coach] Intervals.icu refused the OAuth code for athlete ${athlete.id} (HTTP ${outcome.httpStatus}, ${outcome.error ?? "no error code"})`
+          );
           return { result: ConnectionResult.Failed };
         case "exchanged":
           break;

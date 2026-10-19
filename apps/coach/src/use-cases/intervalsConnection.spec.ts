@@ -224,6 +224,15 @@ describe("completeIntervalsConnection", () => {
     expect(appendUserMessage).not.toHaveBeenCalled();
   });
 
+  it("says denied for a refusal even without the cookie or the state echoed back, storing nothing", async () => {
+    const { useCase, oauth, save } = setup();
+    const query = new URLSearchParams("error=access_denied");
+    expect(await useCase.execute({ query, flow: undefined })).toEqual({ result: ConnectionResult.Denied });
+    expect(await useCase.execute({ query, flow: await flowFor() })).toEqual({ result: ConnectionResult.Denied });
+    expect(oauth.client.complete).not.toHaveBeenCalled();
+    expect(save).not.toHaveBeenCalled();
+  });
+
   it("never reaches Intervals.icu for a link it cannot trust", async () => {
     const { useCase, oauth } = setup();
     await useCase.execute(await callback({ state: "forged.state~random", codeVerifier: "v" }));

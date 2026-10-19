@@ -122,7 +122,11 @@ describe("createIntervalsOAuthClient", () => {
 
     it("returns a refused code (4xx) rather than throwing", async () => {
       const client = createIntervalsOAuthClient(CONFIG, { fetchImpl: respond(400, { error: "invalid_grant" }) });
-      expect(await client.complete(query({ code: "old", state: FLOW.state }), FLOW)).toEqual({ status: "rejected", httpStatus: 400 });
+      expect(await client.complete(query({ code: "old", state: FLOW.state }), FLOW)).toEqual({
+      status: "rejected",
+      httpStatus: 400,
+      error: "invalid_grant"
+    });
     });
 
     it("throws on an outage, without the secret, the code or the verifier in the message", async () => {
