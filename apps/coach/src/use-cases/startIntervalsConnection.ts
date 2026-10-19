@@ -1,7 +1,6 @@
 import { canConnectIntervals, ConnectionResult, phoneHint } from "../domain/intervalsConnection";
-import { bindState, newBrowserNonce, verifyConnectLinkToken } from "../intervals/oauth/connectLinkToken";
-import type { IntervalsOAuthConfig } from "../intervals/oauth/credentials";
-import { authorizeUrl } from "../intervals/oauth/intervalsOAuth";
+import { verifyConnectLinkToken } from "../intervals/oauth/connectLinkToken";
+import type { ConnectionFlow, IntervalsOAuth } from "../intervals/oauth/intervalsOAuth";
 import type { AthleteRepository } from "../repositories/athleteRepository";
 
 /** Who a link connects, shown on the page so a forwarded link is recognised for what it is. */
@@ -15,10 +14,10 @@ export type StartConnectionOutcome =
   | {
       status: "ready";
       holder: LinkHolder;
-      /** Intervals.icu's consent page, with the link token bound to `browserNonce` as `state`. */
+      /** Intervals.icu's consent page, carrying the flow's `state` and PKCE challenge. */
       authorizeUrl: string;
-      /** To set in an HttpOnly cookie before leaving: the callback requires it back. */
-      browserNonce: string;
+      /** To keep in an HttpOnly cookie before leaving: the callback requires it back. */
+      flow: ConnectionFlow;
     }
   | {
       status: typeof ConnectionResult.ExpiredLink | typeof ConnectionResult.InvalidLink | typeof ConnectionResult.Unavailable;
@@ -30,11 +29,11 @@ export interface StartIntervalsConnection {
 
 /**
  * What a connection link opens (INI-69): whose account it connects and the way to Intervals.icu,
- * or why the link cannot be used. Each call draws a fresh browser nonce, bound into the `state`
- * here and kept in a cookie by the route, so only the browser that started the flow can finish it.
+ * or why the link cannot be used. Each call draws a fresh flow (`state` and PKCE verifier), kept
+ * in a cookie by the route, so only the browser that started the flow can finish it.
  */
 export function createStartIntervalsConnection(deps: {
-  oauth: IntervalsOAuthConfig | null;
+  oauth: IntervalsOAuth | null;
   repo: Pick<AthleteRepository, "findById">;
   now?: () => Date;
 }): StartIntervalsConnection {
@@ -42,7 +41,7 @@ export function createStartIntervalsConnection(deps: {
   return {
     async execute(token) {
       if (!deps.oauth) return { status: ConnectionResult.Unavailable };
-      const link = verifyConnectLinkToken(token, deps.oauth.clientSecret, now());
+      const link = await verifyConnectLinkToken(token, deps.oauth.config.clientSecret, now());
       switch (link.status) {
         case "invalid":
           return { status: ConnectionResult.InvalidLink };
@@ -54,13 +53,13 @@ export function createStartIntervalsConnection(deps: {
       const athlete = await deps.repo.findById(link.athleteId);
       if (!athlete || !canConnectIntervals(athlete.status)) return { status: ConnectionResult.InvalidLink };
 
-      const browserNonce = newBrowserNonce();
+      // `token` is defined here: an absent token never verifies.
+      const { authorizeUrl, flow } = await deps.oauth.client.begin(token ?? "");
       return {
         status: "ready",
         holder: { displayName: athlete.displayName, phoneHint: phoneHint(athlete.phoneNum) },
-        // `token` is defined here: an absent token never verifies.
-        authorizeUrl: authorizeUrl(deps.oauth, bindState(token ?? "", browserNonce)),
-        browserNonce
+        authorizeUrl,
+        flow
       };
     }
   };

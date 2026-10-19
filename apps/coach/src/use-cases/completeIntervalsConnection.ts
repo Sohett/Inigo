@@ -2,20 +2,18 @@ import type { ManagedAgentBrain } from "../brain/managedAgents";
 import { formatIntervalsConnectedTurn } from "../brain/taskEnvelope";
 import type { Athlete } from "../domain/athlete";
 import { canConnectIntervals, ConnectionResult, missingScopes } from "../domain/intervalsConnection";
-import { readState, sameNonce, verifyConnectLinkToken } from "../intervals/oauth/connectLinkToken";
-import type { IntervalsOAuthConfig } from "../intervals/oauth/credentials";
-import type { IntervalsTokenExchanger } from "../intervals/oauth/intervalsOAuth";
+import { verifyConnectLinkToken } from "../intervals/oauth/connectLinkToken";
+import { linkTokenOf, type ConnectionFlow, type IntervalsOAuth } from "../intervals/oauth/intervalsOAuth";
 import type { AthleteRepository } from "../repositories/athleteRepository";
 import { AssessStatus, type AssessOnboarding } from "./assessOnboarding";
 import type { IntervalsCredentialStore } from "./connectIntervals";
 
-/** The query string Intervals.icu sends back to the callback. */
+/** What reaches the callback. */
 export interface ConnectionCallback {
-  state?: string;
-  code?: string;
-  error?: string;
-  /** The nonce from the cookie `/connect/intervals/start` set in this browser. */
-  browserNonce?: string;
+  /** The query string Intervals.icu sends back: `code` and `state`, or `error`. */
+  query: URLSearchParams;
+  /** The flow from the cookie `/connect/intervals/start` set in this browser, if any. */
+  flow?: ConnectionFlow;
 }
 
 /** Port: the Intervals.icu athlete id an athlete is already connected to, or null. Reads no secret. */
@@ -42,7 +40,7 @@ export interface CompleteIntervalsConnection {
 
 export interface CompleteIntervalsConnectionDeps {
   /** Null when OAuth is not set up on this deployment. */
-  oauth: { config: IntervalsOAuthConfig; exchanger: IntervalsTokenExchanger } | null;
+  oauth: IntervalsOAuth | null;
   repo: Pick<AthleteRepository, "findById">;
   store: IntervalsCredentialStore;
   connectedAccount: IntervalsAccountReader;
@@ -53,11 +51,12 @@ export interface CompleteIntervalsConnectionDeps {
 
 /**
  * The OAuth callback (INI-69): Intervals.icu sends the athlete back with a code, or a refusal.
- * Nothing is stored unless the link is ours and still valid, the flow comes back to the browser
- * that started it, the athlete can still be coached, the code trades for a token, every scope
- * the coach needs was granted, and the account is the one already connected, if any (never
- * swapped silently). Then the token is stored (encrypted, replacing any API key), and an athlete in onboarding gets a turn so their
- * agent confirms on WhatsApp without waiting for them to write.
+ * Nothing is stored unless the flow comes back to the browser that started it, the link is ours
+ * and still valid, the athlete can still be coached, the code trades for a token (with this
+ * browser's PKCE verifier), every scope the coach needs was granted, and the account is the one
+ * already connected, if any (never swapped silently). Then the token is stored (encrypted,
+ * replacing any API key), and an athlete in onboarding gets a turn so their agent confirms on
+ * WhatsApp without waiting for them to write.
  *
  * Refusals are returned; outages (Intervals.icu down, Neon down) throw, and the route shows the
  * failure page. Telling the agent never fails the connection: it is already stored.
@@ -67,15 +66,10 @@ export function createCompleteIntervalsConnection(deps: CompleteIntervalsConnect
   return {
     async execute(callback) {
       if (!deps.oauth) return { result: ConnectionResult.Unavailable };
-      // Intervals.icu sends `error=access_denied` when the athlete declines.
-      if (callback.error === "access_denied") return { result: ConnectionResult.Denied };
-      if (callback.error) return { result: ConnectionResult.Failed };
+      const { flow } = callback;
+      if (!flow) return { result: ConnectionResult.SessionMismatch };
 
-      const state = readState(callback.state);
-      if (!state) return { result: ConnectionResult.InvalidLink };
-      if (!sameNonce(state.nonce, callback.browserNonce)) return { result: ConnectionResult.SessionMismatch };
-
-      const link = verifyConnectLinkToken(state.token, deps.oauth.config.clientSecret, now());
+      const link = await verifyConnectLinkToken(linkTokenOf(flow.state) ?? undefined, deps.oauth.config.clientSecret, now());
       switch (link.status) {
         case "invalid":
           return { result: ConnectionResult.InvalidLink };
@@ -84,17 +78,24 @@ export function createCompleteIntervalsConnection(deps: CompleteIntervalsConnect
         case "valid":
           break;
       }
-      if (!callback.code) return { result: ConnectionResult.Failed };
-
       const athlete = await deps.repo.findById(link.athleteId);
       if (!athlete || !canConnectIntervals(athlete.status)) return { result: ConnectionResult.InvalidLink };
 
-      const exchange = await deps.oauth.exchanger.exchange(callback.code);
-      if (exchange.status === "rejected") {
-        console.warn(`[coach] Intervals.icu refused the OAuth code for athlete ${athlete.id} (HTTP ${exchange.httpStatus})`);
-        return { result: ConnectionResult.Failed };
+      const outcome = await deps.oauth.client.complete(callback.query, flow);
+      switch (outcome.status) {
+        case "denied":
+          return { result: ConnectionResult.Denied };
+        case "error":
+          return { result: ConnectionResult.Failed };
+        case "state_mismatch":
+          return { result: ConnectionResult.SessionMismatch };
+        case "rejected":
+          console.warn(`[coach] Intervals.icu refused the OAuth code for athlete ${athlete.id} (HTTP ${outcome.httpStatus})`);
+          return { result: ConnectionResult.Failed };
+        case "exchanged":
+          break;
       }
-      const { token } = exchange;
+      const { token } = outcome;
       const missing = missingScopes(token.scopes);
       if (missing.length > 0) {
         console.warn(`[coach] athlete ${athlete.id} connected Intervals.icu without ${missing.join(", ")}: not stored`);

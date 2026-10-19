@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const execute = vi.fn();
 
 vi.mock("../../../../src/deps", () => ({ getDeps: () => ({ repo: {} }) }));
+vi.mock("../../../../src/intervals/oauth/intervalsOAuth", () => ({ intervalsOAuth: () => null }));
 vi.mock("../../../../src/use-cases/startIntervalsConnection", () => ({
   createStartIntervalsConnection: () => ({ execute })
 }));
@@ -17,12 +18,12 @@ const start = (query: string, headers: Record<string, string> = { "sec-fetch-sit
   new Request(`https://app.inigo-coach.com/connect/intervals/start?${query}`, { headers });
 
 describe("GET /connect/intervals/start", () => {
-  it("sets the browser nonce cookie and leaves for Intervals.icu", async () => {
+  it("keeps the flow in a cookie and leaves for Intervals.icu", async () => {
     execute.mockResolvedValue({
       status: "ready",
       holder: { displayName: "Thomas", phoneHint: "01" },
       authorizeUrl: "https://intervals.icu/oauth/authorize?state=t~n",
-      browserNonce: "n"
+      flow: { state: "t~n", codeVerifier: "v" }
     });
     const { GET } = await import("./route");
 
@@ -31,7 +32,7 @@ describe("GET /connect/intervals/start", () => {
     expect(execute).toHaveBeenCalledWith("the-token");
     expect(response.status).toBe(303);
     expect(response.headers.get("location")).toBe("https://intervals.icu/oauth/authorize?state=t~n");
-    expect(response.headers.get("set-cookie")).toMatch(/^inigo_intervals_connect=n; /);
+    expect(response.headers.get("set-cookie")).toMatch(/^inigo_intervals_connect=[\w-]+; /);
   });
 
   it("sends an unusable link to the result page, without a cookie", async () => {

@@ -1,8 +1,8 @@
 import { getDeps } from "../../../../src/deps";
 import { ConnectionResult } from "../../../../src/domain/intervalsConnection";
-import { intervalsOAuthConfig } from "../../../../src/intervals/oauth/credentials";
+import { intervalsOAuth } from "../../../../src/intervals/oauth/intervalsOAuth";
 import { createStartIntervalsConnection } from "../../../../src/use-cases/startIntervalsConnection";
-import { browserNonceCookie, cameFromOurPage } from "../_components/browser-nonce";
+import { cameFromOurPage, connectionFlowCookie } from "../_components/connection-flow";
 
 export const dynamic = "force-dynamic";
 
@@ -13,8 +13,8 @@ function redirect(location: string, cookie?: string): Response {
 }
 
 /**
- * The "Connecter Intervals.icu" button (INI-69): checks the link again, sets the browser nonce
- * cookie, and sends the athlete to Intervals.icu with the link bound to that nonce as `state`.
+ * The "Connecter Intervals.icu" button (INI-69): checks the link again, keeps the flow (`state`
+ * and PKCE verifier) in a cookie, and sends the athlete to Intervals.icu.
  * A link that cannot be used goes to the result page instead, and a request that did not come
  * from the page goes back to it, so the athlete always sees whose account they connect.
  */
@@ -32,9 +32,9 @@ export async function GET(request: Request): Promise<Response> {
   };
 
   try {
-    const outcome = await createStartIntervalsConnection({ oauth: intervalsOAuthConfig(), repo: getDeps().repo }).execute(token);
+    const outcome = await createStartIntervalsConnection({ oauth: intervalsOAuth(), repo: getDeps().repo }).execute(token);
     if (outcome.status !== "ready") return done(outcome.status);
-    return redirect(outcome.authorizeUrl, browserNonceCookie(outcome.browserNonce));
+    return redirect(outcome.authorizeUrl, connectionFlowCookie(outcome.flow));
   } catch (error) {
     console.error("[coach] could not start the Intervals.icu connection", error);
     return done(ConnectionResult.Failed);

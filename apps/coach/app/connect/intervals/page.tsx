@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { getDeps } from "@/deps";
 import { ConnectionResult } from "@/domain/intervalsConnection";
-import { intervalsOAuthConfig } from "@/intervals/oauth/credentials";
+import { intervalsOAuth } from "@/intervals/oauth/intervalsOAuth";
 import { createStartIntervalsConnection, type StartConnectionOutcome } from "@/use-cases/startIntervalsConnection";
 import { ActionLink, BackToWhatsapp, ConnectShell } from "./_components/connect-shell";
 import { RESULT_COPY } from "./_components/result-copy";
@@ -66,7 +66,7 @@ export default async function ConnectIntervalsPage({ searchParams }: { searchPar
 /** A page about a link must never be a 500: an unreadable database reads as a failed attempt. */
 async function startOutcome(token: string | undefined): Promise<StartConnectionOutcome | { status: typeof ConnectionResult.Failed }> {
   try {
-    return await createStartIntervalsConnection({ oauth: intervalsOAuthConfig(), repo: getDeps().repo }).execute(token);
+    return await createStartIntervalsConnection({ oauth: intervalsOAuth(), repo: getDeps().repo }).execute(token);
   } catch (error) {
     console.error("[coach] could not read the Intervals.icu connection link", error);
     return { status: ConnectionResult.Failed };
