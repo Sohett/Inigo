@@ -12,7 +12,8 @@ const inventory: BrainInventory = {
 const onboardingSettings = {
   onboardingAgentId: "agent_onboarding",
   coordinatorAgentId: "agent_coord",
-  accessCode: "VELO26"
+  accessCode: "VELO26",
+  whatsappNumber: "+32470000000"
 };
 
 function makeDeps(

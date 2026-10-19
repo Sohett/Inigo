@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createDb, type Db } from "./client";
-import { getIntervalsKey, setIntervalsKey } from "./credentials";
+import { getIntervalsAccountId, getIntervalsCredential, setIntervalsCredential } from "./credentials";
 import { athlete, athleteCredential } from "./schema";
 
 /**
@@ -51,11 +51,17 @@ describe.skipIf(!databaseUrl || !encryptionKey)("coach <-> Neon round-trip (inte
 
   it("seals and reads back the Intervals.icu key without storing plaintext", async () => {
     const apiKey = "test-intervals-key-xyz";
-    await setIntervalsKey(db, { athleteId, apiKey, externalAthleteId: "i123456" }, encryptionKey as string);
+    await setIntervalsCredential(
+      db,
+      { athleteId, authType: "api_key", secret: apiKey, externalAthleteId: "i123456" },
+      encryptionKey as string
+    );
 
-    const recovered = await getIntervalsKey(db, athleteId, encryptionKey as string);
-    expect(recovered?.apiKey).toBe(apiKey);
+    const recovered = await getIntervalsCredential(db, athleteId, encryptionKey as string);
+    expect(recovered?.authType).toBe("api_key");
+    expect(recovered?.secret).toBe(apiKey);
     expect(recovered?.externalAthleteId).toBe("i123456");
+    expect(await getIntervalsAccountId(db, athleteId)).toBe("i123456");
 
     const creds = await db
       .select({ ciphertext: athleteCredential.secretCiphertext })
@@ -67,9 +73,15 @@ describe.skipIf(!databaseUrl || !encryptionKey)("coach <-> Neon round-trip (inte
   });
 
   it("rotates the key in place (single row per athlete/provider)", async () => {
-    await setIntervalsKey(db, { athleteId, apiKey: "rotated-key-2" }, encryptionKey as string);
-    const rotated = await getIntervalsKey(db, athleteId, encryptionKey as string);
-    expect(rotated?.apiKey).toBe("rotated-key-2");
+    await setIntervalsCredential(
+      db,
+      { athleteId, authType: "oauth", secret: "oauth-token-2" },
+      encryptionKey as string
+    );
+    const rotated = await getIntervalsCredential(db, athleteId, encryptionKey as string);
+    expect(rotated?.secret).toBe("oauth-token-2");
+    // Connecting by OAuth replaces the API key in place.
+    expect(rotated?.authType).toBe("oauth");
     // externalAthleteId is left untouched when a rotation omits it.
     expect(rotated?.externalAthleteId).toBe("i123456");
 

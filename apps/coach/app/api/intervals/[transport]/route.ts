@@ -3,6 +3,8 @@ import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 import { registerIntervalsIcuTools } from "../../../../src/intervals/mcp-tools";
 import { createReadActivityStreams } from "../../../../src/use-cases/readActivityStreams";
 import { createConnectIntervals } from "../../../../src/use-cases/connectIntervals";
+import { createCreateIntervalsConnectLink } from "../../../../src/use-cases/createIntervalsConnectLink";
+import { intervalsOAuthConfig } from "../../../../src/intervals/oauth/credentials";
 import { createIntervalsCredentialVerifier } from "../../../../src/intervals/credentialVerifier";
 import { createDrizzleIntervalsCredentialStore } from "../../../../src/repositories/drizzleIntervalsCredentialStore";
 import { getDeps } from "../../../../src/deps";
@@ -18,14 +20,15 @@ export const dynamic = "force-dynamic";
 // athlete's Intervals.icu key from Neon at request time, so the secret never reaches the LLM.
 const handler = createMcpHandler(
   (server) => {
-    const { intervalsResolver, db, config } = getDeps();
+    const { intervalsResolver, db, config, repo } = getDeps();
     registerIntervalsIcuTools(server, {
       resolve: intervalsResolver,
       readActivityStreams: createReadActivityStreams({ resolveClient: intervalsResolver }),
       connectIntervals: createConnectIntervals({
         verifier: createIntervalsCredentialVerifier(config.INTERVALS_BASE_URL),
         store: createDrizzleIntervalsCredentialStore(db, config.DB_ENCRYPTION_KEY)
-      })
+      }),
+      connectLink: createCreateIntervalsConnectLink({ oauth: intervalsOAuthConfig(), repo })
     });
   },
   {

@@ -16,7 +16,7 @@ describe("createDrizzleIntervalsCredentialStore", () => {
 
     const saving = createDrizzleIntervalsCredentialStore(db, MASTER_KEY).save(
       "11111111-1111-4111-8111-111111111111",
-      "the-key",
+      { type: "api_key", apiKey: "the-key" },
       "i42"
     );
 

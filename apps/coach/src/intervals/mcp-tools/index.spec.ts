@@ -6,6 +6,7 @@ import type { IntervalsIcuClient } from "../client";
 import { registerIntervalsIcuTools } from "./index";
 import { createReadActivityStreams } from "../../use-cases/readActivityStreams";
 import type { ConnectIntervals } from "../../use-cases/connectIntervals";
+import type { CreateIntervalsConnectLink } from "../../use-cases/createIntervalsConnectLink";
 import type { ResolveClient } from "./result";
 import { DEFAULT_READ_BOUNDS } from "../../domain/training";
 
@@ -34,15 +35,19 @@ function recordingResolver(client: IntervalsIcuClient) {
 
 const connected = { status: "connected" as const, intervalsAthleteId: "i42", athleteName: "Thomas" };
 
+const link = { status: "link" as const, url: "https://app.inigo-coach.com/connect/intervals?t=x.y", expiresAt: "2026-10-18T10:00:00.000Z" };
+
 async function connect(
   resolve: ResolveClient,
-  connectIntervals: ConnectIntervals = { execute: vi.fn(async () => connected) }
+  connectIntervals: ConnectIntervals = { execute: vi.fn(async () => connected) },
+  connectLink: CreateIntervalsConnectLink = { execute: vi.fn(async () => link) }
 ) {
   const server = new McpServer({ name: "test", version: "0.0.0" });
   registerIntervalsIcuTools(server, {
     resolve,
     readActivityStreams: createReadActivityStreams({ resolveClient: resolve }),
-    connectIntervals
+    connectIntervals,
+    connectLink
   });
 
   const client = new Client({ name: "test-client", version: "0.0.0" });
@@ -92,7 +97,8 @@ describe("registerIntervalsIcuTools", () => {
         "delete_events_by_range",
         "update_sport_settings",
         "update_athlete_body",
-        "connect_intervals"
+        "connect_intervals",
+        "get_intervals_connect_link"
       ])
     );
   });
@@ -174,6 +180,28 @@ describe("registerIntervalsIcuTools", () => {
     const content = result.content as TextContent;
     const parsed = JSON.parse(content[0]!.text) as Record<string, unknown>;
     expect(parsed["start_date_local"]).toBe("2026-07-01T09:30:00");
+  });
+});
+
+describe("get_intervals_connect_link", () => {
+  it("returns the link for the athlete, as the use-case gives it", async () => {
+    const execute = vi.fn(async () => link);
+    const mcpClient = await connect(recordingResolver(createMockClient()).resolve, undefined, { execute });
+
+    const result = await mcpClient.callTool({ name: "get_intervals_connect_link", arguments: { athleteId: ATHLETE_ID } });
+
+    expect(execute).toHaveBeenCalledWith(ATHLETE_ID);
+    expect(JSON.parse((result.content as TextContent)[0]!.text)).toEqual(link);
+  });
+
+  it("refuses a malformed athlete id before asking for a link", async () => {
+    const execute = vi.fn(async () => link);
+    const mcpClient = await connect(recordingResolver(createMockClient()).resolve, undefined, { execute });
+
+    const result = await mcpClient.callTool({ name: "get_intervals_connect_link", arguments: { athleteId: "i42" } });
+
+    expect(result.isError).toBe(true);
+    expect(execute).not.toHaveBeenCalled();
   });
 });
 
