@@ -1,11 +1,13 @@
 ---
 import Base from "@/layouts/Base.astro";
 import Logo from "@/components/Logo.astro";
+
+const link = "font-medium text-foreground underline underline-offset-4 hover:opacity-70";
 ---
 
 <Base
   title="Confidentialité · Inigo"
-  description="Comment Inigo traite ton numéro WhatsApp et tes données."
+  description="Comment Inigo traite ton numéro WhatsApp, tes échanges de coaching et tes données Intervals.icu."
 >
   <header class="border-b border-border bg-background px-6">
     <div class="mx-auto flex h-16 max-w-3xl items-center">
@@ -18,48 +20,148 @@ import Logo from "@/components/Logo.astro";
   <main id="contenu" class="bg-background px-6">
     <div class="mx-auto max-w-3xl py-20">
       <h1 class="text-3xl font-bold sm:text-4xl">Confidentialité</h1>
-      <p class="mt-3 text-muted-foreground">Dernière mise à jour : juin 2026.</p>
+      <p class="mt-3 text-muted-foreground">Dernière mise à jour : octobre 2026.</p>
 
       <div class="mt-10 flex flex-col gap-8 leading-relaxed">
         <section>
-          <h2 class="font-display text-xl font-semibold">Les données qu'on collecte</h2>
+          <h2 class="font-display text-xl font-semibold">Qui est responsable</h2>
           <p class="mt-2 text-muted-foreground">
-            Via le formulaire de la page d'accueil : ton <strong>prénom</strong> (optionnel),
-            ton <strong>numéro WhatsApp</strong> et ton <strong>consentement</strong> à être
-            recontacté. C'est tout.
+            Inigo est un service de <strong>Poincenot Consulting BE</strong>, responsable du
+            traitement de tes données. Pour toute question, écris à
+            <a class={link} href="mailto:contact@inigo-coach.com">contact@inigo-coach.com</a>.
+          </p>
+        </section>
+
+        <section>
+          <h2 class="font-display text-xl font-semibold">Les données qu'on collecte</h2>
+          <ul class="mt-2 flex list-disc flex-col gap-2 pl-5 text-muted-foreground">
+            <li>
+              <strong>Conversation WhatsApp</strong> : quand tu écris à Inigo, ton numéro, ton nom
+              affiché et les messages que tu échanges avec Inigo.
+            </li>
+            <li>
+              <strong>Ton profil de coaching</strong> : objectifs, disponibilités, contraintes,
+              matériel, historique sportif et ce que tu attends du coaching.
+            </li>
+            <li>
+              <strong>Ta santé, si tu nous en parles</strong> : blessures, limitations ou
+              précautions à respecter. On ne les utilise que pour adapter ton entraînement.
+            </li>
+            <li>
+              <strong>Tes données Intervals.icu</strong>, si tu connectes ton compte (détails
+              plus bas).
+            </li>
+          </ul>
+        </section>
+
+        <section>
+          <h2 class="font-display text-xl font-semibold">Connexion à Intervals.icu</h2>
+          <p class="mt-2 text-muted-foreground">
+            Pour te coacher, Inigo s'appuie sur ton compte
+            <a class={link} href="https://intervals.icu" rel="noopener">Intervals.icu</a>. Tu
+            autorises cet accès toi même, sur Intervals.icu, et tu choisis de le donner ou non.
+            Avec ton accord, Inigo peut :
+          </p>
+          <ul class="mt-3 flex list-disc flex-col gap-2 pl-5 text-muted-foreground">
+            <li>
+              <strong>lire</strong> tes activités (séances, intervalles, puissance, fréquence
+              cardiaque, allure), ta forme (fitness, fatigue, fraîcheur) et ton wellness ;
+            </li>
+            <li>
+              <strong>écrire</strong> tes séances planifiées dans ton calendrier, et les modifier
+              ou les supprimer ;
+            </li>
+            <li>
+              <strong>mettre à jour</strong> tes seuils (FTP, zones), tes données corporelles
+              (sexe, date de naissance, taille, poids) et ton matériel, quand tu nous les donnes.
+            </li>
+          </ul>
+          <p class="mt-3 text-muted-foreground">
+            Intervals.icu reste la référence pour ces données : on les lit quand ton coaching en
+            a besoin, et on ne garde chez nous que ce qui sert à ton suivi (ton plan, l'historique
+            de tes seuils, nos analyses de tes séances). Le jeton d'accès qu'Intervals.icu
+            nous délivre est <strong>chiffré</strong> dans notre base de données et n'est jamais
+            affiché ni partagé. On n'utilise tes données Intervals.icu que pour ton propre
+            coaching : ni revente, ni publicité, ni partage avec d'autres athlètes.
+          </p>
+          <p class="mt-3 text-muted-foreground">
+            Tu peux <strong>retirer cet accès à tout moment</strong> depuis Intervals.icu, dans
+            Settings, puis Apps. Inigo n'aura alors plus accès à ton compte. Tu peux aussi nous
+            demander de supprimer le jeton de notre côté.
           </p>
         </section>
 
         <section>
           <h2 class="font-display text-xl font-semibold">À quoi elles servent</h2>
-          <p class="mt-2 text-muted-foreground">
-            Uniquement à te recontacter sur WhatsApp pour échanger sur ton objectif et le
-            coaching. <strong>Aucune revente, aucune cession à des tiers.</strong>
+          <ul class="mt-2 flex list-disc flex-col gap-2 pl-5 text-muted-foreground">
+            <li>
+              <strong>Te coacher</strong> : analyser tes séances, préparer et ajuster ton plan,
+              te répondre sur WhatsApp. C'est le service que tu nous demandes.
+            </li>
+            <li>
+              <strong>Tenir compte de ta santé</strong> : sur la base de ton consentement explicite,
+              que tu donnes en nous en parlant et que tu peux retirer à tout moment.
+            </li>
+            <li>
+              <strong>Sécuriser le service</strong> : éviter les abus et corriger les erreurs.
+            </li>
+          </ul>
+          <p class="mt-3 text-muted-foreground">
+            <strong>Aucune revente, aucune publicité, aucune cession à des tiers.</strong>
           </p>
         </section>
 
         <section>
-          <h2 class="font-display text-xl font-semibold">Comment elles sont traitées</h2>
+          <h2 class="font-display text-xl font-semibold">Qui les traite pour nous</h2>
           <p class="mt-2 text-muted-foreground">
-            À l'envoi du formulaire, ton numéro est transmis, via une connexion sécurisée, à
-            l'outil qui nous sert à gérer les prises de contact. Il n'est pas publié ni utilisé
-            à d'autres fins.
+            Quelques prestataires techniques font tourner le service pour notre compte, sous
+            contrat, et uniquement pour ça :
+          </p>
+          <ul class="mt-3 flex list-disc flex-col gap-2 pl-5 text-muted-foreground">
+            <li><strong>Vercel</strong> : hébergement du site et du service.</li>
+            <li><strong>Neon</strong> : base de données (profil de coaching, jetons chiffrés).</li>
+            <li>
+              <strong>Anthropic</strong> : traitement automatisé des messages pour préparer les
+              réponses de ton coach. Tes données ne servent pas à entraîner ses modèles.
+            </li>
+            <li><strong>Railway</strong> : hébergement de la passerelle WhatsApp.</li>
+            <li><strong>WhatsApp</strong> : transport des messages.</li>
+            <li><strong>Intervals.icu</strong> : si tu y connectes ton compte.</li>
+          </ul>
+          <p class="mt-3 text-muted-foreground">
+            Certains de ces prestataires sont situés hors de l'Union européenne, notamment aux
+            États Unis. Ces transferts sont encadrés par les clauses contractuelles types de la
+            Commission européenne ou par le cadre de protection des données UE États Unis.
+          </p>
+        </section>
+
+        <section>
+          <h2 class="font-display text-xl font-semibold">Sécurité</h2>
+          <p class="mt-2 text-muted-foreground">
+            Les échanges passent par des connexions chiffrées. Les accès à tes comptes, comme le
+            jeton Intervals.icu, sont chiffrés dans notre base de données. Seules les personnes
+            qui font tourner Inigo peuvent accéder aux données, et uniquement pour le service.
           </p>
         </section>
 
         <section>
           <h2 class="font-display text-xl font-semibold">Conservation</h2>
           <p class="mt-2 text-muted-foreground">
-            Ton numéro est conservé le temps de te recontacter, puis tant que tu restes en
-            relation avec Inigo. Tu peux demander sa suppression à tout moment.
+            Ton numéro, tes échanges, ton profil de coaching et ton accès Intervals.icu sont
+            conservés tant que tu es en relation avec Inigo. Quand tu arrêtes, on les supprime sur simple demande, et au
+            plus tard un an après notre dernier échange.
           </p>
         </section>
 
         <section>
           <h2 class="font-display text-xl font-semibold">Tes droits</h2>
           <p class="mt-2 text-muted-foreground">
-            Accès, rectification et suppression de tes données : il suffit de le demander, par
-            WhatsApp ou à <a class="font-medium text-foreground underline underline-offset-4 hover:opacity-70" href="mailto:contact@inigo-coach.com">contact@inigo-coach.com</a>.
+            Tu peux accéder à tes données, les corriger, les supprimer, en demander une copie,
+            t'opposer à leur traitement ou retirer ton consentement : il suffit de le demander,
+            par WhatsApp ou à
+            <a class={link} href="mailto:contact@inigo-coach.com">contact@inigo-coach.com</a>.
+            On te répond dans le mois. Si tu estimes que tes droits ne sont pas respectés, tu peux
+            saisir l'<a class={link} href="https://www.autoriteprotectiondonnees.be" rel="noopener">Autorité de protection des données</a>.
           </p>
         </section>
       </div>
