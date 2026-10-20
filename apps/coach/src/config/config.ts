@@ -25,7 +25,7 @@ export const configSchema = z.object({
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
   /**
    * Base64-encoded 32-byte master key for AES-256-GCM sealing of per-athlete secrets
-   * (e.g. Intervals.icu API keys). Server-side only; never logged, never committed.
+   * (e.g. Intervals.icu OAuth tokens). Server-side only; never logged, never committed.
    */
   DB_ENCRYPTION_KEY: z
     .string()

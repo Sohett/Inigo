@@ -5,7 +5,7 @@ import type { IntervalsOAuthConfig } from "../intervals/oauth/credentials";
 /** Goes back to the agent as is: the link is meant for the athlete, nothing here is a secret. */
 export type ConnectLinkOutcome =
   | { status: "link"; url: string; expiresAt: string }
-  /** OAuth is not set up on this deployment: the agent falls back to the API key. */
+  /** OAuth is not set up on this deployment (local, preview): nothing can be connected. */
   | { status: "oauth_unavailable"; reason: string }
   | { status: "unknown_athlete"; reason: string };
 
@@ -14,7 +14,7 @@ export interface CreateIntervalsConnectLink {
 }
 
 /**
- * The link the onboarding agent sends on WhatsApp so the athlete connects Intervals.icu by OAuth
+ * The link an agent sends on WhatsApp so the athlete connects Intervals.icu by OAuth
  * (INI-69). It opens our page, which hands over to Intervals.icu. Signed and short-lived, so it
  * can only ever connect the athlete it was made for.
  */
@@ -29,7 +29,7 @@ export function createCreateIntervalsConnectLink(deps: {
       if (!deps.oauth) {
         return {
           status: "oauth_unavailable",
-          reason: "Intervals.icu OAuth is not set up yet: ask the athlete for their API key and athlete id instead (connect_intervals)."
+          reason: "The Intervals.icu connection is not open on this deployment: tell the athlete it is temporarily unavailable."
         };
       }
       const athlete = await deps.repo.findById(athleteId);

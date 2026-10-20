@@ -71,7 +71,7 @@ describe("createIntervalsConnectLink", () => {
     expect(url.searchParams.get("t")).toBe(expected);
   });
 
-  it("says OAuth is unavailable when the app is not configured, so the agent falls back to the key", async () => {
+  it("says the connection is unavailable when the OAuth app is not configured", async () => {
     const outcome = await createCreateIntervalsConnectLink({ oauth: null, repo: { findById } }).execute(ATHLETE.id);
     expect(outcome.status).toBe("oauth_unavailable");
   });
@@ -174,7 +174,7 @@ describe("completeIntervalsConnection", () => {
     expect(turn).toContain("onboarding_fait: intervals_connected\nonboarding_manquant: body\nevenement: intervals_connecte\nmessage: \"\"");
   });
 
-  it("reconnects the same Intervals.icu account, e.g. from an API key to OAuth", async () => {
+  it("reconnects the same Intervals.icu account, e.g. after a revoked access", async () => {
     const { useCase, save } = setup({ connectedTo: "i42" });
     expect((await useCase.execute(await callback())).result).toBe(ConnectionResult.Connected);
     expect(save).toHaveBeenCalled();

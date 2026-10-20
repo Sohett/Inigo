@@ -4,8 +4,8 @@ import { z } from "zod";
  * The Intervals.icu OAuth app (INI-69), read where it is used rather than in `configSchema`:
  * same rule as the OpenWA and admin credentials. `configSchema` is parsed on every request path,
  * so a missing OAuth variable there would take the WhatsApp webhook and the MCP servers down
- * with it. Here, it only turns the OAuth connection off, and the onboarding agent falls back to
- * the API key.
+ * with it. Here, it only turns the OAuth connection off: the agents say it is temporarily
+ * unavailable.
  */
 export interface IntervalsOAuthConfig {
   clientId: string;

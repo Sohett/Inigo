@@ -59,7 +59,7 @@ export interface CompleteIntervalsConnectionDeps {
  * and still valid, the athlete can still be coached, the code trades for a token (with this
  * browser's PKCE verifier), every scope the coach needs was granted, and the account is the one
  * already connected, if any (never swapped silently). Then the token is stored (encrypted,
- * replacing any API key), and an athlete in onboarding gets a turn so their agent confirms on
+ * replacing the previous one), and an athlete in onboarding gets a turn so their agent confirms on
  * WhatsApp without waiting for them to write.
  *
  * Refusals are returned; outages (Intervals.icu down, Neon down) throw, and the route shows the

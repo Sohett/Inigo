@@ -9,7 +9,7 @@ MCP WhatsApp de cette app.
 Il expose **trois serveurs MCP** pour le brain, tous de la forme `api/<domaine>/mcp` :
 **`coaching-data`** (`/api/coaching-data/mcp`) pour la donnée coaching structurée en base
 (profil, seuils, objectifs, plan, journal d'adaptation) ; **Intervals.icu**
-(`/api/intervals/mcp`) pour la donnée d'entraînement live, avec la clé résolue par athlète
+(`/api/intervals/mcp`) pour la donnée d'entraînement live, avec le token OAuth résolu par athlète
 depuis Neon (rapatrié de l'ex-app `intervals-icu-mcp`, INI-7) ; et **WhatsApp**
 (`/api/whatsapp/mcp`), un unique outil `send_whatsapp_message` qui relaie vers la passerelle
 OpenWA (INI-37).
