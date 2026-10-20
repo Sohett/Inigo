@@ -314,7 +314,7 @@ L'athlète connecte son compte depuis un lien, sans jamais coller de clé dans W
 3. `GET /connect/intervals/start?t=` : tire un flow (`state` = `<jeton>~<aléatoire>` et un
    vérificateur PKCE), le garde dans un cookie (HttpOnly, Secure, Lax, 15 min, path
    `/connect/intervals`) et redirige vers `intervals.icu/oauth/authorize` (scopes
-   `ACTIVITY:READ,WELLNESS:READ,CALENDAR:WRITE,SETTINGS:WRITE`, `state`, `code_challenge` S256).
+   `ACTIVITY:READ,WELLNESS:WRITE,CALENDAR:WRITE,SETTINGS:WRITE`, `state`, `code_challenge` S256).
 4. `GET /connect/intervals/callback?code&state` : `completeIntervalsConnection` exige le flow du
    cookie (`session_mismatch` sinon), vérifie le jeton qu'il porte, puis le client OAuth
    (`oauth4webapi`) exige que le `state` reçu soit celui du cookie et échange le code avec le

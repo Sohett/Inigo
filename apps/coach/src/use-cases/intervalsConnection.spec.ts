@@ -26,7 +26,7 @@ const ATHLETE: Athlete = {
   locale: "fr",
   activeSession: { sessionId: "sesn_onboarding", agentId: "agent_onboarding" }
 };
-const ALL_SCOPES = ["ACTIVITY:READ", "WELLNESS:READ", "CALENDAR:WRITE", "SETTINGS:WRITE"];
+const ALL_SCOPES = ["ACTIVITY:READ", "WELLNESS:WRITE", "CALENDAR:WRITE", "SETTINGS:WRITE"];
 const EXCHANGED: CallbackOutcome = {
   status: "exchanged",
   token: { accessToken: "token-123", scopes: ALL_SCOPES, intervalsAthleteId: "i42", athleteName: "Thomas" }

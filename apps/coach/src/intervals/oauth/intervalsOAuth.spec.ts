@@ -60,7 +60,7 @@ describe("createIntervalsOAuthClient", () => {
       expect(Object.fromEntries(url.searchParams)).toEqual({
         client_id: "inigo",
         redirect_uri: "https://app.inigo-coach.com/connect/intervals/callback",
-        scope: "ACTIVITY:READ,WELLNESS:READ,CALENDAR:WRITE,SETTINGS:WRITE",
+        scope: "ACTIVITY:READ,WELLNESS:WRITE,CALENDAR:WRITE,SETTINGS:WRITE",
         state: flow.state,
         code_challenge: createHash("sha256").update(flow.codeVerifier).digest("base64url"),
         code_challenge_method: "S256"

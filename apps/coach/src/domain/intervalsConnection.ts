@@ -25,13 +25,15 @@ export function phoneHint(phoneNum: string | null): string | null {
 }
 
 /**
- * The scopes Inigo asks for, from what the coach's Intervals tools actually call:
+ * The scopes Inigo asks for, from what the coach's Intervals tools call:
  * - `ACTIVITY:READ`: activities, intervals, streams, power, HR and pace curves;
- * - `WELLNESS:READ`: wellness and fitness (CTL/ATL/TSB);
+ * - `WELLNESS:WRITE`: wellness and fitness (CTL/ATL/TSB) read; written ahead of the tool that
+ *   will log what the athlete says on WhatsApp (sleep, fatigue, soreness), so that adding it
+ *   does not make every connected athlete reconnect;
  * - `CALENDAR:WRITE`: planned workouts, created, updated and deleted by the plan builder;
  * - `SETTINGS:WRITE`: FTP and zones, body data (sex, birth date, height, weight), gear.
  */
-export const INTERVALS_SCOPES = ["ACTIVITY:READ", "WELLNESS:READ", "CALENDAR:WRITE", "SETTINGS:WRITE"] as const;
+export const INTERVALS_SCOPES = ["ACTIVITY:READ", "WELLNESS:WRITE", "CALENDAR:WRITE", "SETTINGS:WRITE"] as const;
 
 /**
  * The required scopes the athlete did not grant (Intervals.icu lets them untick some). `WRITE`
