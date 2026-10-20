@@ -1,5 +1,6 @@
 ---
 import HeroShowcase from "@/components/HeroShowcase.astro";
+import StartCta from "@/components/StartCta.astro";
 import { hero } from "@/content/copy";
 ---
 
@@ -22,12 +23,10 @@ import { hero } from "@/content/copy";
       class="rise-in mt-10 flex flex-col items-center gap-3 sm:flex-row"
       style="--delay:240ms"
     >
-      <a
-        href={hero.ctaPrimary.href}
+      <StartCta
+        label={hero.ctaPrimary.label}
         class="inline-flex h-12 items-center justify-center rounded-xl bg-encre px-6 text-base font-semibold text-white transition hover:-translate-y-0.5 hover:bg-encre/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-encre focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-      >
-        {hero.ctaPrimary.label}
-      </a>
+      />
       <a
         href={hero.ctaSecondary.href}
         class="inline-flex h-12 items-center justify-center rounded-xl border border-encre/15 px-6 text-base font-medium text-foreground transition hover:border-encre/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-encre/40"

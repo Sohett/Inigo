@@ -8,7 +8,7 @@ expose aux agents IA les serveurs MCP (donnée coaching + [Intervals.icu](https:
 
 ```
 apps/    # services déployables
-  landing-page/        # landing page one-page (Astro) qui capte des leads WhatsApp
+  landing-page/        # landing page one-page (Astro) qui emmène vers WhatsApp
   coach/         # backend (Next.js) : WhatsApp (OpenWA) → coach Managed Agent + serveurs MCP
 ```
 
@@ -30,7 +30,7 @@ Pour lancer un service en développement, voir son README (ex. `pnpm dev:coach`)
 
 | Service | Description | Doc |
 |---|---|---|
-| `landing-page` | Landing page one-page (Astro) — présente le coach et capte un numéro WhatsApp | [`apps/landing-page/README.md`](apps/landing-page/README.md) |
+| `landing-page` | Landing page one-page (Astro) — présente le coach et emmène l'athlète sur WhatsApp | [`apps/landing-page/README.md`](apps/landing-page/README.md) |
 | `coach` | Backend (Next.js) reliant WhatsApp (gateway OpenWA) au coach Managed Agent ; héberge les trois serveurs MCP coaching-data (`/api/coaching-data/mcp`), Intervals.icu (`/api/intervals/mcp`) et WhatsApp (`/api/whatsapp/mcp`) | [`apps/coach/README.md`](apps/coach/README.md) |
 
 ## Contribuer

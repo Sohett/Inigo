@@ -17,7 +17,8 @@ export const nav = {
     { label: "La méthode", href: "#methode" },
     { label: "Ce qu'il te faut", href: "#prerequis" },
   ],
-  cta: { label: "Échanger avec Inigo", href: "#demarrer" },
+  // Ouvre WhatsApp sur mobile, descend vers le QR de « Démarrer » sur desktop (cf. StartCta).
+  cta: { label: "Échanger avec Inigo" },
   // Place réservée pour un futur bouton « Connexion » (non câblé).
   login: { label: "Connexion" },
 } as const;
@@ -27,7 +28,8 @@ export const hero = {
   title: "Ton coach d'endurance, sur WhatsApp.",
   subtitle:
     "Inigo construit ton plan, l'ajuste chaque semaine et t'explique chaque séance. La méthode d'un coach pro, branchée sur tes données d'entraînement.",
-  ctaPrimary: { label: "Laisser mon numéro", href: "#demarrer" },
+  // Ouvre WhatsApp sur mobile, descend vers le QR de « Démarrer » sur desktop (cf. StartCta).
+  ctaPrimary: { label: "Écrire à Inigo" },
   ctaSecondary: { label: "Voir la méthode", href: "#methode" },
   // Label mono posé en haut du visuel signature.
   signature: "Ton coaching, en direct",
@@ -140,28 +142,29 @@ export const requirements = {
   ],
 } as const;
 
-export const form = {
+/**
+ * Contact WhatsApp d'Inigo. Le code d'accès doit rester celui saisi dans l'admin du coach
+ * (Réglages, Onboarding) : un numéro inconnu qui écrit sans lui ne démarre pas d'onboarding.
+ */
+export const whatsappContact = {
+  phoneNumber: "+447882748102",
+  accessCode: "INIGO_BETA_2026",
+} as const;
+
+export const start = {
   eyebrow: "DÉMARRER",
-  title: "Laisse ton numéro. Inigo t'écrit.",
+  title: "Écris à Inigo sur WhatsApp.",
   subtitle:
-    "Pas d'engagement. On parle de ton objectif, et on voit comment Inigo peut t'aider.",
-  labels: {
-    firstName: "Prénom",
-    firstNameHint: "optionnel",
-    phone: "Numéro WhatsApp",
-    consent: "J'accepte d'être contacté par Inigo sur WhatsApp.",
+    "Pas d'engagement. Ton premier message est déjà prêt : tu l'envoies, et Inigo te pose quelques questions sur ton objectif.",
+  // Message prérempli dans WhatsApp. Le coach y cherche le code d'accès.
+  message: `Bonjour Inigo, je veux démarrer mon coaching. Mon code : ${whatsappContact.accessCode}`,
+  cta: "Écrire à Inigo sur WhatsApp",
+  qr: {
+    title: "Scanne avec ton téléphone",
+    body: "WhatsApp s'ouvre avec ton premier message prêt à partir. Le coaching se vit sur ton téléphone.",
+    alt: "QR code qui ouvre la conversation WhatsApp avec Inigo",
   },
-  placeholders: {
-    firstName: "Ton prénom",
-  },
-  submit: "Envoyer mon numéro",
-  submitting: "Envoi…",
-  success: "C'est noté. Inigo t'écrit très vite sur WhatsApp.",
-  errors: {
-    phone: "Entre un numéro de mobile valide.",
-    consent: "Coche la case pour qu'Inigo puisse te contacter.",
-    server: "On n'a pas pu enregistrer ton numéro. Réessaie dans un instant.",
-  },
+  desktopLink: "Ou ouvrir WhatsApp sur cet ordinateur",
 } as const;
 
 export const footer = {
