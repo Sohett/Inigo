@@ -61,3 +61,12 @@ dans l'admin du coach (Réglages, Onboarding) ; s'il change là-bas, le changer 
 
 - `src/lib/whatsapp-link.spec.ts` : chiffres seuls dans le numéro, encodage du message, code
   d'accès présent dans le message de la landing, pas de tiret.
+- `vitest.config.ts` : environnement `node`. `pnpm verify` doit passer.
+
+## Ajouter / modifier une section
+
+1. Édite la copy dans `src/content/copy.ts` (jamais de texte en dur dans les composants).
+2. Crée/édite le composant `.astro` correspondant ; ajoute `class="reveal"` (+ `--delay`)
+   pour l'apparition au scroll. Sections ancrées : `id` + `scroll-mt-20`.
+3. Branche-le dans `src/pages/index.astro`.
+4. `pnpm verify`.
