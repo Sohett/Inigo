@@ -29,9 +29,10 @@ export function registerCredentialTools(
       title: "Get the athlete's Intervals.icu connection link",
       description:
         "A personal link (valid 72 hours) the athlete opens to connect Intervals.icu to Inigo " +
-        "by OAuth, without any API key. Send it as is on WhatsApp. When the athlete is done, you " +
+        "by OAuth, without any API key. Send it as is on WhatsApp. Also the way to reconnect an " +
+        "athlete whose access was lost or revoked. When an athlete in onboarding is done, you " +
         "receive a turn with `evenement: intervals_connecte`. `oauth_unavailable` means OAuth " +
-        "is not set up yet: fall back to the API key (connect_intervals).",
+        "is not set up yet: fall back to the API key (connect_intervals) if you have that tool.",
       inputSchema: { ...athleteIdShape }
     },
     (args) =>

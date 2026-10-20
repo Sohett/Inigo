@@ -2,6 +2,9 @@
   "archived_at": null,
   "created_at": "2026-07-03T15:54:34.796990Z",
   "description": null,
+  "execution_identity": {
+    "type": "service_account"
+  },
   "id": "agent_01Sp4ghn8GHc5Lbd9JJptEzR",
   "mcp_servers": [
     {
