@@ -14,6 +14,8 @@ export const ERROR_COPY: Record<string, string> = {
   athlete_not_found: "Cet athlète n'existe plus en base.",
   no_session_to_clone: "Cet athlète n'a pas de session à cloner. Choisis les éléments ci-dessous.",
   invalid_elements: "Éléments invalides.",
+  athlete_not_routed: "Cet athlète est terminé ou bloqué : aucune session ne lui est ouverte.",
+  agent_not_configured: "L'agent qui correspond à son statut (onboarding ou coordinateur) n'est pas réglé. Voir Réglages.",
   session_start_failed: "Anthropic ou la base a refusé l'opération. Voir les logs du serveur."
 };
 

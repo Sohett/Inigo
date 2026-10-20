@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import type { Athlete } from "../domain/athlete";
 import type { RunningSession } from "../domain/brain";
+import type { OnboardingSettings } from "../domain/onboarding";
 import type { ManagedAgentBrain } from "../brain/managedAgents";
 import {
   createStartAthleteSession,
@@ -40,6 +41,7 @@ type ReadSession = ManagedAgentBrain["readSession"];
 function makeDeps(
   overrides: {
     athlete?: Athlete | null;
+    settings?: Pick<Partial<OnboardingSettings>, "onboardingAgentId" | "coordinatorAgentId">;
     readSession?: ReadSession;
     createSession?: CreateSession;
   } = {}
@@ -68,6 +70,16 @@ function makeDeps(
       readSession,
       createSession,
       listInventory: vi.fn()
+    },
+    settings: {
+      get: () =>
+        Promise.resolve({
+          onboardingAgentId: "agent_onboarding",
+          accessCode: "code",
+          coordinatorAgentId: "agent_coord",
+          whatsappNumber: null,
+          ...overrides.settings
+        })
     },
     now: () => new Date("2026-09-05T12:00:00Z")
   };
@@ -176,6 +188,52 @@ describe("startAthleteSession — cloning a live session", () => {
       "anthropic down"
     );
     expect(setSession).not.toHaveBeenCalled();
+  });
+});
+
+describe("startAthleteSession — the agent follows the athlete's status (INI-74)", () => {
+  it("opens an onboarding session for an athlete in onboarding, even from a coordinator session", async () => {
+    const { deps, createSession, setSession } = makeDeps({ athlete: { ...athlete, status: "onboarding" } });
+
+    await createStartAthleteSession(deps).execute(athlete.id);
+
+    expect(createSession).toHaveBeenCalledWith(
+      expect.objectContaining({ agentId: "agent_onboarding", environmentId: "env_1", vaultIds: ["vlt_1"] })
+    );
+    expect(setSession).toHaveBeenCalledWith(athlete.id, "sesn_new", "agent_onboarding");
+  });
+
+  it.each(["active", "paused"] as const)("opens a coordinator session for an %s athlete, even from an onboarding session", async (status) => {
+    const { deps, createSession } = makeDeps({
+      athlete: { ...athlete, status, activeSession: { sessionId: "sesn_old", agentId: "agent_onboarding" } },
+      readSession: () => Promise.resolve({ ...running, agentId: "agent_onboarding" })
+    });
+
+    await createStartAthleteSession(deps).execute(athlete.id);
+
+    expect(createSession).toHaveBeenCalledWith(expect.objectContaining({ agentId: "agent_coord" }));
+  });
+
+  it.each(["ended", "blocked"] as const)("refuses an %s athlete without touching the brain", async (status) => {
+    const { deps, readSession, createSession } = makeDeps({ athlete: { ...athlete, status } });
+
+    const outcome = await createStartAthleteSession(deps).execute(athlete.id);
+
+    expect(outcome).toEqual({ status: "failed", reason: StartSessionFailure.AthleteNotRouted });
+    expect(readSession).not.toHaveBeenCalled();
+    expect(createSession).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["onboarding", { onboardingAgentId: null }],
+    ["active", { coordinatorAgentId: null }]
+  ] as const)("refuses an %s athlete when its agent is not set", async (status, settings) => {
+    const { deps, createSession } = makeDeps({ athlete: { ...athlete, status }, settings });
+
+    const outcome = await createStartAthleteSession(deps).execute(athlete.id);
+
+    expect(outcome).toEqual({ status: "failed", reason: StartSessionFailure.AgentNotConfigured });
+    expect(createSession).not.toHaveBeenCalled();
   });
 });
 

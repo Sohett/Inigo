@@ -2,7 +2,9 @@ import { z } from "zod";
 import type { ManagedAgentBrain } from "../brain/managedAgents";
 import type { Athlete } from "../domain/athlete";
 import type { SessionElements } from "../domain/brain";
+import type { OnboardingSettings } from "../domain/onboarding";
 import type { AthleteRepository } from "../repositories/athleteRepository";
+import type { OnboardingSettingsRepository } from "../repositories/onboardingSettingsRepository";
 
 /**
  * Why a session could not be started. All are normal business outcomes (the route
@@ -17,7 +19,11 @@ export const StartSessionFailure = {
    */
   NoSessionToClone: "no_session_to_clone",
   /** The supplied elements were malformed. */
-  InvalidElements: "invalid_elements"
+  InvalidElements: "invalid_elements",
+  /** The athlete is `ended` or `blocked`: nothing is routed to them, so no session either. */
+  AthleteNotRouted: "athlete_not_routed",
+  /** The agent the athlete's status calls for (onboarding or coordinator) is not set in the admin. */
+  AgentNotConfigured: "agent_not_configured"
 } as const;
 
 export type StartSessionFailure =
@@ -59,6 +65,7 @@ export type StartSessionOutcome =
 export interface StartAthleteSessionDeps {
   repo: AthleteRepository;
   brain: ManagedAgentBrain;
+  settings: Pick<OnboardingSettingsRepository, "get">;
   /** Injected for a deterministic session title in tests. */
   now?: () => Date;
 }
@@ -77,6 +84,24 @@ export function sessionTitle(
 ): string {
   const who = athlete.displayName ?? athlete.phoneNum ?? athlete.whatsappLid;
   return `Inigo · ${who} · ${at.toISOString().slice(0, 10)}`;
+}
+
+/**
+ * The agent an athlete's new session runs, by lifecycle status (INI-74): the same rule as the
+ * routing, so an athlete in onboarding never lands on the coordinator, nor the reverse.
+ * `null` when nothing is routed to the athlete; `undefined` when the agent is not set.
+ */
+function agentForStatus(athlete: Athlete, settings: OnboardingSettings): string | null | undefined {
+  switch (athlete.status) {
+    case "onboarding":
+      return settings.onboardingAgentId ?? undefined;
+    case "active":
+    case "paused":
+      return settings.coordinatorAgentId ?? undefined;
+    case "ended":
+    case "blocked":
+      return null;
+  }
 }
 
 /** Turn the flat form input into the elements a session is created from. */
@@ -105,11 +130,12 @@ function toSessionElements(parsed: z.output<typeof sessionElementsSchema>): Sess
  * agent config at creation, so the runtime only moves once a new session exists.
  *
  * Where the elements come from is the whole design. When the athlete already runs a
- * session, we **read that session back** and recreate it — the running session is the
- * authoritative record of which agent, environment, vaults and memory store this athlete
- * uses, and unlike a stored copy it cannot drift from the control plane. Referencing the
- * agent by id re-pins its latest version, which is the one thing we deliberately change.
- * Only a first session needs elements supplied, chosen from the live inventory.
+ * session, we **read that session back** and recreate its environment, vaults and memory
+ * store: the running session is the authoritative record of those, and unlike a stored copy
+ * it cannot drift from the control plane. The agent, though, follows the athlete's status
+ * (INI-74): the onboarding agent while in onboarding, the coordinator once active, both as
+ * set in the admin. Referencing it by id pins its latest version. Only a first session needs
+ * elements supplied, chosen from the live inventory.
  *
  * The new session is created *before* the pointer is written, so a failed create never
  * orphans the athlete: they keep talking to their previous session until one succeeds.
@@ -130,9 +156,12 @@ export function createStartAthleteSession(
       let sessionElements: SessionElements;
 
       if (athlete.activeSession) {
+        const agentId = agentForStatus(athlete, await deps.settings.get());
+        if (agentId === null) return { status: "failed", reason: StartSessionFailure.AthleteNotRouted };
+        if (agentId === undefined) return { status: "failed", reason: StartSessionFailure.AgentNotConfigured };
         const running = await deps.brain.readSession(athlete.activeSession.sessionId);
         sessionElements = {
-          agentId: running.agentId,
+          agentId,
           environmentId: running.environmentId,
           vaultIds: running.vaultIds,
           resources: running.resources
