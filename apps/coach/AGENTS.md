@@ -65,7 +65,7 @@ src/
   use-cases/
     routeInboundMessage.ts         # use-case de routing : une seule fonction publique execute()
     startAthleteSession.ts         # use-case admin : clone la session courante, repointe l'athlète
-    listAdminAthletes.ts           # use-case admin (lecture) : la liste + `attention` (switch exhaustif sur le statut) ; PORT AthleteRosterReader
+    listAdminAthletes.ts           # use-case admin (lecture) : la liste des athlètes (plan et dernière proposition) ; PORT AthleteRosterReader
     loadAthleteSessions.ts         # use-case admin (lecture) : session live + historique + inventaire d'un athlète (null si inconnu)
     loadAdminSettings.ts           # use-case admin (lecture) : session de passerelle + réglages d'onboarding + inventaire
     settle.ts                      # settle(read) : une lecture qui échoue devient un message, pas une 500
@@ -600,7 +600,7 @@ le skill Claude Code `managed-agents-api`.
   préfixes d'ids refusés, athlète inconnu, échec de lecture ou de création qui n'écrit rien) et
   **`loadAthleteSessions`** (athlète inconnu, session cassée rendue visible, inventaire injoignable qui
   dégrade au lieu de casser, historique sans la session active), **`loadAdminSettings`** (chaque
-  réglage illisible dégrade seul) et **`listAdminAthletes`** (`attention` par statut, plan et proposition). Route admin : 401 sans/avec mauvais identifiants, 400 UUID
+  réglage illisible dégrade seul) et **`listAdminAthletes`** (la liste dans l'ordre du reader). Route admin : 401 sans/avec mauvais identifiants, 400 UUID
   invalide, 200 clone, 200 première session, 409 sans rien à cloner, 404, 502. Côté MCP :
   intégration `InMemoryTransport` (reads + writes présents dont
   `save_training_plan`, un call renvoie du JSON, validation de date rejetée), route (401 sans

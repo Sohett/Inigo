@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SessionLink } from "../../../_components/session-link";
 
 /** Server error codes mapped to something an operator can act on. */
 export const ERROR_COPY: Record<string, string> = {
@@ -127,7 +128,7 @@ export function NewSessionButton({ athleteId, canClone }: NewSessionButtonProps)
       )}
       {state.kind === "done" && (
         <p className="text-xs text-muted-foreground">
-          Créée : <span className="font-mono">{state.sessionId}</span> (agent v{state.agentVersion})
+          Créée : <SessionLink sessionId={state.sessionId} /> (agent v{state.agentVersion})
         </p>
       )}
       {state.kind === "error" && <p className="text-xs text-destructive">{state.message}</p>}

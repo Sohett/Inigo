@@ -1,6 +1,6 @@
 import type { SortingState } from "@tanstack/react-table";
 import type { AthleteStatus } from "@/domain/athlete";
-import type { AdminAthleteRow } from "@/use-cases/listAdminAthletes";
+import type { AthleteRosterEntry } from "@/domain/athleteRoster";
 import { ATHLETE_STATUSES } from "../../_components/labels";
 
 /**
@@ -15,8 +15,8 @@ type SortableColumn = (typeof SORTABLE_COLUMNS)[number];
 /** Newest athletes first until the admin picks another order. */
 export const DEFAULT_SORT: SortingState = [{ id: "createdAt", desc: true }];
 
-/** The status filter: one lifecycle status, or every athlete that calls for a look. */
-export type StatusFilter = AthleteStatus | "attention";
+/** The status filter: one lifecycle status. */
+export type StatusFilter = AthleteStatus;
 
 /** `sort` is a column id, prefixed with `-` when descending. */
 export function readSort(value: string | null): SortingState {
@@ -35,12 +35,11 @@ export function writeSort(sorting: SortingState): string | null {
 }
 
 export function readStatus(value: string | null): StatusFilter | null {
-  if (value === "attention") return value;
   return ATHLETE_STATUSES.find((status) => status === value) ?? null;
 }
 
 /** Search by name, number or LID, case-insensitively. */
-export function matchesSearch(row: AdminAthleteRow, query: string): boolean {
+export function matchesSearch(row: AthleteRosterEntry, query: string): boolean {
   const needle = query.trim().toLowerCase();
   if (!needle) return true;
   return [row.displayName, row.phoneNum, row.whatsappLid].some((value) =>
@@ -48,8 +47,7 @@ export function matchesSearch(row: AdminAthleteRow, query: string): boolean {
   );
 }
 
-export function matchesStatus(row: AdminAthleteRow, filter: StatusFilter | null): boolean {
+export function matchesStatus(row: AthleteRosterEntry, filter: StatusFilter | null): boolean {
   if (filter === null) return true;
-  if (filter === "attention") return row.attention !== null;
   return row.status === filter;
 }

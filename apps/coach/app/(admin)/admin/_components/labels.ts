@@ -1,6 +1,5 @@
 import type { PlanStatus, PropositionStatus } from "@inigo/db";
 import type { AthleteStatus } from "@/domain/athlete";
-import type { AttentionReason } from "@/use-cases/listAdminAthletes";
 
 /** Shared wording of the admin pages, so the roster and the athlete page say the same thing. */
 
@@ -20,11 +19,6 @@ export const STATUS_VARIANT: Record<AthleteStatus, "default" | "secondary" | "ou
   paused: "secondary",
   ended: "outline",
   blocked: "destructive"
-};
-
-export const ATTENTION_LABEL: Record<AttentionReason, string> = {
-  no_active_plan: "Pas de plan actif",
-  proposition_pending: "Semaine pas appliquée"
 };
 
 export const PLAN_STATUS_LABEL: Record<PlanStatus, string> = {

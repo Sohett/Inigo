@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { AdminAthleteRow } from "@/use-cases/listAdminAthletes";
+import type { AthleteRosterEntry } from "@/domain/athleteRoster";
 import {
   DEFAULT_SORT,
   matchesSearch,
@@ -9,7 +9,7 @@ import {
   writeSort
 } from "./roster-url";
 
-const row: AdminAthleteRow = {
+const row: AthleteRosterEntry = {
   id: "a-1",
   displayName: "Thomas",
   phoneNum: "+32470000000",
@@ -17,8 +17,7 @@ const row: AdminAthleteRow = {
   status: "active",
   createdAt: new Date("2026-09-01T00:00:00Z"),
   plan: null,
-  latestProposition: null,
-  attention: "no_active_plan"
+  latestProposition: null
 };
 
 describe("readSort / writeSort", () => {
@@ -40,11 +39,11 @@ describe("readSort / writeSort", () => {
 });
 
 describe("readStatus", () => {
-  it.each(["attention", "onboarding", "active", "paused", "ended", "blocked"])("keeps %s", (value) => {
+  it.each(["onboarding", "active", "paused", "ended", "blocked"])("keeps %s", (value) => {
     expect(readStatus(value)).toBe(value);
   });
 
-  it.each([null, "", "ACTIVE", "deleted"])("ignores %s", (value) => {
+  it.each([null, "", "ACTIVE", "deleted", "attention"])("ignores %s", (value) => {
     expect(readStatus(value)).toBeNull();
   });
 });
@@ -62,11 +61,6 @@ describe("matchesSearch", () => {
 describe("matchesStatus", () => {
   it("keeps everyone without a filter", () => {
     expect(matchesStatus(row, null)).toBe(true);
-  });
-
-  it("keeps only athletes that call for a look under attention", () => {
-    expect(matchesStatus(row, "attention")).toBe(true);
-    expect(matchesStatus({ ...row, attention: null }, "attention")).toBe(false);
   });
 
   it("filters on the lifecycle status", () => {
