@@ -6,7 +6,7 @@ export default defineConfig({
   test: {
     environment: "node",
     // Pas de specs sous src/pages (Astro y route tous les fichiers) : la logique testable
-    // de l'endpoint vit dans src/lib/lead-handler.ts.
+    // vit dans src/lib.
     include: ["src/**/*.spec.ts"],
     coverage: {
       provider: "v8",

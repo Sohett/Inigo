@@ -1,6 +1,4 @@
 @import "tailwindcss";
-@import "tw-animate-css";
-@import "shadcn/tailwind.css";
 
 /* Typo « Aube alpine » — self-hostée, pas de requête externe (cf. spec §4) */
 @import "@fontsource-variable/schibsted-grotesk"; /* Display — titres */
@@ -235,55 +233,4 @@ html.js .reveal.is-visible {
   background-color: color-mix(in oklab, var(--background) 72%, transparent);
   backdrop-filter: saturate(140%) blur(12px);
   border-bottom-color: var(--border);
-}
-
-/* ───────────────────────── Input téléphone (react-phone-number-input) ─────────────────────────
-   Le pays vit dans un « trigger » bordé à gauche (drapeau + chevron), le numéro dans
-   l'Input shadcn à droite. Style aligné sur base-nova. */
-.inigo-phone {
-  display: flex;
-  align-items: stretch;
-}
-.inigo-phone .PhoneInputCountry {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  height: 2.75rem; /* = h-11 de l'Input */
-  margin: 0;
-  padding: 0 0.625rem;
-  border: 1px solid var(--input);
-  border-right: 0;
-  border-radius: var(--radius) 0 0 var(--radius);
-  background: var(--background);
-  position: relative;
-}
-.inigo-phone .PhoneInputCountry:focus-within {
-  outline: none;
-  border-color: var(--ring);
-  box-shadow: 0 0 0 2px color-mix(in oklab, var(--ring) 40%, transparent);
-  z-index: 1;
-}
-.inigo-phone .PhoneInputInput {
-  border-top-left-radius: 0;
-  border-bottom-left-radius: 0;
-}
-.inigo-phone .PhoneInputCountryIcon {
-  width: 1.45em;
-  height: 1.05em;
-  box-shadow: none;
-  background: transparent;
-}
-.inigo-phone .PhoneInputCountryIcon--border {
-  box-shadow: none;
-  background: transparent;
-}
-.inigo-phone .PhoneInputCountrySelectArrow {
-  width: 0.4em;
-  height: 0.4em;
-  margin-left: 0.1rem;
-  border-style: solid;
-  border-color: var(--muted-foreground);
-  border-width: 0 1.5px 1.5px 0;
-  transform: rotate(45deg);
-  opacity: 0.7;
 }
