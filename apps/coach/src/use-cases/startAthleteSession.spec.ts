@@ -77,7 +77,6 @@ function makeDeps(
           onboardingAgentId: "agent_onboarding",
           accessCode: "code",
           coordinatorAgentId: "agent_coord",
-          whatsappNumber: null,
           ...overrides.settings
         })
     },

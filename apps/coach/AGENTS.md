@@ -358,7 +358,9 @@ Règles :
 - **Redirect URI** : `<COACH_PUBLIC_URL>/connect/intervals/callback`, à enregistrer sur l'app
   (pas de wildcard chez Intervals, donc pas de flow complet sur les previews Vercel ; `localhost`
   est toujours autorisé).
-- **Numéro WhatsApp d'Inigo** : `onboarding_settings.whatsapp_number`, édité dans /admin, Réglages.
+- **Numéro WhatsApp d'Inigo** : `whatsapp_gateway.whatsapp_number` (INI-79), édité dans /admin,
+  Réglages, carte Passerelle WhatsApp (`POST /api/admin/whatsapp-number`, 409 tant qu'aucune
+  session n'est enregistrée).
   Absent ou Neon illisible → la page n'a simplement pas de bouton.
 
 ## MCP WhatsApp (le brain répond à l'athlète) — INI-37

@@ -22,7 +22,9 @@ function build(options: {
   const check = createCheckGatewaySession({
     gateway: {
       getSessionId: async () => (options.sessionId === undefined ? SESSION : options.sessionId),
-      setSessionId: async () => undefined
+      setSessionId: async () => undefined,
+      getWhatsappNumber: async () => null,
+      setWhatsappNumber: async () => true
     },
     resolveClient: options.resolveClient ?? (() => ({ getSession, startSession }) as never),
     alerter: { notify }

@@ -43,7 +43,7 @@ vi.mock("../../../../../../src/deps", () => ({
     brain: { readSession: fake.readSession, createSession: fake.createSession },
     onboardingSettings: {
       get: () =>
-        Promise.resolve({ onboardingAgentId: "agent_onboarding", coordinatorAgentId: "agent_coord", accessCode: "code", whatsappNumber: null })
+        Promise.resolve({ onboardingAgentId: "agent_onboarding", coordinatorAgentId: "agent_coord", accessCode: "code" })
     }
   })
 }));

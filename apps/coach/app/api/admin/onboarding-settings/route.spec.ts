@@ -37,34 +37,30 @@ describe("POST /api/admin/onboarding-settings", () => {
       post({
         onboardingAgentId: "agent_onb",
         coordinatorAgentId: "agent_coord",
-        accessCode: " VELO26 ",
-        whatsappNumber: "+32 470 12 34 56"
+        accessCode: " VELO26 "
       })
     );
     expect(response.status).toBe(200);
     expect(set).toHaveBeenCalledWith({
       onboardingAgentId: "agent_onb",
       coordinatorAgentId: "agent_coord",
-      accessCode: "VELO26",
-      whatsappNumber: "+32470123456"
+      accessCode: "VELO26"
     });
   });
 
   it("reads an empty field as cleared, which turns onboarding off", async () => {
     const { POST } = await import("./route");
-    await POST(post({ onboardingAgentId: "", coordinatorAgentId: "agent_coord", accessCode: "", whatsappNumber: "" }));
+    await POST(post({ onboardingAgentId: "", coordinatorAgentId: "agent_coord", accessCode: "" }));
     expect(set).toHaveBeenCalledWith({
       onboardingAgentId: null,
       coordinatorAgentId: "agent_coord",
-      accessCode: null,
-      whatsappNumber: null
+      accessCode: null
     });
   });
 
   it.each([
-    ["an id that is not an agent", { onboardingAgentId: "env_1", coordinatorAgentId: null, accessCode: null, whatsappNumber: null }],
-    ["a code too short to guess", { onboardingAgentId: null, coordinatorAgentId: null, accessCode: "ab", whatsappNumber: null }],
-    ["a number without its country code", { onboardingAgentId: null, coordinatorAgentId: null, accessCode: null, whatsappNumber: "0470123456" }]
+    ["an id that is not an agent", { onboardingAgentId: "env_1", coordinatorAgentId: null, accessCode: null }],
+    ["a code too short to guess", { onboardingAgentId: null, coordinatorAgentId: null, accessCode: "ab" }]
   ])("rejects %s", async (_label, body) => {
     const { POST } = await import("./route");
     const response = await POST(post(body));
@@ -74,7 +70,7 @@ describe("POST /api/admin/onboarding-settings", () => {
 
   it("refuses without admin credentials", async () => {
     const { POST } = await import("./route");
-    const response = await POST(post({ onboardingAgentId: null, coordinatorAgentId: null, accessCode: null, whatsappNumber: null }, {}));
+    const response = await POST(post({ onboardingAgentId: null, coordinatorAgentId: null, accessCode: null }, {}));
     expect(response.status).toBe(401);
     expect(set).not.toHaveBeenCalled();
   });
@@ -82,7 +78,7 @@ describe("POST /api/admin/onboarding-settings", () => {
   it("answers 502 when the database refuses the write", async () => {
     set.mockRejectedValue(new Error("neon down"));
     const { POST } = await import("./route");
-    const response = await POST(post({ onboardingAgentId: null, coordinatorAgentId: null, accessCode: null, whatsappNumber: null }));
+    const response = await POST(post({ onboardingAgentId: null, coordinatorAgentId: null, accessCode: null }));
     expect(response.status).toBe(502);
   });
 });

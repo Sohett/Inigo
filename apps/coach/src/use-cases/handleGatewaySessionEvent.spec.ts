@@ -21,7 +21,12 @@ function build(getSessionId: () => Promise<string | null> = async () => SESSION)
   const notify = vi.fn(async (_alert: GatewayAlert) => undefined);
   const handle = createHandleGatewaySessionEvent({
     alerter: { notify },
-    gateway: { getSessionId, setSessionId: async () => undefined }
+    gateway: {
+      getSessionId,
+      setSessionId: async () => undefined,
+      getWhatsappNumber: async () => null,
+      setWhatsappNumber: async () => true
+    }
   });
   return { handle, notify };
 }

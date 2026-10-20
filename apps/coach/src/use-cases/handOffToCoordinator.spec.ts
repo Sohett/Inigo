@@ -8,8 +8,7 @@ const COORDINATOR = "agent_coordinator";
 const SETTINGS: OnboardingSettings = {
   onboardingAgentId: "agent_onboarding",
   coordinatorAgentId: COORDINATOR,
-  accessCode: "VELO26",
-  whatsappNumber: "+32470000000"
+  accessCode: "VELO26"
 };
 const INVENTORY: BrainInventory = {
   agents: [{ id: COORDINATOR, name: "inigo-coordinateur", version: 24, isCoordinator: true }],
