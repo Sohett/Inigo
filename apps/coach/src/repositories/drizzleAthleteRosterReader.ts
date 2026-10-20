@@ -1,5 +1,5 @@
-import { desc, eq, sql } from "drizzle-orm";
-import { athlete, trainingPlan, weeklyProposition, type Db } from "@inigo/db";
+import { and, desc, eq, sql } from "drizzle-orm";
+import { athlete, athleteCredential, trainingPlan, weeklyProposition, type Db } from "@inigo/db";
 import type { AthleteRosterEntry } from "../domain/athleteRoster";
 import type { AthleteRosterReader } from "../use-cases/listAdminAthletes";
 
@@ -15,6 +15,8 @@ export interface AthleteRosterRow {
   planStatus: NonNullable<AthleteRosterEntry["plan"]>["status"] | null;
   propositionWeekStart: string | null;
   propositionStatus: NonNullable<AthleteRosterEntry["latestProposition"]>["status"] | null;
+  intervalsAuthType: NonNullable<AthleteRosterEntry["intervals"]>["authType"] | null;
+  intervalsConnectedAt: Date | null;
 }
 
 /** Map the query row onto the domain entry. Exported so it can be unit-tested without a database. */
@@ -33,13 +35,18 @@ export function toAthleteRosterEntry(row: AthleteRosterRow): AthleteRosterEntry 
     latestProposition:
       row.propositionWeekStart !== null && row.propositionStatus !== null
         ? { weekStart: row.propositionWeekStart, status: row.propositionStatus }
+        : null,
+    intervals:
+      row.intervalsAuthType !== null && row.intervalsConnectedAt !== null
+        ? { authType: row.intervalsAuthType, connectedAt: row.intervalsConnectedAt }
         : null
   };
 }
 
 /**
  * Drizzle-backed `AthleteRosterReader`: one query, each athlete left-joined laterally with
- * their plan (the active one first, else the most recent) and their latest proposition.
+ * their plan (the active one first, else the most recent) and their latest proposition, and
+ * with their Intervals.icu credential (one per athlete and provider; its secret is never read).
  */
 export function createDrizzleAthleteRosterReader(db: Db): AthleteRosterReader {
   return {
@@ -70,11 +77,17 @@ export function createDrizzleAthleteRosterReader(db: Db): AthleteRosterReader {
           planName: plan.name,
           planStatus: plan.status,
           propositionWeekStart: proposition.weekStart,
-          propositionStatus: proposition.status
+          propositionStatus: proposition.status,
+          intervalsAuthType: athleteCredential.authType,
+          intervalsConnectedAt: athleteCredential.updatedAt
         })
         .from(athlete)
         .leftJoinLateral(plan, sql`true`)
         .leftJoinLateral(proposition, sql`true`)
+        .leftJoin(
+          athleteCredential,
+          and(eq(athleteCredential.athleteId, athlete.id), eq(athleteCredential.provider, "intervals_icu"))
+        )
         .orderBy(athlete.createdAt);
       return rows.map(toAthleteRosterEntry);
     }

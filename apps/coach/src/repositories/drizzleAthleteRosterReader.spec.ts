@@ -11,7 +11,9 @@ const row: AthleteRosterRow = {
   planName: "Gran Fondo 2027",
   planStatus: "active",
   propositionWeekStart: "2026-10-12",
-  propositionStatus: "applied"
+  propositionStatus: "applied",
+  intervalsAuthType: "oauth",
+  intervalsConnectedAt: new Date("2026-10-20T09:00:00Z")
 };
 
 describe("toAthleteRosterEntry", () => {
@@ -24,7 +26,8 @@ describe("toAthleteRosterEntry", () => {
       status: "active",
       createdAt: new Date("2026-09-01T00:00:00Z"),
       plan: { name: "Gran Fondo 2027", status: "active" },
-      latestProposition: { weekStart: "2026-10-12", status: "applied" }
+      latestProposition: { weekStart: "2026-10-12", status: "applied" },
+      intervals: { authType: "oauth", connectedAt: new Date("2026-10-20T09:00:00Z") }
     });
   });
 
@@ -34,9 +37,12 @@ describe("toAthleteRosterEntry", () => {
       planName: null,
       planStatus: null,
       propositionWeekStart: null,
-      propositionStatus: null
+      propositionStatus: null,
+      intervalsAuthType: null,
+      intervalsConnectedAt: null
     });
     expect(entry.plan).toBeNull();
     expect(entry.latestProposition).toBeNull();
+    expect(entry.intervals).toBeNull();
   });
 });

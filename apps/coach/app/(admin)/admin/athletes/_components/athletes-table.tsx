@@ -38,6 +38,7 @@ import {
   contactOf,
   DATE_FORMAT,
   formatDay,
+  INTERVALS_AUTH_LABEL,
   PLAN_STATUS_LABEL,
   PROPOSITION_STATUS_LABEL,
   STATUS_LABEL,
@@ -72,6 +73,21 @@ const columns: ColumnDef<AthleteRosterEntry>[] = [
     cell: ({ row }) => (
       <Badge variant={STATUS_VARIANT[row.original.status]}>{STATUS_LABEL[row.original.status]}</Badge>
     )
+  },
+  {
+    id: "intervals",
+    header: "Intervals.icu",
+    // Connected athletes first when sorted descending; the oldest connection last among them.
+    accessorFn: (row) => row.intervals?.connectedAt.getTime() ?? 0,
+    cell: ({ row }) =>
+      row.original.intervals ? (
+        <span title={`Connecté le ${DATE_FORMAT.format(row.original.intervals.connectedAt)}`}>
+          <Badge variant="default">Connecté</Badge>{" "}
+          <span className="text-xs text-muted-foreground">{INTERVALS_AUTH_LABEL[row.original.intervals.authType]}</span>
+        </span>
+      ) : (
+        <Badge variant="destructive">Non connecté</Badge>
+      )
   },
   {
     id: "plan",

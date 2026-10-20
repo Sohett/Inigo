@@ -34,7 +34,8 @@ const rows: AthleteRosterEntry[] = [
     status: "active",
     createdAt: new Date("2026-09-01T00:00:00Z"),
     plan: { name: "Gran Fondo", status: "active" },
-    latestProposition: { weekStart: "2026-10-12", status: "applied" }
+    latestProposition: { weekStart: "2026-10-12", status: "applied" },
+    intervals: { authType: "oauth", connectedAt: new Date("2026-10-20T09:00:00Z") }
   },
   {
     id: "a-2",
@@ -44,7 +45,8 @@ const rows: AthleteRosterEntry[] = [
     status: "onboarding",
     createdAt: new Date("2026-10-01T00:00:00Z"),
     plan: null,
-    latestProposition: null
+    latestProposition: null,
+    intervals: null
   }
 ];
 
@@ -106,5 +108,23 @@ describe.each(["", "?sort=-name", "?status=active&sort=plan"])("AthletesTable at
     expect(new URLSearchParams(window.location.search).get("q")).toBe("zzz");
     expect(container.textContent).not.toContain("Thomas");
     expect(container.textContent).toContain("Aucun athlète ne correspond.");
+  });
+});
+
+describe("AthletesTable Intervals.icu column", () => {
+  beforeEach(() => {
+    window.history.replaceState(null, "", "/admin/athletes");
+  });
+
+  it("shows who is connected, and how, and who is not", async () => {
+    act(() => root.render(<AthletesTable rows={rows} />));
+    await settle();
+
+    const lines = [...container.querySelectorAll("tbody tr")].map((row) => row.textContent ?? "");
+    const thomas = lines.find((line) => line.includes("Thomas")) ?? "";
+    const julie = lines.find((line) => line.includes("Julie")) ?? "";
+    expect(thomas).toContain("Connecté OAuth");
+    expect(thomas).not.toContain("Non connecté");
+    expect(julie).toContain("Non connecté");
   });
 });

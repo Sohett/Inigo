@@ -43,7 +43,8 @@ describe.skipIf(!databaseUrl)("drizzleAthleteRosterReader (integration)", () => 
       phoneNum: TEST_PHONE,
       status: "active",
       plan: null,
-      latestProposition: null
+      latestProposition: null,
+      intervals: null
     });
   });
 
