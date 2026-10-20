@@ -2,7 +2,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AdminAthleteRow } from "@/use-cases/listAdminAthletes";
+import type { AthleteRosterEntry } from "@/domain/athleteRoster";
 
 const renders = { count: 0 };
 
@@ -25,7 +25,7 @@ vi.mock("next/link", () => ({
 
 const { AthletesTable } = await import("./athletes-table");
 
-const rows: AdminAthleteRow[] = [
+const rows: AthleteRosterEntry[] = [
   {
     id: "a-1",
     displayName: "Thomas",
@@ -34,8 +34,7 @@ const rows: AdminAthleteRow[] = [
     status: "active",
     createdAt: new Date("2026-09-01T00:00:00Z"),
     plan: { name: "Gran Fondo", status: "active" },
-    latestProposition: { weekStart: "2026-10-12", status: "applied" },
-    attention: null
+    latestProposition: { weekStart: "2026-10-12", status: "applied" }
   },
   {
     id: "a-2",
@@ -45,8 +44,7 @@ const rows: AdminAthleteRow[] = [
     status: "onboarding",
     createdAt: new Date("2026-10-01T00:00:00Z"),
     plan: null,
-    latestProposition: null,
-    attention: null
+    latestProposition: null
   }
 ];
 

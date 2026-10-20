@@ -13,7 +13,7 @@ import {
   type ColumnDef,
   type FilterFn
 } from "@tanstack/react-table";
-import type { AdminAthleteRow } from "@/use-cases/listAdminAthletes";
+import type { AthleteRosterEntry } from "@/domain/athleteRoster";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,7 +35,6 @@ import {
 } from "./roster-url";
 import {
   ATHLETE_STATUSES,
-  ATTENTION_LABEL,
   contactOf,
   DATE_FORMAT,
   formatDay,
@@ -45,10 +44,10 @@ import {
   STATUS_VARIANT
 } from "../../_components/labels";
 
-const searchFilter: FilterFn<AdminAthleteRow> = (row, _columnId, query: string) =>
+const searchFilter: FilterFn<AthleteRosterEntry> = (row, _columnId, query: string) =>
   matchesSearch(row.original, query);
 
-const columns: ColumnDef<AdminAthleteRow>[] = [
+const columns: ColumnDef<AthleteRosterEntry>[] = [
   {
     id: "name",
     header: "Athlète",
@@ -71,12 +70,7 @@ const columns: ColumnDef<AdminAthleteRow>[] = [
     header: "Statut",
     accessorFn: (row) => ATHLETE_STATUSES.indexOf(row.status),
     cell: ({ row }) => (
-      <div className="flex flex-wrap gap-1">
-        <Badge variant={STATUS_VARIANT[row.original.status]}>{STATUS_LABEL[row.original.status]}</Badge>
-        {row.original.attention && (
-          <Badge variant="destructive">{ATTENTION_LABEL[row.original.attention]}</Badge>
-        )}
-      </div>
+      <Badge variant={STATUS_VARIANT[row.original.status]}>{STATUS_LABEL[row.original.status]}</Badge>
     )
   },
   {
@@ -117,7 +111,7 @@ const columns: ColumnDef<AdminAthleteRow>[] = [
   }
 ];
 
-export function AthletesTable({ rows }: { rows: AdminAthleteRow[] }) {
+export function AthletesTable({ rows }: { rows: AthleteRosterEntry[] }) {
   const searchParams = useSearchParams();
   const query = searchParams.get("q") ?? "";
   // The box follows the URL when it changes from outside (sidebar link, back button).
@@ -158,7 +152,6 @@ export function AthletesTable({ rows }: { rows: AdminAthleteRow[] }) {
 
   const filters: { value: StatusFilter | null; label: string }[] = [
     { value: null, label: "Tous" },
-    { value: "attention", label: "À traiter" },
     ...ATHLETE_STATUSES.map((status) => ({ value: status, label: STATUS_LABEL[status] }))
   ];
 

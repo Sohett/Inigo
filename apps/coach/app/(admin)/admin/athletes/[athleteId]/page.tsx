@@ -8,6 +8,7 @@ import { createLoadAthleteSessions } from "@/use-cases/loadAthleteSessions";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { contactOf, DATE_TIME_FORMAT, STATUS_LABEL, STATUS_VARIANT } from "../../_components/labels";
+import { SessionLink } from "../../_components/session-link";
 import { FirstSessionForm } from "./_components/first-session-form";
 import { NewSessionButton } from "./_components/new-session-button";
 
@@ -32,7 +33,9 @@ function SessionSummary({
   return (
     <dl className="grid gap-1 text-xs sm:grid-cols-[7rem_1fr]">
       <dt className="text-muted-foreground">Session</dt>
-      <dd className="font-mono break-all">{session.sessionId}</dd>
+      <dd>
+        <SessionLink sessionId={session.sessionId} />
+      </dd>
 
       <dt className="text-muted-foreground">Tourne sur</dt>
       <dd>
@@ -74,7 +77,7 @@ function PastSessions({ sessions }: { sessions: AthleteSession[] }) {
       <ul className="mt-2 grid gap-1">
         {sessions.map((session) => (
           <li key={session.sessionId} className="grid gap-x-3 sm:grid-cols-[1fr_auto]">
-            <span className="font-mono break-all">{session.sessionId}</span>
+            <SessionLink sessionId={session.sessionId} />
             <span className="text-muted-foreground">
               {DATE_TIME_FORMAT.format(session.startedAt)} →{" "}
               {session.endedAt && DATE_TIME_FORMAT.format(session.endedAt)}
@@ -130,7 +133,8 @@ export default async function AthletePage({ params }: { params: Promise<{ athlet
           {sessionError && (
             <div className="grid gap-1 text-xs">
               <p className="text-destructive">
-                La session <span className="font-mono">{athlete.activeSession?.sessionId}</span> est
+                La session{" "}
+                {athlete.activeSession && <SessionLink sessionId={athlete.activeSession.sessionId} />} est
                 illisible chez Anthropic.
               </p>
               <p className="text-muted-foreground">{sessionError}</p>
