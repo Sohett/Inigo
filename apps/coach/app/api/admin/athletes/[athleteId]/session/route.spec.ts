@@ -40,7 +40,11 @@ const fake = {
 vi.mock("../../../../../../src/deps", () => ({
   getDeps: () => ({
     repo: { findById: fake.findById, setSession: fake.setSession },
-    brain: { readSession: fake.readSession, createSession: fake.createSession }
+    brain: { readSession: fake.readSession, createSession: fake.createSession },
+    onboardingSettings: {
+      get: () =>
+        Promise.resolve({ onboardingAgentId: "agent_onboarding", coordinatorAgentId: "agent_coord", accessCode: "code", whatsappNumber: null })
+    }
   })
 }));
 
@@ -148,6 +152,19 @@ describe("POST /api/admin/athletes/[athleteId]/session", () => {
 
     expect(response.status).toBe(404);
     await expect(response.json()).resolves.toMatchObject({ error: "athlete_not_found" });
+  });
+
+  it("answers 409 for a blocked athlete, without opening a session", async () => {
+    fake.findById.mockResolvedValue({ ...athlete, status: "blocked" });
+    const { POST } = await import("./route");
+    const response = await POST(
+      post(athlete.id, { authorization: basic() }),
+      params(athlete.id)
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({ error: "athlete_not_routed" });
+    expect(fake.createSession).not.toHaveBeenCalled();
   });
 
   it("answers 409 for an athlete with no session and no elements supplied", async () => {

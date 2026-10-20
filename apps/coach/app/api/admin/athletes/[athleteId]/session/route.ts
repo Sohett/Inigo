@@ -17,7 +17,9 @@ const athleteIdSchema = z.uuid();
 const FAILURE_STATUS: Record<StartSessionFailure, number> = {
   [StartSessionFailure.AthleteNotFound]: 404,
   [StartSessionFailure.NoSessionToClone]: 409,
-  [StartSessionFailure.InvalidElements]: 400
+  [StartSessionFailure.InvalidElements]: 400,
+  [StartSessionFailure.AthleteNotRouted]: 409,
+  [StartSessionFailure.AgentNotConfigured]: 409
 };
 
 export async function POST(
@@ -43,7 +45,7 @@ export async function POST(
   }
 
   const deps = getDeps();
-  const startAthleteSession = createStartAthleteSession({ repo: deps.repo, brain: deps.brain });
+  const startAthleteSession = createStartAthleteSession({ repo: deps.repo, brain: deps.brain, settings: deps.onboardingSettings });
 
   try {
     const outcome = await startAthleteSession.execute(parsed.data, elements);

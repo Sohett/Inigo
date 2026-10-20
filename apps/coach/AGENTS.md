@@ -64,7 +64,7 @@ src/
     drizzleOnboardingFactsReader.ts # ADAPTER Drizzle du port OnboardingFactsReader (profil + goals actifs + credential, une requête) + toOnboardingFacts
   use-cases/
     routeInboundMessage.ts         # use-case de routing : une seule fonction publique execute()
-    startAthleteSession.ts         # use-case admin : clone la session courante, repointe l'athlète
+    startAthleteSession.ts         # use-case admin : clone la session courante avec l'agent de son statut (INI-74), repointe l'athlète
     listAdminAthletes.ts           # use-case admin (lecture) : la liste des athlètes (plan et dernière proposition) ; PORT AthleteRosterReader
     loadAthleteSessions.ts         # use-case admin (lecture) : session live + historique + inventaire d'un athlète (null si inconnu)
     loadAdminSettings.ts           # use-case admin (lecture) : session de passerelle + réglages d'onboarding + inventaire
@@ -597,11 +597,11 @@ le skill Claude Code `managed-agents-api`.
   brain (fake SDK : append, readSession qui retire les champs output-only, createSession,
   listInventory), **`startAthleteSession`** (clone nominal, éléments ignorés quand il y a une
   session, ressources reportées telles quelles, première session depuis des éléments choisis,
-  préfixes d'ids refusés, athlète inconnu, échec de lecture ou de création qui n'écrit rien) et
+  préfixes d'ids refusés, athlète inconnu, échec de lecture ou de création qui n'écrit rien, agent choisi selon le statut, `ended`/`blocked` refusés, agent non réglé) et
   **`loadAthleteSessions`** (athlète inconnu, session cassée rendue visible, inventaire injoignable qui
   dégrade au lieu de casser, historique sans la session active), **`loadAdminSettings`** (chaque
   réglage illisible dégrade seul) et **`listAdminAthletes`** (la liste dans l'ordre du reader). Route admin : 401 sans/avec mauvais identifiants, 400 UUID
-  invalide, 200 clone, 200 première session, 409 sans rien à cloner, 404, 502. Côté MCP :
+  invalide, 200 clone, 200 première session, 409 sans rien à cloner, 409 athlète bloqué, 404, 502. Côté MCP :
   intégration `InMemoryTransport` (reads + writes présents dont
   `save_training_plan`, un call renvoie du JSON, validation de date rejetée), route (401 sans
   bearer, 400 UUID invalide). Les trois routes MCP ont un cas **200** qui garde le `basePath` :
