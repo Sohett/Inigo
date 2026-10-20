@@ -2,6 +2,7 @@ import { getDeps } from "@/deps";
 import { createLoadAdminSettings } from "@/use-cases/loadAdminSettings";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { WhatsappSessionForm } from "./_components/whatsapp-session-form";
+import { WhatsappNumberForm } from "./_components/whatsapp-number-form";
 import { OnboardingSettingsForm } from "./_components/onboarding-settings-form";
 
 // Reads live DB and control-plane state, so it must never be prerendered or cached.
@@ -29,13 +30,20 @@ export default async function SettingsPage() {
             soit.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="grid gap-6">
           {settings.whatsappSessionError ? (
             <p className="text-sm text-destructive">
               Session illisible en base : {settings.whatsappSessionError}
             </p>
           ) : (
             <WhatsappSessionForm current={settings.whatsappSessionId} />
+          )}
+          {settings.whatsappNumberError ? (
+            <p className="text-sm text-destructive">
+              Numéro illisible en base : {settings.whatsappNumberError}
+            </p>
+          ) : (
+            <WhatsappNumberForm current={settings.whatsappNumber} />
           )}
         </CardContent>
       </Card>

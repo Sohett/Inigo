@@ -21,11 +21,6 @@ export const onboardingSettings = pgTable(
     coordinatorAgentId: text("coordinator_agent_id"),
     /** The shared code an unknown number must send to start onboarding. */
     accessCode: text("access_code"),
-    /**
-     * Inigo's own WhatsApp number, E.164 (`+32475123456`): where a web page sends the athlete back
-     * to the conversation (`wa.me`), e.g. after connecting Intervals.icu (INI-69).
-     */
-    whatsappNumber: text("whatsapp_number"),
     ...timestamps()
   },
   (t) => [check("onboarding_settings_singleton_check", sql`${t.id}`)]

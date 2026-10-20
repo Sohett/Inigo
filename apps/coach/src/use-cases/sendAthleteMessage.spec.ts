@@ -24,7 +24,12 @@ function build(
   sendText = vi.fn(async () => undefined)
 ) {
   const repo = { findById: async () => athlete } as unknown as AthleteRepository;
-  const gateway = { getSessionId: async () => sessionId, setSessionId: async () => undefined };
+  const gateway = {
+    getSessionId: async () => sessionId,
+    setSessionId: async () => undefined,
+    getWhatsappNumber: async () => null,
+    setWhatsappNumber: async () => true
+  };
   const sendMessage = createSendAthleteMessage({
     repo,
     gateway,

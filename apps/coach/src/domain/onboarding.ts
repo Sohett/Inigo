@@ -81,9 +81,4 @@ export interface OnboardingSettings {
   /** The agent an athlete is handed to once onboarding is complete (INI-49). */
   coordinatorAgentId: string | null;
   accessCode: string | null;
-  /**
-   * Inigo's own WhatsApp number, E.164: where a web page sends the athlete back to the
-   * conversation (`wa.me`), e.g. after connecting Intervals.icu (INI-69).
-   */
-  whatsappNumber: string | null;
 }
