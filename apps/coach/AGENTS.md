@@ -67,7 +67,7 @@ src/
     startAthleteSession.ts         # use-case admin : clone la session courante avec l'agent de son statut (INI-74), repointe l'athlète
     listAdminAthletes.ts           # use-case admin (lecture) : la liste des athlètes (plan et dernière proposition) ; PORT AthleteRosterReader
     loadAthleteSessions.ts         # use-case admin (lecture) : session live + historique + inventaire d'un athlète (null si inconnu)
-    loadAdminSettings.ts           # use-case admin (lecture) : session de passerelle + réglages d'onboarding + inventaire
+    loadAdminSettings.ts           # use-case admin (lecture) : session et numéro de passerelle + réglages d'onboarding + inventaire
     settle.ts                      # settle(read) : une lecture qui échoue devient un message, pas une 500
     sendAthleteMessage.ts          # use-case : la seule façon de parler à l'athlète (chat + session de passerelle)
     readActivityStreams.ts         # use-case : fenêtre obligatoire + refus au-delà du plafond, jamais de troncature
@@ -84,7 +84,7 @@ src/
     gatewayAlerter.ts              # PORT GatewayAlerter (notify ne throw jamais)
     logAndSlackAlerter.ts          # ADAPTER : log structuré [coach][alert] + Slack si SLACK_ALERT_WEBHOOK_URL
     slack.ts                       # POST Incoming Webhook (timeout 5s), l'URL n'apparaît jamais dans une erreur
-  repositories/whatsappGatewayRepository.ts  # PORT : la session de passerelle (en base, pas en env)
+  repositories/whatsappGatewayRepository.ts  # PORT : la session et le numéro WhatsApp de la passerelle (en base, pas en env)
   mappers/
     sessionElements.ts             # sessionElementsFrom : agent + l'environnement, le vault et la knowledge base (read_only) uniques de l'inventaire
     whatsappPayload.ts             # schémas zod + normalisation du payload OpenWA + senderPhone
