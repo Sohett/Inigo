@@ -10,7 +10,8 @@ const onTrack: AthleteRosterEntry = {
   status: "active",
   createdAt: new Date("2026-09-01T00:00:00Z"),
   plan: { name: "Gran Fondo 2027", status: "active" },
-  latestProposition: { weekStart: "2026-10-12", status: "applied" }
+  latestProposition: { weekStart: "2026-10-12", status: "applied" },
+  intervals: null
 };
 
 describe("listAdminAthletes", () => {

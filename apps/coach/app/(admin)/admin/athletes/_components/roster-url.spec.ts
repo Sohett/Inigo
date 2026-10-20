@@ -17,7 +17,8 @@ const row: AthleteRosterEntry = {
   status: "active",
   createdAt: new Date("2026-09-01T00:00:00Z"),
   plan: null,
-  latestProposition: null
+  latestProposition: null,
+  intervals: null
 };
 
 describe("readSort / writeSort", () => {
