@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import type { Db } from "./client";
 import { openSecret, sealSecret } from "./crypto";
 import { athleteCredential } from "./schema";
-import type { CredentialAuthType, CredentialProvider } from "./schema";
+import type { CredentialProvider } from "./schema";
 
 /**
  * Dedicated read/write path for per-athlete secrets, so the encrypt/decrypt boundary
@@ -13,9 +13,7 @@ const DEFAULT_PROVIDER: CredentialProvider = "intervals_icu";
 
 /** An athlete's decrypted Intervals.icu credential, as needed to call their API. */
 export interface IntervalsCredential {
-  /** What `secret` is: an API key (HTTP Basic password) or an OAuth access token (Bearer). */
-  authType: CredentialAuthType;
-  /** The decrypted secret. */
+  /** The decrypted OAuth access token (Bearer). */
   secret: string;
   /** Intervals.icu athlete id (e.g. "i123456"), null if it was never recorded. */
   externalAthleteId: string | null;
@@ -23,8 +21,8 @@ export interface IntervalsCredential {
 
 /**
  * Fetch and decrypt an athlete's Intervals.icu credential, or null if none is stored.
- * Returns the secret, how it authenticates, and the external athlete id — a caller needs all
- * three to build a client (the id keys every `/athlete/{id}/…` path).
+ * Returns the token and the external athlete id: a caller needs both to build a client (the id
+ * keys every `/athlete/{id}/…` path).
  */
 export async function getIntervalsCredential(
   db: Db,
@@ -33,7 +31,6 @@ export async function getIntervalsCredential(
 ): Promise<IntervalsCredential | null> {
   const rows = await db
     .select({
-      authType: athleteCredential.authType,
       externalAthleteId: athleteCredential.externalAthleteId,
       ciphertext: athleteCredential.secretCiphertext,
       iv: athleteCredential.secretIv,
@@ -54,16 +51,16 @@ export async function getIntervalsCredential(
     { ciphertext: row.ciphertext, iv: row.iv, authTag: row.authTag },
     masterKeyBase64
   );
-  return { authType: row.authType, secret, externalAthleteId: row.externalAthleteId };
+  return { secret, externalAthleteId: row.externalAthleteId };
 }
 
 /**
- * Encrypt and upsert an athlete's Intervals.icu credential. One per athlete: connecting by OAuth
- * replaces an API key, and the other way round.
+ * Encrypt and upsert an athlete's Intervals.icu access token. One per athlete: a new connection
+ * replaces the previous token.
  */
 export async function setIntervalsCredential(
   db: Db,
-  params: { athleteId: string; authType: CredentialAuthType; secret: string; externalAthleteId?: string },
+  params: { athleteId: string; secret: string; externalAthleteId?: string },
   masterKeyBase64: string
 ): Promise<void> {
   const sealed = sealSecret(params.secret, masterKeyBase64);
@@ -72,7 +69,6 @@ export async function setIntervalsCredential(
     .values({
       athleteId: params.athleteId,
       provider: DEFAULT_PROVIDER,
-      authType: params.authType,
       externalAthleteId: params.externalAthleteId,
       secretCiphertext: sealed.ciphertext,
       secretIv: sealed.iv,
@@ -81,7 +77,6 @@ export async function setIntervalsCredential(
     .onConflictDoUpdate({
       target: [athleteCredential.athleteId, athleteCredential.provider],
       set: {
-        authType: params.authType,
         externalAthleteId: params.externalAthleteId,
         secretCiphertext: sealed.ciphertext,
         secretIv: sealed.iv,

@@ -1,21 +1,11 @@
-import { getIntervalsCredential, type Db, type IntervalsCredential } from "@inigo/db";
-import { IntervalsIcuClient, type IntervalsAuth } from "./client";
+import { getIntervalsCredential, type Db } from "@inigo/db";
+import { IntervalsIcuClient } from "./client";
 import type { ResolveClient } from "./mcp-tools/result";
-
-/** How a stored credential authenticates against Intervals.icu. */
-function authOf(credential: IntervalsCredential): IntervalsAuth {
-  switch (credential.authType) {
-    case "api_key":
-      return { type: "api_key", apiKey: credential.secret };
-    case "oauth":
-      return { type: "oauth", accessToken: credential.secret };
-  }
-}
 
 /**
  * Build the per-request Intervals.icu client resolver for the MCP tools. Given an Inigo
  * `athleteId`, it fetches that athlete's credential from Neon and decrypts it here, at the
- * moment of use — the plaintext secret (API key or OAuth token) never leaves this process and
+ * moment of use — the plaintext OAuth token never leaves this process and
  * never reaches the LLM.
  *
  * Throws (surfaced as a clean tool error, never leaking the secret) when the athlete has no
@@ -41,7 +31,7 @@ export function createIntervalsResolver(
       );
     }
     return new IntervalsIcuClient({
-      auth: authOf(credential),
+      accessToken: credential.secret,
       athleteId: credential.externalAthleteId,
       baseUrl
     });

@@ -38,7 +38,6 @@ import {
   contactOf,
   DATE_FORMAT,
   formatDay,
-  INTERVALS_AUTH_LABEL,
   PLAN_STATUS_LABEL,
   PROPOSITION_STATUS_LABEL,
   STATUS_LABEL,
@@ -82,8 +81,7 @@ const columns: ColumnDef<AthleteRosterEntry>[] = [
     cell: ({ row }) =>
       row.original.intervals ? (
         <span title={`Connecté le ${DATE_FORMAT.format(row.original.intervals.connectedAt)}`}>
-          <Badge variant="default">Connecté</Badge>{" "}
-          <span className="text-xs text-muted-foreground">{INTERVALS_AUTH_LABEL[row.original.intervals.authType]}</span>
+          <Badge variant="default">Connecté</Badge>
         </span>
       ) : (
         <Badge variant="destructive">Non connecté</Badge>

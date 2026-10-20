@@ -49,17 +49,16 @@ describe.skipIf(!databaseUrl || !encryptionKey)("coach <-> Neon round-trip (inte
     expect(rows[0]?.id).toBe(athleteId);
   });
 
-  it("seals and reads back the Intervals.icu key without storing plaintext", async () => {
-    const apiKey = "test-intervals-key-xyz";
+  it("seals and reads back the Intervals.icu token without storing plaintext", async () => {
+    const token = "test-intervals-token-xyz";
     await setIntervalsCredential(
       db,
-      { athleteId, authType: "api_key", secret: apiKey, externalAthleteId: "i123456" },
+      { athleteId, secret: token, externalAthleteId: "i123456" },
       encryptionKey as string
     );
 
     const recovered = await getIntervalsCredential(db, athleteId, encryptionKey as string);
-    expect(recovered?.authType).toBe("api_key");
-    expect(recovered?.secret).toBe(apiKey);
+    expect(recovered?.secret).toBe(token);
     expect(recovered?.externalAthleteId).toBe("i123456");
     expect(await getIntervalsAccountId(db, athleteId)).toBe("i123456");
 
@@ -69,19 +68,17 @@ describe.skipIf(!databaseUrl || !encryptionKey)("coach <-> Neon round-trip (inte
       .where(eq(athleteCredential.athleteId, athleteId));
     const cred = creds[0];
     expect(cred).toBeDefined();
-    expect(cred!.ciphertext.toString("utf8")).not.toContain(apiKey);
+    expect(cred!.ciphertext.toString("utf8")).not.toContain(token);
   });
 
-  it("rotates the key in place (single row per athlete/provider)", async () => {
+  it("rotates the token in place (single row per athlete/provider)", async () => {
     await setIntervalsCredential(
       db,
-      { athleteId, authType: "oauth", secret: "oauth-token-2" },
+      { athleteId, secret: "oauth-token-2" },
       encryptionKey as string
     );
     const rotated = await getIntervalsCredential(db, athleteId, encryptionKey as string);
     expect(rotated?.secret).toBe("oauth-token-2");
-    // Connecting by OAuth replaces the API key in place.
-    expect(rotated?.authType).toBe("oauth");
     // externalAthleteId is left untouched when a rotation omits it.
     expect(rotated?.externalAthleteId).toBe("i123456");
 

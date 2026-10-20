@@ -6,7 +6,7 @@ const MASTER_KEY = Buffer.alloc(32, 7).toString("base64");
 
 describe("createDrizzleIntervalsCredentialStore", () => {
   it("never lets a failed write carry the query params out", async () => {
-    const leaky = new Error("Failed query: insert ... params: 11111111,i42,<sealed key bytes>", {
+    const leaky = new Error("Failed query: insert ... params: 11111111,i42,<sealed token bytes>", {
       cause: { code: "23503" }
     });
     const db = {
@@ -16,7 +16,7 @@ describe("createDrizzleIntervalsCredentialStore", () => {
 
     const saving = createDrizzleIntervalsCredentialStore(db, MASTER_KEY).save(
       "11111111-1111-4111-8111-111111111111",
-      { type: "api_key", apiKey: "the-key" },
+      "the-token",
       "i42"
     );
 

@@ -6,7 +6,6 @@ import { verifyConnectLinkToken } from "../intervals/oauth/connectLinkToken";
 import { linkTokenOf, type ConnectionFlow, type IntervalsOAuth } from "../intervals/oauth/intervalsOAuth";
 import type { AthleteRepository } from "../repositories/athleteRepository";
 import { AssessStatus, type AssessOnboarding } from "./assessOnboarding";
-import type { IntervalsCredentialStore } from "./connectIntervals";
 
 /** What reaches the callback. */
 export interface ConnectionCallback {
@@ -36,6 +35,11 @@ export type CompleteConnectionOutcome =
 
 export interface CompleteIntervalsConnection {
   execute(callback: ConnectionCallback): Promise<CompleteConnectionOutcome>;
+}
+
+/** Port: store an athlete's Intervals.icu access token (encrypted at rest, account id in clear). One per athlete. */
+export interface IntervalsCredentialStore {
+  save(athleteId: string, accessToken: string, intervalsAthleteId: string): Promise<void>;
 }
 
 export interface CompleteIntervalsConnectionDeps {
@@ -113,7 +117,7 @@ export function createCompleteIntervalsConnection(deps: CompleteIntervalsConnect
         return { result: ConnectionResult.OtherAccount };
       }
 
-      await deps.store.save(athlete.id, { type: "oauth", accessToken: token.accessToken }, token.intervalsAthleteId);
+      await deps.store.save(athlete.id, token.accessToken, token.intervalsAthleteId);
       console.info(`[coach] athlete ${athlete.id} connected Intervals.icu ${token.intervalsAthleteId} by OAuth`);
       return { result: ConnectionResult.Connected, agent: await notifyAgent(athlete, deps, now()) };
     }

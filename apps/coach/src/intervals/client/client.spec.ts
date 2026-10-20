@@ -16,7 +16,7 @@ afterAll(() => server.close());
 
 function makeClient(overrides: Partial<ConstructorParameters<typeof IntervalsIcuClient>[0]> = {}) {
   return new IntervalsIcuClient({
-    auth: { type: "api_key", apiKey: "secret-key" },
+    accessToken: "oauth-token",
     athleteId: ATHLETE,
     retryDelayMs: 0,
     ...overrides
@@ -24,7 +24,7 @@ function makeClient(overrides: Partial<ConstructorParameters<typeof IntervalsIcu
 }
 
 describe("IntervalsIcuClient", () => {
-  it("sends HTTP Basic auth with the API_KEY username convention", async () => {
+  it("sends the OAuth access token as a Bearer header", async () => {
     let received: string | null = null;
     server.use(
       http.get(`${BASE_URL}/athlete/${ATHLETE}/activities`, ({ request }) => {
@@ -34,21 +34,6 @@ describe("IntervalsIcuClient", () => {
     );
 
     await makeClient().getActivities();
-
-    const expected = `Basic ${Buffer.from("API_KEY:secret-key").toString("base64")}`;
-    expect(received).toBe(expected);
-  });
-
-  it("sends a Bearer header for an OAuth access token", async () => {
-    let received: string | null = null;
-    server.use(
-      http.get(`${BASE_URL}/athlete/${ATHLETE}/activities`, ({ request }) => {
-        received = request.headers.get("authorization");
-        return HttpResponse.json([]);
-      })
-    );
-
-    await makeClient({ auth: { type: "oauth", accessToken: "oauth-token" } }).getActivities();
 
     expect(received).toBe("Bearer oauth-token");
   });
