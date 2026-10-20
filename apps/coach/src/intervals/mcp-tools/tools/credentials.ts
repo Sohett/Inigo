@@ -14,8 +14,8 @@ export function registerCredentialTools(server: McpServer, connectLink: CreateIn
       description:
         "A personal link (valid 72 hours) the athlete opens to connect Intervals.icu to Inigo " +
         "by OAuth, without any API key. Send it as is on WhatsApp. Also the way to reconnect an " +
-        "athlete whose access was lost or revoked. When an athlete in onboarding is done, you " +
-        "receive a turn with `evenement: intervals_connecte`. `oauth_unavailable` means the " +
+        "athlete whose access was lost or revoked. When the athlete is done, you receive a turn " +
+        "with `evenement: intervals_connecte` and an empty message. `oauth_unavailable` means the " +
         "connection is not open on this deployment: tell the athlete it is temporarily unavailable.",
       inputSchema: { ...athleteIdShape }
     },

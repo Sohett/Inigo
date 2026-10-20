@@ -291,6 +291,8 @@ plus une seule clé en env, mais **un token OAuth par athlète** stocké chiffr�
   → déchiffre le token + lit l'id Intervals externe → `new IntervalsIcuClient(...)`. Le secret est
   déchiffré **dans coach**, jamais renvoyé au brain ni au LLM.
 - **Absence de token** : le resolver `throw` (message clair, sans secret) → `errorResult` du tool.
+- **Accès perdu** (INI-71) : un 401 ou 403 d'Intervals.icu devient `ACCESS_LOST_MESSAGE` dans
+  `errorResult` (envoyer un nouveau lien), jamais l'erreur brute. Aucun état en base.
 - **Deux endpoints, pas un** : choix assumé pour garder le **nom de serveur brain `intervals-icu`**
   et les **allowlists de toolset par agent** (coordinateur = read-only, constructeur/réadaptateur =
   full) inchangées. Seule l'URL du serveur `intervals-icu` bascule (ops, post-deploy) vers
@@ -319,7 +321,8 @@ L'athlète connecte son compte depuis un lien, sans jamais coller de clé dans W
    vérificateur PKCE (`POST /api/oauth/token`, form-encoded, moins de 2 min). Le use-case exige
    tous les scopes, refuse un **autre** compte Intervals que
    celui déjà relié (`other_account`), stocke le token (`athlete_credential`, remplace le précédent), puis réveille
-   l'agent d'onboarding (tour `evenement: intervals_connecte`, `message` vide). Puis 303 vers
+   l'agent de l'athlète (tour `evenement: intervals_connecte`, `message` vide) : l'onboarding avec sa
+   checklist, ou le coordinateur seul pour un athlète actif ou en pause qui se reconnecte (INI-71). Puis 303 vers
    `/connect/intervals/done?result=<ConnectionResult>`, qui propose `wa.me/<numéro d'Inigo>`.
 
 Règles :

@@ -104,6 +104,14 @@ export function formatIntervalsConnectedTurn(
   );
 }
 
+/**
+ * The turn telling the coordinator an active athlete just reconnected Intervals.icu from the link
+ * (INI-71), so it confirms and resumes what had failed without waiting for the athlete to write.
+ */
+export function formatIntervalsReconnectedTurn(athlete: EnvelopeAthlete, now: Date = new Date()): string {
+  return formatEnvelope(athlete, [INTERVALS_CONNECTED_LINE], "", now);
+}
+
 /** The line telling the coordinator an athlete just finished onboarding (INI-49). */
 export const HANDOFF_LINE = "passation: onboarding terminé, planifie la semaine 1";
 
