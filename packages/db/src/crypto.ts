@@ -1,7 +1,7 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 
 /**
- * App-level envelope encryption for per-athlete secrets (the Intervals.icu API key).
+ * App-level envelope encryption for per-athlete secrets (the Intervals.icu OAuth token).
  *
  * AES-256-GCM with a 32-byte master key supplied out of band (env `DB_ENCRYPTION_KEY`,
  * base64). The DB stores only ciphertext + IV + auth tag — never plaintext, never the
