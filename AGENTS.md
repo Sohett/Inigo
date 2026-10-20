@@ -25,7 +25,7 @@ de ce service.
 
 ```
 apps/        # services déployables
-  landing-page/        # @inigo/landing-page : landing one-page (Astro), leads WhatsApp
+  landing-page/        # @inigo/landing-page : landing one-page (Astro), CTA WhatsApp avec code d'accès
   coach/               # @inigo/coach : backend (Next.js) WhatsApp→coach + serveurs MCP (athlete-data, Intervals.icu)
 tooling/     # outillage dev local (ne ship pas)
   brain/               # @inigo/brain : opérer le brain (Managed Agents) — pull, audit mémoire, deploy skills
@@ -100,5 +100,5 @@ Les exigences de test propres à un service (mocks, transports) sont dans son do
 
 Chaque service documente ses détails dans son `AGENTS.md` (agents) et `README.md` (humains) :
 
-- **`landing-page`** : landing one-page Astro (capte des leads WhatsApp).
+- **`landing-page`** : landing one-page Astro (emmène l'athlète sur WhatsApp avec le code d'accès).
 - **`coach`** : backend Next.js reliant WhatsApp (gateway OpenWA) au coach Managed Agent ; héberge aussi les trois serveurs MCP **coaching-data** (`/api/coaching-data/mcp`), **Intervals.icu** (`/api/intervals/mcp`) et **WhatsApp** (`/api/whatsapp/mcp`).

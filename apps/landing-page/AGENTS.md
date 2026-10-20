@@ -14,35 +14,34 @@ boutons en encre (noir profond, token `encre`), pas de vert. La couleur « aube 
 
 ```
 apps/landing-page/
-  astro.config.mjs                 # adapter Vercel + schéma astro:env (secrets serveur)
+  astro.config.mjs                 # adapter Vercel, site 100 % statique
   src/
     layouts/Base.astro             # <head>, SEO/OG, skip-link, classe .js (motion)
     pages/
       index.astro                  # assemble les sections + script reveal (IntersectionObserver)
       confidentialite.astro        # page RGPD (lien du footer)
-      api/lead.ts                  # POST /api/lead (prerender = false) — wrapper fin
-    lib/lead-handler.ts            # logique du endpoint (testable hors routing Astro)
     components/
       SiteHeader · Hero · Coach · Method · WhatsApp · Requirements · Demarrer · SiteFooter   (.astro, statiques)
+      StartCta.astro               # CTA principal : WhatsApp sur mobile, #demarrer (QR) sur desktop
       Logo · PowerCurve · GrainOverlay   (.astro, visuels partagés)
-      lead-form.tsx                # ÎLOT React (react-hook-form + zodResolver + sonner)
-      ui/                          # primitives (button, input, label, phone-input, sonner)
-    content/copy.ts                # TOUTE la copy FR (source unique)
-    lib/
-      lead-schema.ts               # zod, partagé client + serveur
-      phone.ts                     # normalisation E.164 (libphonenumber-js, défaut BE)
-      notify.ts                    # notifyNewLead() → POST webhook
-      rate-limit.ts                # garde anti-spam best-effort (in-memory)
+    content/copy.ts                # TOUTE la copy FR (source unique), dont numéro + code d'accès
+    lib/whatsapp-link.ts           # lien wa.me avec message prérempli
     styles/global.css              # tokens (clair/encre + aube signature), polices, motion
 ```
 
-Flux du lead : `lead-form.tsx` (client) → `POST /api/lead` → `lead-schema` (zod) → honeypot →
-rate-limit → `phone` (E.164) → `notify` (webhook). Schéma zod **partagé** client/serveur.
+Flux de démarrage (INI-47) : l'athlète écrit en premier à Inigo sur WhatsApp, avec le code
+d'accès dans un message prérempli (`wa.me/<numéro>?text=…`). Le coach crée alors l'athlète en
+`onboarding` (INI-45). Sur mobile, les CTA ouvrent WhatsApp directement ; sur desktop, ils
+descendent vers un QR (généré au build depuis le même lien, lib `qrcode`) pour que la
+conversation se fasse sur le téléphone, avec un lien secondaire pour WhatsApp sur l'ordinateur.
+
+**Numéro et code d'accès** : `whatsappContact` dans `copy.ts`. Le code doit rester celui saisi
+dans l'admin du coach (Réglages, Onboarding) ; s'il change là-bas, le changer ici et redéployer.
 
 ## Conventions du service
 
-- **Sections statiques en `.astro`** (zéro JS). React (`.tsx`) **uniquement** pour
-  l'interactif : ici le seul îlot est `lead-form.tsx`, hydraté `client:visible`.
+- **Sections statiques en `.astro`** (zéro JS côté client hors reveal et navbar). Pas de
+  framework d'îlots : la bascule mobile/desktop des CTA se fait en CSS (breakpoint `lg`).
 - **Couleurs** : toute la page est claire (token `background` = canvas). Accent fonctionnel
   = `encre` (boutons `bg-encre`, texte `text-foreground`/`text-encre-soft`, focus
   `ring-encre`). **Pas de vert, pas d'aplat de couleur** : nuit/indigo/alpenglow/ambre/glacier
@@ -57,33 +56,8 @@ rate-limit → `phone` (E.164) → `notify` (webhook). Schéma zod **partagé** 
 - **Élément signature** : `PowerCurve.astro` — courbe puissance/durée (façon
   Garmin/Intervals.icu), tracée une fois (`.draw-stroke`, `pathLength="1000"`), posée sur le
   dégradé du hero avec grain.
-- **Téléphone** : `ui/phone-input.tsx` (sur `react-phone-number-input`) — sélecteur de pays
-  + numéro, sortie E.164, défaut BE. Branché via `Controller` dans `lead-form.tsx`.
-
-## Formulaire & route
-
-- `leadSchema` : `firstName?` (≤60, trim), `phone` (string non vide), `consent` (true requis),
-  `_hp` (honeypot). La **validité E.164** du numéro est vérifiée côté serveur via `phone.ts`
-  (le schéma ne valide que la forme).
-- `POST /api/lead` : `400` payload/consentement, honeypot rempli → `200` **sans** transmettre,
-  `429` rate-limit, numéro invalide → `400`, sinon `notifyNewLead` → `200` (ou `500`).
-- **Jamais** logguer le numéro en clair ailleurs que dans le payload du webhook.
-- Rate-limit `rate-limit.ts` : best-effort en mémoire (non partagé en serverless) — la défense
-  principale reste le honeypot. Brancher Upstash derrière la même fonction si besoin.
 
 ## Tests
 
-- `src/lib/lead-schema.spec.ts` : payloads valides/invalides (consent, longueur prénom).
-- `src/lib/phone.spec.ts` : E.164 (BE par défaut + international), rejets.
-- `src/lib/lead-handler.spec.ts` : logique du endpoint avec `notify` mocké
-  (`vi.mock("@/lib/notify")`, car `notify` importe `astro:env/server`). Couvre
-  valide/numéro invalide/honeypot/consentement/JSON illisible.
-- `vitest.config.ts` : environnement `node`. `pnpm verify` doit passer.
-
-## Ajouter / modifier une section
-
-1. Édite la copy dans `src/content/copy.ts` (jamais de texte en dur dans les composants).
-2. Crée/édite le composant `.astro` correspondant ; ajoute `class="reveal"` (+ `--delay`)
-   pour l'apparition au scroll. Sections ancrées : `id` + `scroll-mt-20`.
-3. Branche-le dans `src/pages/index.astro`.
-4. `pnpm verify`.
+- `src/lib/whatsapp-link.spec.ts` : chiffres seuls dans le numéro, encodage du message, code
+  d'accès présent dans le message de la landing, pas de tiret.
