@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import type { IntervalsIcuClient } from "../client";
+import { IntervalsIcuApiError, type IntervalsIcuClient } from "../client";
 import { registerIntervalsIcuTools } from "./index";
 import { createReadActivityStreams } from "../../use-cases/readActivityStreams";
 import type { CreateIntervalsConnectLink } from "../../use-cases/createIntervalsConnectLink";
@@ -216,6 +216,35 @@ describe("registerIntervalsIcuTools without a stored credential", () => {
     expect(result.isError).toBe(true);
     const content = result.content as TextContent;
     expect(content[0]!.text).toContain("No Intervals.icu credential");
+  });
+});
+
+describe("registerIntervalsIcuTools when Intervals.icu refuses the token (INI-71)", () => {
+  function refusing(status: number): ResolveClient {
+    const client = {
+      getActivities: async () => {
+        throw new IntervalsIcuApiError(`Intervals.icu API error ${status}`, { status, endpoint: "/athlete/i42/activities", body: "token secret-token" });
+      }
+    } as unknown as IntervalsIcuClient;
+    return async () => client;
+  }
+
+  it.each([401, 403])("tells the agent the access is lost and to send a new link on a %i", async (status) => {
+    const mcpClient = await connect(refusing(status));
+    const result = await mcpClient.callTool({ name: "get_activities", arguments: { athleteId: ATHLETE_ID } });
+
+    expect(result.isError).toBe(true);
+    const text = (result.content as TextContent)[0]!.text;
+    expect(text).toContain("Intervals.icu access lost");
+    expect(text).toContain("get_intervals_connect_link");
+    expect(text).not.toContain("secret-token");
+  });
+
+  it("keeps any other Intervals.icu error as it is", async () => {
+    const mcpClient = await connect(refusing(500));
+    const result = await mcpClient.callTool({ name: "get_activities", arguments: { athleteId: ATHLETE_ID } });
+
+    expect((result.content as TextContent)[0]!.text).toBe("Error: Intervals.icu API error 500");
   });
 });
 

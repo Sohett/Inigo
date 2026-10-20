@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { assertAthleteId, athleteIdShape } from "../../mcp/athleteId";
-import type { IntervalsIcuClient } from "../client";
+import { IntervalsIcuApiError, type IntervalsIcuClient } from "../client";
 
 /** Result type returned by every Intervals.icu tool. */
 export type ToolResult = CallToolResult;
@@ -24,9 +24,22 @@ export function jsonResult(data: unknown): ToolResult {
   return { content: [{ type: "text", text: JSON.stringify(data) }] };
 }
 
+/**
+ * What an agent reads when Intervals.icu refuses the athlete's token (401, or 403 for a scope
+ * withdrawn): the access is gone and only a new connection link brings it back (INI-71).
+ * Intervals.icu sends no webhook when an athlete disconnects the app, so this is where it shows.
+ */
+export const ACCESS_LOST_MESSAGE =
+  "Intervals.icu access lost for this athlete (revoked or expired). Send them a new connection " +
+  "link with get_intervals_connect_link; if you do not have that tool, report it to the coordinator.";
+
+function isAccessLost(error: unknown): boolean {
+  return error instanceof IntervalsIcuApiError && (error.status === 401 || error.status === 403);
+}
+
 /** Wrap an error as an MCP error result, never leaking secrets. */
 export function errorResult(error: unknown): ToolResult {
-  const message = error instanceof Error ? error.message : String(error);
+  const message = isAccessLost(error) ? ACCESS_LOST_MESSAGE : error instanceof Error ? error.message : String(error);
   return { content: [{ type: "text", text: `Error: ${message}` }], isError: true };
 }
 

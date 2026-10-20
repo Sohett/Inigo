@@ -1,5 +1,5 @@
 import type { ManagedAgentBrain } from "../brain/managedAgents";
-import { formatIntervalsConnectedTurn } from "../brain/taskEnvelope";
+import { formatIntervalsConnectedTurn, formatIntervalsReconnectedTurn } from "../brain/taskEnvelope";
 import type { Athlete } from "../domain/athlete";
 import { canConnectIntervals, ConnectionResult, missingScopes } from "../domain/intervalsConnection";
 import { verifyConnectLinkToken } from "../intervals/oauth/connectLinkToken";
@@ -18,10 +18,10 @@ export interface ConnectionCallback {
 /** Port: the Intervals.icu athlete id an athlete is already connected to, or null. Reads no secret. */
 export type IntervalsAccountReader = (athleteId: string) => Promise<string | null>;
 
-/** Whether the athlete's agent heard about the connection (only an onboarding athlete's does). */
+/** Whether the athlete's agent heard about the connection. */
 export const AgentNotice = {
   Notified: "notified",
-  /** Not in onboarding, or no session: nobody to tell. */
+  /** No session, or an athlete nothing is routed to: nobody to tell. */
   NotNeeded: "not_needed",
   /** The connection is stored but telling the agent failed (logged): the athlete's next message carries it. */
   Failed: "failed"
@@ -125,24 +125,34 @@ export function createCompleteIntervalsConnection(deps: CompleteIntervalsConnect
 }
 
 /**
- * Tell the onboarding agent the athlete connected, with a fresh checklist (now reading
- * Intervals.icu with the new token). Only onboarding: the coordinator's prompt knows no such
- * event, and a reconnection after a revoked token is INI-71.
+ * Wake the athlete's agent with an `evenement: intervals_connecte` turn, so it confirms on
+ * WhatsApp without waiting for the athlete to write. The onboarding agent gets a fresh checklist
+ * (now reading Intervals.icu with the new token); the coordinator gets the event alone, after a
+ * reconnection (INI-71).
  */
 async function notifyAgent(
   athlete: Athlete,
   deps: Pick<CompleteIntervalsConnectionDeps, "assessOnboarding" | "brain">,
   now: Date
 ): Promise<AgentNotice> {
-  if (athlete.status !== "onboarding" || !athlete.activeSession) return AgentNotice.NotNeeded;
+  if (!athlete.activeSession) return AgentNotice.NotNeeded;
+  const { sessionId } = athlete.activeSession;
   try {
-    const assessed = await deps.assessOnboarding.execute(athlete.id);
-    if (assessed.status === AssessStatus.UnknownAthlete) return AgentNotice.Failed;
-    await deps.brain.appendUserMessage(
-      athlete.activeSession.sessionId,
-      formatIntervalsConnectedTurn(athlete, assessed.state, now)
-    );
-    return AgentNotice.Notified;
+    switch (athlete.status) {
+      case "onboarding": {
+        const assessed = await deps.assessOnboarding.execute(athlete.id);
+        if (assessed.status === AssessStatus.UnknownAthlete) return AgentNotice.Failed;
+        await deps.brain.appendUserMessage(sessionId, formatIntervalsConnectedTurn(athlete, assessed.state, now));
+        return AgentNotice.Notified;
+      }
+      case "active":
+      case "paused":
+        await deps.brain.appendUserMessage(sessionId, formatIntervalsReconnectedTurn(athlete, now));
+        return AgentNotice.Notified;
+      case "ended":
+      case "blocked":
+        return AgentNotice.NotNeeded;
+    }
   } catch (error) {
     console.error(`[coach] could not tell athlete ${athlete.id}'s agent about the Intervals.icu connection`, error);
     return AgentNotice.Failed;

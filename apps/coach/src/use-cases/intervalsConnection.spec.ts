@@ -189,13 +189,16 @@ describe("completeIntervalsConnection", () => {
     expect(save).toHaveBeenCalled();
   });
 
-  it("does not wake a coordinator: only onboarding knows the event", async () => {
-    const { useCase, appendUserMessage } = setup({ athlete: { ...ATHLETE, status: "active" } });
+  it.each(["active", "paused"] as const)("wakes the coordinator of a %s athlete who reconnected, with the event alone", async (status) => {
+    const { useCase, appendUserMessage } = setup({ athlete: { ...ATHLETE, status } });
     expect(await useCase.execute(await callback())).toEqual({
       result: ConnectionResult.Connected,
-      agent: AgentNotice.NotNeeded
+      agent: AgentNotice.Notified
     });
-    expect(appendUserMessage).not.toHaveBeenCalled();
+    const turn = String((appendUserMessage.mock.calls as unknown[][])[0]?.[1]);
+    expect(turn).toContain("evenement: intervals_connecte");
+    expect(turn).not.toContain("onboarding_manquant");
+    expect(turn.split("\n").at(-1)).toBe('message: ""');
   });
 
   it.each([
