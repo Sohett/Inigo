@@ -3,7 +3,7 @@ import { ConnectionResult, missingScopes, parseConnectionResult } from "./interv
 
 describe("missingScopes", () => {
   it("is empty when every scope was granted", () => {
-    expect(missingScopes(["ACTIVITY:READ", "WELLNESS:READ", "CALENDAR:WRITE", "SETTINGS:WRITE"])).toEqual([]);
+    expect(missingScopes(["ACTIVITY:READ", "WELLNESS:WRITE", "CALENDAR:WRITE", "SETTINGS:WRITE"])).toEqual([]);
   });
 
   it("counts a WRITE grant as covering the READ asked", () => {
@@ -11,7 +11,7 @@ describe("missingScopes", () => {
   });
 
   it("names what the athlete unticked, and never accepts a READ for a WRITE", () => {
-    expect(missingScopes(["ACTIVITY:READ", "CALENDAR:READ", "settings:write "])).toEqual(["WELLNESS:READ", "CALENDAR:WRITE"]);
+    expect(missingScopes(["ACTIVITY:READ", "WELLNESS:READ", "CALENDAR:READ", "settings:write "])).toEqual(["WELLNESS:WRITE", "CALENDAR:WRITE"]);
   });
 });
 

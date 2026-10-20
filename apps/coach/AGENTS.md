@@ -34,7 +34,7 @@ app/
   api/whatsapp/[transport]/route.ts     # endpoint MCP WhatsApp statique (/api/whatsapp/mcp), bearer requis
   api/admin/athletes/[athleteId]/session/route.ts  # POST : ouvre une session et repointe l'athlète
   connect/intervals/page.tsx            # page publique d'un lien de connexion Intervals.icu (INI-69) : à qui est le lien + bouton
-  connect/intervals/start/route.ts      # GET : pose le cookie nonce (liaison au navigateur) → 303 vers l'autorisation Intervals
+  connect/intervals/start/route.ts      # GET : pose le cookie de flow (state + vérificateur PKCE) → 303 vers l'autorisation Intervals
   connect/intervals/callback/route.ts   # GET : retour OAuth d'Intervals.icu → use-case → 303 vers done
   connect/intervals/done/page.tsx       # résultat de la connexion + bouton « Retourner sur WhatsApp »
   (admin)/admin/layout.tsx              # sidebar shadcn (Athlètes, Réglages) ; /admin redirige vers /admin/athletes
@@ -104,7 +104,7 @@ src/
     mappers/project.ts             # projection objet brut Intervals → modèle du coach (aucune décision)
     mcp-tools/{index,result,tools/*}.ts  # tools MCP Intervals fins ; chaque tool prend athleteId + résout un client par requête
     resolveClient.ts               # createIntervalsResolver(db, encKey, baseUrl) : getIntervalsCredential → déchiffre → IntervalsIcuClient (Basic ou Bearer)
-    oauth/                         # INI-69 : credentials de l'app (hors configSchema), jeton de lien HMAC, URL d'autorisation, échange du code
+    oauth/                         # INI-69/73 : credentials de l'app (hors configSchema), lien signé (JWT, jose), client OAuth PKCE (oauth4webapi)
     credentialVerifier.ts          # ADAPTER IntervalsCredentialVerifier : GET /athlete/{id} avec la clé (401/403/404 → issues, le reste throw)
     intervalsAthleteReader.ts      # ADAPTER du port IntervalsAthleteReader : un GET profil Intervals → toBikeFtp (réglages Ride) + toBodyComplete (sexe, naissance, taille, poids)
   deps.ts                          # singleton lazy { config, brain, db, repo, athleteData, intervalsResolver }
@@ -303,7 +303,7 @@ plus une seule clé en env, mais **une par athlète** stockée chiffrée dans Ne
   l'onboarding : le lien OAuth (INI-69, voir plus bas), ou en repli l'outil `connect_intervals`
   (INI-50) : clé et athlete id vérifiés auprès d'Intervals.icu, puis stockés.
 
-## Connexion Intervals.icu par OAuth — INI-69
+## Connexion Intervals.icu par OAuth — INI-69, INI-73
 
 L'athlète connecte son compte depuis un lien, sans jamais coller de clé dans WhatsApp.
 
@@ -311,23 +311,32 @@ L'athlète connecte son compte depuis un lien, sans jamais coller de clé dans W
 2. `GET /connect/intervals?t=<jeton>` (page publique, hors `proxy.ts`) : `startIntervalsConnection`
    vérifie le jeton et l'athlète, la page dit **à qui** est le lien (prénom, deux derniers chiffres
    du WhatsApp) et propose le bouton.
-3. `GET /connect/intervals/start?t=` : pose un cookie nonce (HttpOnly, Secure, Lax, 15 min, path
+3. `GET /connect/intervals/start?t=` : tire un flow (`state` = `<jeton>~<aléatoire>` et un
+   vérificateur PKCE), le garde dans un cookie (HttpOnly, Secure, Lax, 15 min, path
    `/connect/intervals`) et redirige vers `intervals.icu/oauth/authorize` (scopes
-   `ACTIVITY:READ,WELLNESS:READ,CALENDAR:WRITE,SETTINGS:WRITE`, `state` = `<jeton>~<nonce>`).
-4. `GET /connect/intervals/callback?code&state` : `completeIntervalsConnection` exige le nonce du
-   cookie (`session_mismatch` sinon), vérifie le jeton, échange le code (`POST /api/oauth/token`,
-   form-encoded, moins de 2 min), exige tous les scopes, refuse un **autre** compte Intervals que
+   `ACTIVITY:READ,WELLNESS:WRITE,CALENDAR:WRITE,SETTINGS:WRITE`, `state`, `code_challenge` S256).
+4. `GET /connect/intervals/callback?code&state` : `completeIntervalsConnection` exige le flow du
+   cookie (`session_mismatch` sinon), vérifie le jeton qu'il porte, puis le client OAuth
+   (`oauth4webapi`) exige que le `state` reçu soit celui du cookie et échange le code avec le
+   vérificateur PKCE (`POST /api/oauth/token`, form-encoded, moins de 2 min). Le use-case exige
+   tous les scopes, refuse un **autre** compte Intervals que
    celui déjà relié (`other_account`), stocke le token (`athlete_credential.auth_type = oauth`, remplace une clé API), puis réveille
    l'agent d'onboarding (tour `evenement: intervals_connecte`, `message` vide). Puis 303 vers
    `/connect/intervals/done?result=<ConnectionResult>`, qui propose `wa.me/<numéro d'Inigo>`.
 
 Règles :
-- **Jeton sans état** (`intervals/oauth/connectLinkToken.ts`) : `{athleteId, expiration}` signé
-  HMAC-SHA256 (clé dérivée du client secret), 72 h. Pas de table de liens. Il voyage dans le
-  `state`, donc le callback sait quel athlète et que le flow part d'un lien émis par nous.
-- **Liaison au navigateur (anti login CSRF)** : le jeton seul prouve « lien émis par Inigo », pas
-  « ce navigateur est cet athlète ». Le nonce du cookie, lié dans le `state`, empêche qu'une URL
-  d'autorisation forgée avec le jeton d'un autre, ouverte ailleurs, relie un compte. Et
+- **Bibliothèques, pas de crypto maison** (INI-73) : `jose` pour le lien, `oauth4webapi` pour le
+  flow (PKCE, contrôle du `state`, échange, validation de la réponse). Le code à nous se limite aux
+  règles d'Inigo (titulaire, clic depuis la page, autre compte, scopes).
+- **Jeton sans état** (`intervals/oauth/connectLinkToken.ts`) : JWT HS256 (`sub` = athlète,
+  `aud` = `inigo:intervals-connect`, `exp` à 72 h), clé dérivée du client secret, algorithme imposé
+  à la vérification. Pas de table de liens. Il voyage dans le `state`, donc le callback sait quel
+  athlète et que le flow part d'un lien émis par nous.
+- **Liaison au navigateur (anti login CSRF, anti injection de code)** : le jeton seul prouve « lien
+  émis par Inigo », pas « ce navigateur est cet athlète ». Le cookie de flow
+  (`app/connect/intervals/_components/connection-flow.ts`) garde le `state` et le vérificateur
+  PKCE : une URL d'autorisation forgée, ouverte ailleurs, ou un code volé ne relient rien. Une fois
+  le premier flow réel réussi (INI-70), cocher « Require PKCE » sur l'app Intervals.icu. Et
   `/start` n'accepte que le clic depuis la page (`Sec-Fetch-Site: same-origin`, sinon `Referer` de
   même origine, la page étant en `referrer: same-origin`) : un lien direct vers `/start` est renvoyé
   à la page, qui montre le titulaire. Un lien

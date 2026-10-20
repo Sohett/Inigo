@@ -35,7 +35,7 @@ export function createCreateIntervalsConnectLink(deps: {
       const athlete = await deps.repo.findById(athleteId);
       if (!athlete) return { status: "unknown_athlete", reason: `No athlete ${athleteId}: pass the inigo_athlete_id of the envelope.` };
 
-      const { token, expiresAt } = signConnectLinkToken(athlete.id, deps.oauth.clientSecret, now());
+      const { token, expiresAt } = await signConnectLinkToken(athlete.id, deps.oauth.clientSecret, now());
       const url = new URL("/connect/intervals", deps.oauth.publicUrl);
       url.searchParams.set("t", token);
       return { status: "link", url: url.toString(), expiresAt: expiresAt.toISOString() };

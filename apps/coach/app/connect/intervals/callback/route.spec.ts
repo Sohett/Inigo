@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { connectionFlowCookie } from "../_components/connection-flow";
 
 const execute = vi.fn();
 
@@ -11,6 +12,7 @@ vi.mock("../../../../src/deps", () => ({
     config: { DB_ENCRYPTION_KEY: Buffer.alloc(32).toString("base64") }
   })
 }));
+vi.mock("../../../../src/intervals/oauth/intervalsOAuth", () => ({ intervalsOAuth: () => null }));
 vi.mock("../../../../src/use-cases/completeIntervalsConnection", () => ({
   createCompleteIntervalsConnection: () => ({ execute })
 }));
@@ -32,9 +34,10 @@ describe("GET /connect/intervals/callback", () => {
     execute.mockResolvedValue({ result: "connected", agent: "notified" });
     const { GET } = await import("./route");
 
-    const response = await GET(callback("code=abc&state=s.t~n", "inigo_intervals_connect=n"));
+    const flow = { state: "s.t~n", codeVerifier: "v" };
+    const response = await GET(callback("code=abc&state=s.t~n", connectionFlowCookie(flow).split(";")[0]));
 
-    expect(execute).toHaveBeenCalledWith({ code: "abc", state: "s.t~n", error: undefined, browserNonce: "n" });
+    expect(execute).toHaveBeenCalledWith({ query: new URLSearchParams("code=abc&state=s.t~n"), flow });
     expect(response.status).toBe(303);
     expect(response.headers.get("location")).toBe("https://app.inigo-coach.com/connect/intervals/done?result=connected");
     expect(response.headers.get("cache-control")).toBe("no-store");
@@ -48,7 +51,7 @@ describe("GET /connect/intervals/callback", () => {
 
     const response = await GET(callback("error=access_denied&state=s.t"));
 
-    expect(execute).toHaveBeenCalledWith({ code: undefined, state: "s.t", error: "access_denied", browserNonce: undefined });
+    expect(execute).toHaveBeenCalledWith({ query: new URLSearchParams("error=access_denied&state=s.t"), flow: undefined });
     expect(response.headers.get("location")).toContain("result=denied");
   });
 

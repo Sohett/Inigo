@@ -1,13 +1,12 @@
 import { getDeps } from "../../../../src/deps";
 import { ConnectionResult } from "../../../../src/domain/intervalsConnection";
-import { intervalsOAuthConfig } from "../../../../src/intervals/oauth/credentials";
-import { createIntervalsTokenExchanger } from "../../../../src/intervals/oauth/intervalsOAuth";
+import { intervalsOAuth } from "../../../../src/intervals/oauth/intervalsOAuth";
 import { createIntervalsAthleteReader } from "../../../../src/intervals/intervalsAthleteReader";
 import {
   createDrizzleIntervalsAccountReader,
   createDrizzleIntervalsCredentialStore
 } from "../../../../src/repositories/drizzleIntervalsCredentialStore";
-import { clearBrowserNonceCookie, readBrowserNonce } from "../_components/browser-nonce";
+import { clearConnectionFlowCookie, readConnectionFlow } from "../_components/connection-flow";
 import { createDrizzleOnboardingFactsReader } from "../../../../src/repositories/drizzleOnboardingFactsReader";
 import { createAssessOnboarding } from "../../../../src/use-cases/assessOnboarding";
 import { createCompleteIntervalsConnection } from "../../../../src/use-cases/completeIntervalsConnection";
@@ -23,20 +22,13 @@ export const maxDuration = 30;
  * Neon) is logged and shown as a failure the athlete can retry from their link.
  */
 export async function GET(request: Request): Promise<Response> {
-  const params = new URL(request.url).searchParams;
-  const callback = {
-    state: params.get("state") ?? undefined,
-    code: params.get("code") ?? undefined,
-    error: params.get("error") ?? undefined,
-    browserNonce: readBrowserNonce(request)
-  };
+  const callback = { query: new URL(request.url).searchParams, flow: readConnectionFlow(request) };
 
   let result: ConnectionResult;
   try {
     const deps = getDeps();
-    const config = intervalsOAuthConfig();
     const completeConnection = createCompleteIntervalsConnection({
-      oauth: config ? { config, exchanger: createIntervalsTokenExchanger(config) } : null,
+      oauth: intervalsOAuth(),
       repo: deps.repo,
       store: createDrizzleIntervalsCredentialStore(deps.db, deps.config.DB_ENCRYPTION_KEY),
       connectedAccount: createDrizzleIntervalsAccountReader(deps.db),
@@ -61,7 +53,7 @@ export async function GET(request: Request): Promise<Response> {
       "cache-control": "no-store",
       "referrer-policy": "no-referrer",
       // The binding is single use: whatever the result, a retry starts again from the link.
-      "set-cookie": clearBrowserNonceCookie()
+      "set-cookie": clearConnectionFlowCookie()
     }
   });
 }
