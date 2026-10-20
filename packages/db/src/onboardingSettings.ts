@@ -6,14 +6,12 @@ export interface OnboardingSettingsRow {
   onboardingAgentId: string | null;
   coordinatorAgentId: string | null;
   accessCode: string | null;
-  whatsappNumber: string | null;
 }
 
 const EMPTY: OnboardingSettingsRow = {
   onboardingAgentId: null,
   coordinatorAgentId: null,
-  accessCode: null,
-  whatsappNumber: null
+  accessCode: null
 };
 
 /** Read the onboarding settings. Nothing recorded yet reads as every field unset, not an error. */
@@ -22,8 +20,7 @@ export async function getOnboardingSettings(db: Db): Promise<OnboardingSettingsR
     .select({
       onboardingAgentId: onboardingSettings.onboardingAgentId,
       coordinatorAgentId: onboardingSettings.coordinatorAgentId,
-      accessCode: onboardingSettings.accessCode,
-      whatsappNumber: onboardingSettings.whatsappNumber
+      accessCode: onboardingSettings.accessCode
     })
     .from(onboardingSettings)
     .where(eq(onboardingSettings.id, true))

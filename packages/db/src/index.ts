@@ -13,7 +13,12 @@ export {
   setIntervalsCredential,
   type IntervalsCredential
 } from "./credentials";
-export { getWhatsappSessionId, setWhatsappSessionId } from "./whatsappGateway";
+export {
+  getWhatsappNumber,
+  getWhatsappSessionId,
+  setWhatsappNumber,
+  setWhatsappSessionId
+} from "./whatsappGateway";
 export {
   getOnboardingSettings,
   setOnboardingSettings,

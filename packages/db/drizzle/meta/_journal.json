@@ -99,6 +99,13 @@
       "when": 1792495992386,
       "tag": "0013_intervals_oauth_only",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1792499103091,
+      "tag": "0014_whatsapp_number_on_gateway",
+      "breakpoints": true
     }
   ]
 }
