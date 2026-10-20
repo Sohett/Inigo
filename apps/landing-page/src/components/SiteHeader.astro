@@ -1,5 +1,6 @@
 ---
 import Logo from "@/components/Logo.astro";
+import StartCta from "@/components/StartCta.astro";
 import { nav } from "@/content/copy";
 ---
 
@@ -35,12 +36,10 @@ import { nav } from "@/content/copy";
       >
         {nav.login.label}
       </span>
-      <a
-        href={nav.cta.href}
+      <StartCta
+        label={nav.cta.label}
         class="inline-flex h-9 items-center rounded-lg bg-encre px-4 text-sm font-semibold text-white transition hover:bg-encre/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-encre focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-      >
-        {nav.cta.label}
-      </a>
+      />
     </div>
   </div>
 </header>
