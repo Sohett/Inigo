@@ -92,6 +92,13 @@
       "when": 1792051636974,
       "tag": "0012_intervals_oauth",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1792495992386,
+      "tag": "0013_intervals_oauth_only",
+      "breakpoints": true
     }
   ]
 }

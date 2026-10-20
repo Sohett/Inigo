@@ -25,8 +25,8 @@ const db = createDb(process.env.DATABASE_URL!);
 const rows = await db.select().from(athlete).where(eq(athlete.phoneNum, "+32..."));
 
 // Per-athlete secrets are sealed with AES-256-GCM (never stored in plaintext):
-// authType: "api_key" (HTTP Basic) or "oauth" (Bearer access token, INI-69).
-await setIntervalsCredential(db, { athleteId, authType: "oauth", secret, externalAthleteId }, process.env.DB_ENCRYPTION_KEY!);
+// secret: the athlete's OAuth access token (Bearer, INI-69; the API key is gone since INI-72).
+await setIntervalsCredential(db, { athleteId, secret, externalAthleteId }, process.env.DB_ENCRYPTION_KEY!);
 const credential = await getIntervalsCredential(db, athleteId, process.env.DB_ENCRYPTION_KEY!);
 ```
 

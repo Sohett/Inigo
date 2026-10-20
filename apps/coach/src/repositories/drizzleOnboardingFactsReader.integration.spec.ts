@@ -65,7 +65,7 @@ describe.skipIf(!databaseUrl || !encryptionKey)("drizzleOnboardingFactsReader (i
     ]);
     await setIntervalsCredential(
       db,
-      { athleteId, authType: "api_key", secret: "test-key", externalAthleteId: "i000006" },
+      { athleteId, secret: "test-token", externalAthleteId: "i000006" },
       encryptionKey as string
     );
 

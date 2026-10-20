@@ -1,4 +1,4 @@
-import type { CredentialAuthType, PlanStatus, PropositionStatus } from "@inigo/db";
+import type { PlanStatus, PropositionStatus } from "@inigo/db";
 import type { AthleteStatus } from "@/domain/athlete";
 
 /** Shared wording of the admin pages, so the roster and the athlete page say the same thing. */
@@ -33,12 +33,6 @@ export const PROPOSITION_STATUS_LABEL: Record<PropositionStatus, string> = {
   validated: "validée",
   applied: "appliquée",
   rejected: "rejetée"
-};
-
-/** How an athlete's Intervals.icu account is connected (INI-69: OAuth, or the API key fallback). */
-export const INTERVALS_AUTH_LABEL: Record<CredentialAuthType, string> = {
-  oauth: "OAuth",
-  api_key: "Clé API"
 };
 
 export const DATE_TIME_FORMAT = new Intl.DateTimeFormat("fr-BE", {

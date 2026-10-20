@@ -5,7 +5,6 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { IntervalsIcuClient } from "../client";
 import { registerIntervalsIcuTools } from "./index";
 import { createReadActivityStreams } from "../../use-cases/readActivityStreams";
-import type { ConnectIntervals } from "../../use-cases/connectIntervals";
 import type { CreateIntervalsConnectLink } from "../../use-cases/createIntervalsConnectLink";
 import type { ResolveClient } from "./result";
 import { DEFAULT_READ_BOUNDS } from "../../domain/training";
@@ -33,20 +32,16 @@ function recordingResolver(client: IntervalsIcuClient) {
   return { resolve, calls };
 }
 
-const connected = { status: "connected" as const, intervalsAthleteId: "i42", athleteName: "Thomas" };
-
 const link = { status: "link" as const, url: "https://app.inigo-coach.com/connect/intervals?t=x.y", expiresAt: "2026-10-18T10:00:00.000Z" };
 
 async function connect(
   resolve: ResolveClient,
-  connectIntervals: ConnectIntervals = { execute: vi.fn(async () => connected) },
   connectLink: CreateIntervalsConnectLink = { execute: vi.fn(async () => link) }
 ) {
   const server = new McpServer({ name: "test", version: "0.0.0" });
   registerIntervalsIcuTools(server, {
     resolve,
     readActivityStreams: createReadActivityStreams({ resolveClient: resolve }),
-    connectIntervals,
     connectLink
   });
 
@@ -97,10 +92,11 @@ describe("registerIntervalsIcuTools", () => {
         "delete_events_by_range",
         "update_sport_settings",
         "update_athlete_body",
-        "connect_intervals",
         "get_intervals_connect_link"
       ])
     );
+    // INI-72: the API key path is gone, OAuth is the only way to connect.
+    expect(names).not.toContain("connect_intervals");
   });
 
   it("exposes athleteId as a required input on every tool", async () => {
@@ -186,7 +182,7 @@ describe("registerIntervalsIcuTools", () => {
 describe("get_intervals_connect_link", () => {
   it("returns the link for the athlete, as the use-case gives it", async () => {
     const execute = vi.fn(async () => link);
-    const mcpClient = await connect(recordingResolver(createMockClient()).resolve, undefined, { execute });
+    const mcpClient = await connect(recordingResolver(createMockClient()).resolve, { execute });
 
     const result = await mcpClient.callTool({ name: "get_intervals_connect_link", arguments: { athleteId: ATHLETE_ID } });
 
@@ -196,49 +192,9 @@ describe("get_intervals_connect_link", () => {
 
   it("refuses a malformed athlete id before asking for a link", async () => {
     const execute = vi.fn(async () => link);
-    const mcpClient = await connect(recordingResolver(createMockClient()).resolve, undefined, { execute });
+    const mcpClient = await connect(recordingResolver(createMockClient()).resolve, { execute });
 
     const result = await mcpClient.callTool({ name: "get_intervals_connect_link", arguments: { athleteId: "i42" } });
-
-    expect(result.isError).toBe(true);
-    expect(execute).not.toHaveBeenCalled();
-  });
-});
-
-describe("connect_intervals", () => {
-  it("passes the key and a normalised Intervals.icu id, and never echoes the key", async () => {
-    const execute = vi.fn(async () => connected);
-    const mcpClient = await connect(recordingResolver(createMockClient()).resolve, { execute });
-
-    const result = await mcpClient.callTool({
-      name: "connect_intervals",
-      arguments: { athleteId: ATHLETE_ID, apiKey: " secret-key-123 ", intervalsAthleteId: "42" }
-    });
-
-    expect(execute).toHaveBeenCalledWith(ATHLETE_ID, "secret-key-123", "i42");
-    const text = (result.content as TextContent)[0]!.text;
-    expect(JSON.parse(text)).toEqual(connected);
-    expect(text).not.toContain("secret-key-123");
-  });
-
-  it("mends an id typed with a capital I", async () => {
-    const execute = vi.fn(async () => connected);
-    const mcpClient = await connect(recordingResolver(createMockClient()).resolve, { execute });
-    await mcpClient.callTool({
-      name: "connect_intervals",
-      arguments: { athleteId: ATHLETE_ID, apiKey: "secret-key-123", intervalsAthleteId: "I42" }
-    });
-    expect(execute).toHaveBeenCalledWith(ATHLETE_ID, "secret-key-123", "i42");
-  });
-
-  it("refuses an id that is not an Intervals.icu athlete id", async () => {
-    const execute = vi.fn(async () => connected);
-    const mcpClient = await connect(recordingResolver(createMockClient()).resolve, { execute });
-
-    const result = await mcpClient.callTool({
-      name: "connect_intervals",
-      arguments: { athleteId: ATHLETE_ID, apiKey: "secret-key-123", intervalsAthleteId: "thomas" }
-    });
 
     expect(result.isError).toBe(true);
     expect(execute).not.toHaveBeenCalled();

@@ -35,7 +35,7 @@ const rows: AthleteRosterEntry[] = [
     createdAt: new Date("2026-09-01T00:00:00Z"),
     plan: { name: "Gran Fondo", status: "active" },
     latestProposition: { weekStart: "2026-10-12", status: "applied" },
-    intervals: { authType: "oauth", connectedAt: new Date("2026-10-20T09:00:00Z") }
+    intervals: { connectedAt: new Date("2026-10-20T09:00:00Z") }
   },
   {
     id: "a-2",
@@ -116,14 +116,14 @@ describe("AthletesTable Intervals.icu column", () => {
     window.history.replaceState(null, "", "/admin/athletes");
   });
 
-  it("shows who is connected, and how, and who is not", async () => {
+  it("shows who is connected and who is not", async () => {
     act(() => root.render(<AthletesTable rows={rows} />));
     await settle();
 
     const lines = [...container.querySelectorAll("tbody tr")].map((row) => row.textContent ?? "");
     const thomas = lines.find((line) => line.includes("Thomas")) ?? "";
     const julie = lines.find((line) => line.includes("Julie")) ?? "";
-    expect(thomas).toContain("Connecté OAuth");
+    expect(thomas).toContain("Connecté");
     expect(thomas).not.toContain("Non connecté");
     expect(julie).toContain("Non connecté");
   });

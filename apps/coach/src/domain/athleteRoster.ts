@@ -1,4 +1,4 @@
-import type { CredentialAuthType, PlanStatus, PropositionStatus } from "@inigo/db";
+import type { PlanStatus, PropositionStatus } from "@inigo/db";
 import type { AthleteStatus } from "./athlete";
 
 /**
@@ -18,9 +18,9 @@ export interface AthleteRosterEntry {
   /** The most recent weekly proposition (latest week, then latest written). Null when none. */
   latestProposition: { weekStart: string; status: PropositionStatus } | null;
   /**
-   * The stored Intervals.icu credential: how it authenticates and when it was last stored. Null
-   * when the athlete never connected. A stored token can still have been revoked on Intervals.icu
-   * since: that only shows on the next call (INI-71).
+   * The stored Intervals.icu connection: when its token was last stored. Null when the athlete
+   * never connected. A stored token can still have been revoked on Intervals.icu since: that only
+   * shows on the next call (INI-71).
    */
-  intervals: { authType: CredentialAuthType; connectedAt: Date } | null;
+  intervals: { connectedAt: Date } | null;
 }

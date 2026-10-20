@@ -1,7 +1,7 @@
 /**
  * Error thrown when the Intervals.icu API returns a non-2xx response or the
  * response body fails validation. Carries enough context to debug without ever
- * embedding the API key.
+ * embedding the access token.
  */
 export class IntervalsIcuApiError extends Error {
   readonly status: number;

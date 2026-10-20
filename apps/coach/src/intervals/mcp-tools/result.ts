@@ -9,7 +9,7 @@ export type ToolResult = CallToolResult;
 /**
  * Resolve the per-athlete Intervals.icu client. The endpoint is a single static
  * `/api/intervals/mcp` shared by all athletes, so the athlete is identified per call and its
- * API key is fetched + decrypted from Neon on demand (see `createIntervalsResolver`).
+ * OAuth token is fetched + decrypted from Neon on demand (see `createIntervalsResolver`).
  */
 export type ResolveClient = (athleteId: string) => Promise<IntervalsIcuClient>;
 

@@ -71,7 +71,7 @@ describe("createIntervalsConnectLink", () => {
     expect(url.searchParams.get("t")).toBe(expected);
   });
 
-  it("says OAuth is unavailable when the app is not configured, so the agent falls back to the key", async () => {
+  it("says the connection is unavailable when the OAuth app is not configured", async () => {
     const outcome = await createCreateIntervalsConnectLink({ oauth: null, repo: { findById } }).execute(ATHLETE.id);
     expect(outcome.status).toBe("oauth_unavailable");
   });
@@ -158,7 +158,7 @@ describe("completeIntervalsConnection", () => {
     flow: flow === null ? undefined : (flow ?? (await flowFor()))
   });
 
-  it("checks the callback against this browser's flow, stores the token as an OAuth credential, then wakes the onboarding agent", async () => {
+  it("checks the callback against this browser's flow, stores the token, then wakes the onboarding agent", async () => {
     const { useCase, oauth, save, appendUserMessage, calls } = setup();
     const flow = await flowFor();
 
@@ -168,13 +168,13 @@ describe("completeIntervalsConnection", () => {
     });
     expect(oauth.client.complete).toHaveBeenCalledWith(CALLBACK, flow);
     expect(calls).toEqual(["complete", "save", "append"]);
-    expect(save).toHaveBeenCalledWith(ATHLETE.id, { type: "oauth", accessToken: "token-123" }, "i42");
+    expect(save).toHaveBeenCalledWith(ATHLETE.id, "token-123", "i42");
     const [sessionId, turn] = appendUserMessage.mock.calls[0] as unknown as [string, string];
     expect(sessionId).toBe("sesn_onboarding");
     expect(turn).toContain("onboarding_fait: intervals_connected\nonboarding_manquant: body\nevenement: intervals_connecte\nmessage: \"\"");
   });
 
-  it("reconnects the same Intervals.icu account, e.g. from an API key to OAuth", async () => {
+  it("reconnects the same Intervals.icu account, e.g. after a revoked access", async () => {
     const { useCase, save } = setup({ connectedTo: "i42" });
     expect((await useCase.execute(await callback())).result).toBe(ConnectionResult.Connected);
     expect(save).toHaveBeenCalled();

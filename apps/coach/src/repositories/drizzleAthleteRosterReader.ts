@@ -15,7 +15,6 @@ export interface AthleteRosterRow {
   planStatus: NonNullable<AthleteRosterEntry["plan"]>["status"] | null;
   propositionWeekStart: string | null;
   propositionStatus: NonNullable<AthleteRosterEntry["latestProposition"]>["status"] | null;
-  intervalsAuthType: NonNullable<AthleteRosterEntry["intervals"]>["authType"] | null;
   intervalsConnectedAt: Date | null;
 }
 
@@ -37,9 +36,7 @@ export function toAthleteRosterEntry(row: AthleteRosterRow): AthleteRosterEntry 
         ? { weekStart: row.propositionWeekStart, status: row.propositionStatus }
         : null,
     intervals:
-      row.intervalsAuthType !== null && row.intervalsConnectedAt !== null
-        ? { authType: row.intervalsAuthType, connectedAt: row.intervalsConnectedAt }
-        : null
+      row.intervalsConnectedAt !== null ? { connectedAt: row.intervalsConnectedAt } : null
   };
 }
 
@@ -78,7 +75,6 @@ export function createDrizzleAthleteRosterReader(db: Db): AthleteRosterReader {
           planStatus: plan.status,
           propositionWeekStart: proposition.weekStart,
           propositionStatus: proposition.status,
-          intervalsAuthType: athleteCredential.authType,
           intervalsConnectedAt: athleteCredential.updatedAt
         })
         .from(athlete)

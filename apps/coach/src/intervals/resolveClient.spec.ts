@@ -13,7 +13,7 @@ import { createIntervalsResolver } from "./resolveClient";
 const MASTER_KEY = Buffer.alloc(32).toString("base64");
 const BASE_URL = "https://intervals.icu/api/v1";
 const ATHLETE = "550e8400-e29b-41d4-a716-446655440000";
-const API_KEY = "super-secret-key";
+const TOKEN = "super-secret-token";
 const db = {} as Parameters<typeof createIntervalsResolver>[0];
 
 const server = setupServer();
@@ -25,8 +25,8 @@ afterEach(() => {
 afterAll(() => server.close());
 
 describe("createIntervalsResolver", () => {
-  it("builds a client that calls Intervals with the resolved key + external athlete id", async () => {
-    getIntervalsCredential.mockResolvedValue({ authType: "api_key", secret: API_KEY, externalAthleteId: "i789" });
+  it("builds a client that calls Intervals with the resolved token as Bearer and the external athlete id", async () => {
+    getIntervalsCredential.mockResolvedValue({ secret: TOKEN, externalAthleteId: "i789" });
     let auth: string | null = null;
     server.use(
       http.get(`${BASE_URL}/athlete/i789/gear`, ({ request }) => {
@@ -40,26 +40,10 @@ describe("createIntervalsResolver", () => {
     expect(client).toBeInstanceOf(IntervalsIcuClient);
     await client.getGear();
 
-    // The resolved key reaches Intervals only as the HTTP Basic password, and the external
-    // id keys the path — proving the resolver wires both credential fields correctly.
-    expect(auth).toBe(`Basic ${Buffer.from(`API_KEY:${API_KEY}`).toString("base64")}`);
+    // The resolved token reaches Intervals only as the Bearer header, and the external id keys
+    // the path: the resolver wires both credential fields.
+    expect(auth).toBe(`Bearer ${TOKEN}`);
     expect(getIntervalsCredential).toHaveBeenCalledWith(db, ATHLETE, MASTER_KEY);
-  });
-
-  it("authenticates with Bearer when the athlete connected by OAuth", async () => {
-    getIntervalsCredential.mockResolvedValue({ authType: "oauth", secret: "oauth-token", externalAthleteId: "i789" });
-    let auth: string | null = null;
-    server.use(
-      http.get(`${BASE_URL}/athlete/i789/gear`, ({ request }) => {
-        auth = request.headers.get("authorization");
-        return HttpResponse.json([]);
-      })
-    );
-
-    const client = await createIntervalsResolver(db, MASTER_KEY, BASE_URL)(ATHLETE);
-    await client.getGear();
-
-    expect(auth).toBe("Bearer oauth-token");
   });
 
   it("throws a clear error when the athlete has no stored credential", async () => {
@@ -71,11 +55,11 @@ describe("createIntervalsResolver", () => {
   });
 
   it("throws a secret-free error when the credential has no external athlete id", async () => {
-    getIntervalsCredential.mockResolvedValue({ authType: "api_key", secret: API_KEY, externalAthleteId: null });
+    getIntervalsCredential.mockResolvedValue({ secret: TOKEN, externalAthleteId: null });
     const resolve = createIntervalsResolver(db, MASTER_KEY, BASE_URL);
     const error = (await resolve(ATHLETE).catch((e: unknown) => e)) as Error;
     expect(error.message).toContain("missing the Intervals athlete id");
-    // The decrypted key must never appear in an error surfaced to the caller.
-    expect(error.message).not.toContain(API_KEY);
+    // The decrypted token must never appear in an error surfaced to the caller.
+    expect(error.message).not.toContain(TOKEN);
   });
 });

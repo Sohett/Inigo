@@ -29,20 +29,8 @@ Réponds en coach, en deux ou trois phrases, sans liste technique :
      l'athlète n'a rien écrit, c'est la connexion qui te prévient. Confirme en une phrase sur
      WhatsApp et enchaîne sur ce qui manque ;
    - pas de clé à copier, rien de sensible ne passe par WhatsApp.
-3. **Repli** si `get_intervals_connect_link` répond `oauth_unavailable` : la clé API et l'athlete id.
-   - sur intervals.icu, ouvrir **Settings** (menu, en haut à droite) ;
-   - descendre jusqu'à la section **Developer Settings** ;
-   - à la ligne **API Key**, générer la clé si besoin, puis la copier ;
-   - l'**athlete id** est affiché dans cette même section (il ressemble à `i123456`). On le voit
-     aussi dans l'adresse de sa page Intervals ;
-   - les envoyer tous les deux dans WhatsApp, puis appeler `connect_intervals` avec les deux. Il
-     vérifie le couple auprès d'Intervals.icu avant de l'enregistrer (clé chiffrée) :
-     - `connected` : c'est bon, les autres outils Intervals marchent pour cet athlète ;
-     - `invalid_credentials` : la clé est refusée, souvent un copier coller incomplet ;
-     - `credentials_mismatch` : la clé marche mais ne correspond pas à cet id, presque toujours une
-       faute de frappe dans l'id : redemande celui de la section Developer ;
-     - `unknown_athlete_id` : aucun athlète ne porte cet id.
-   Ne recopie jamais la clé dans un message.
+3. Si `get_intervals_connect_link` répond `oauth_unavailable` : la connexion est momentanément
+   indisponible. Dis-le simplement et repropose le lien plus tard. Jamais de clé API.
 
 ## Parcours B : pas encore de compte
 

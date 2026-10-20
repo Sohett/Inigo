@@ -2,11 +2,8 @@ import { createMcpHandler, withMcpAuth } from "mcp-handler";
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 import { registerIntervalsIcuTools } from "../../../../src/intervals/mcp-tools";
 import { createReadActivityStreams } from "../../../../src/use-cases/readActivityStreams";
-import { createConnectIntervals } from "../../../../src/use-cases/connectIntervals";
 import { createCreateIntervalsConnectLink } from "../../../../src/use-cases/createIntervalsConnectLink";
 import { intervalsOAuthConfig } from "../../../../src/intervals/oauth/credentials";
-import { createIntervalsCredentialVerifier } from "../../../../src/intervals/credentialVerifier";
-import { createDrizzleIntervalsCredentialStore } from "../../../../src/repositories/drizzleIntervalsCredentialStore";
 import { getDeps } from "../../../../src/deps";
 import { verifyBearerToken } from "../../../../src/auth";
 
@@ -17,17 +14,13 @@ export const dynamic = "force-dynamic";
 // (/api/coaching-data/mcp) so the brain keeps its `intervals-icu` server name and per-agent read/write
 // toolset allowlists unchanged. Each tool takes an `athleteId` argument (the same
 // `inigo_athlete_id` coach injects into every message); the resolver fetches + decrypts that
-// athlete's Intervals.icu key from Neon at request time, so the secret never reaches the LLM.
+// athlete's Intervals.icu token from Neon at request time, so the secret never reaches the LLM.
 const handler = createMcpHandler(
   (server) => {
-    const { intervalsResolver, db, config, repo } = getDeps();
+    const { intervalsResolver, repo } = getDeps();
     registerIntervalsIcuTools(server, {
       resolve: intervalsResolver,
       readActivityStreams: createReadActivityStreams({ resolveClient: intervalsResolver }),
-      connectIntervals: createConnectIntervals({
-        verifier: createIntervalsCredentialVerifier(config.INTERVALS_BASE_URL),
-        store: createDrizzleIntervalsCredentialStore(db, config.DB_ENCRYPTION_KEY)
-      }),
       connectLink: createCreateIntervalsConnectLink({ oauth: intervalsOAuthConfig(), repo })
     });
   },
