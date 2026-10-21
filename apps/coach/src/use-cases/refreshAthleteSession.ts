@@ -3,6 +3,7 @@ import { turnMessage } from "../brain/taskEnvelope";
 import type { ActiveSession, Athlete } from "../domain/athlete";
 import { SessionStatus, type RunningSession, type SessionExchange } from "../domain/brain";
 import type { AthleteRepository } from "../repositories/athleteRepository";
+import type { TurnSession, TurnSessionResolver } from "./routeInboundMessage";
 import { sessionTitle } from "./startAthleteSession";
 
 /** How many of the last WhatsApp messages a new session picks up: the thread, not the history. */
@@ -38,13 +39,13 @@ export type RefreshOutcome =
     }
   | { status: typeof RefreshStatus.Failed; sessionId: string; reason: string };
 
-export interface RefreshAthleteSession {
+/**
+ * Specific to Claude Managed Agents. Leaving them means deleting this use-case (and its spec), the
+ * brain methods only it calls, `replaceSession`, and the `reprise_conversation` line: the routing
+ * only knows the `TurnSessionResolver` port. See « Migration lazy des sessions » in AGENTS.md.
+ */
+export interface RefreshAthleteSession extends TurnSessionResolver {
   execute(athlete: Athlete, session: ActiveSession): Promise<RefreshOutcome>;
-  /**
-   * Archive the session a `migrated` outcome replaced, once the first turn reached the new one.
-   * Best effort: an idle leftover session costs nothing. Never throws.
-   */
-  retire(previousSessionId: string): Promise<void>;
 }
 
 /**
@@ -61,9 +62,9 @@ export interface RefreshAthleteSession {
  * Intervals.icu, which the agent reads anyway; only the short thread lived in the session.
  *
  * Moving is an optimisation, never a reason to lose a message: until the athlete is repointed,
- * any failure leaves them on their session (`failed`). The old session is archived by `retire`,
- * which the caller runs only once the first turn reached the new session: a turn that fails to
- * land leaves the old session as it was. (The carry-over itself is not replayed on a retry.)
+ * any failure leaves them on their session (`failed`). The old session is archived by the
+ * `delivered` of `resolve`, once the first turn reached the new session: a turn that fails to land
+ * leaves the old session as it was. (The carry-over itself is not replayed on a retry.)
  */
 export function createRefreshAthleteSession(deps: {
   repo: Pick<AthleteRepository, "replaceSession" | "findById">;
@@ -128,34 +129,51 @@ export function createRefreshAthleteSession(deps: {
     }
   }
 
+  async function execute(athlete: Athlete, session: ActiveSession): Promise<RefreshOutcome> {
+    let running: RunningSession;
+    let latestVersion: number;
+    try {
+      [running, latestVersion] = await Promise.all([
+        deps.brain.readSession(session.sessionId),
+        deps.brain.latestAgentVersion(session.agentId)
+      ]);
+    } catch (error) {
+      return failed(athlete, session, "could not check the session version", error);
+    }
+    if (running.agentVersion >= latestVersion) return { status: RefreshStatus.Current, sessionId: session.sessionId };
+
+    switch (running.status) {
+      case SessionStatus.Running:
+      case SessionStatus.Rescheduling:
+        console.info(
+          `[coach] session ${session.sessionId} of athlete ${athlete.id} is outdated (v${running.agentVersion} < v${latestVersion}) but busy: next message`
+        );
+        return { status: RefreshStatus.Busy, sessionId: session.sessionId };
+      case SessionStatus.Idle:
+      case SessionStatus.Terminated:
+        return migrate(athlete, session, running);
+    }
+  }
+
   return {
-    async execute(athlete: Athlete, session: ActiveSession): Promise<RefreshOutcome> {
-      let running: RunningSession;
-      let latestVersion: number;
-      try {
-        [running, latestVersion] = await Promise.all([
-          deps.brain.readSession(session.sessionId),
-          deps.brain.latestAgentVersion(session.agentId)
-        ]);
-      } catch (error) {
-        return failed(athlete, session, "could not check the session version", error);
-      }
-      if (running.agentVersion >= latestVersion) return { status: RefreshStatus.Current, sessionId: session.sessionId };
+    execute,
 
-      switch (running.status) {
-        case SessionStatus.Running:
-        case SessionStatus.Rescheduling:
-          console.info(
-            `[coach] session ${session.sessionId} of athlete ${athlete.id} is outdated (v${running.agentVersion} < v${latestVersion}) but busy: next message`
-          );
-          return { status: RefreshStatus.Busy, sessionId: session.sessionId };
-        case SessionStatus.Idle:
-        case SessionStatus.Terminated:
-          return migrate(athlete, session, running);
+    /** The routing's view: the session to use and, after a move, the conversation and the archive. */
+    async resolve(athlete: Athlete, session: ActiveSession): Promise<TurnSession> {
+      const refresh = await execute(athlete, session);
+      switch (refresh.status) {
+        case RefreshStatus.Migrated:
+          return {
+            sessionId: refresh.sessionId,
+            carryOver: refresh.carryOver,
+            delivered: () => archive(refresh.previousSessionId)
+          };
+        case RefreshStatus.Current:
+        case RefreshStatus.Busy:
+        case RefreshStatus.Failed:
+          return { sessionId: refresh.sessionId, carryOver: [], delivered: async () => {} };
       }
-    },
-
-    retire: archive
+    }
   };
 }
 

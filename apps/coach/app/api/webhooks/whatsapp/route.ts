@@ -126,7 +126,7 @@ export async function POST(request: Request): Promise<Response> {
       register,
       assessOnboarding,
       handOff: createHandOffToCoordinator({ repo: deps.repo, settings: deps.onboardingSettings, brain: deps.brain }),
-      refreshSession: createRefreshAthleteSession({ repo: deps.repo, brain: deps.brain })
+      turnSession: createRefreshAthleteSession({ repo: deps.repo, brain: deps.brain })
     });
     logOutcome(await routeInboundMessage.execute(payload));
   } catch (error) {

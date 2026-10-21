@@ -80,7 +80,7 @@ src/
     assessOnboarding.ts            # use-case : état d'onboarding calculé (jamais stocké) ; PORTS OnboardingFactsReader + IntervalsAthleteReader
     blockAthlete.ts                # use-case : statut blocked + log de la raison (outil block_athlete, INI-66)
     handOffToCoordinator.ts        # use-case : onboarding complet → session du coordinateur + statut active, en un db.batch (INI-49)
-    refreshAthleteSession.ts       # use-case : session figée sur une version d'agent dépassée → clone sur la dernière + reprise du fil (INI-27)
+    refreshAthleteSession.ts       # use-case SPÉCIFIQUE Managed Agents (INI-27) : implémente TurnSessionResolver ; session sur une version d'agent dépassée → clone + reprise du fil
   alerts/
     gatewayAlerter.ts              # PORT GatewayAlerter (notify ne throw jamais)
     logAndSlackAlerter.ts          # ADAPTER : log structuré [coach][alert] + Slack si SLACK_ALERT_WEBHOOK_URL
@@ -138,9 +138,10 @@ src/
    (`onboarding_settings.coordinator_agent_id`), puis statut `active` + bascule de session en **un**
    `db.batch` (`completeOnboarding`), et le message part à la nouvelle session via `formatHandoffTurn`
    (ligne `passation:`, ce tour seulement) → `handed_off`. Sans coordinateur utilisable → le message
-   reste à la session d'onboarding (`handoff_not_configured`, warning). **Session périmée** (INI-27) :
-   un tour qui reste sur la session de l'athlète passe d'abord par `refreshAthleteSession` (voir
-   « Migration lazy des sessions »). Le tour est résolu avant tout
+   reste à la session d'onboarding (`handoff_not_configured`, warning). Un tour qui reste avec
+   l'athlète demande sa session au port `TurnSessionResolver` (session, contexte à porter, puis
+   `delivered()` après l'append) ; aujourd'hui `refreshAthleteSession` (voir « Migration lazy des
+   sessions »). Le tour est résolu avant tout
    autre effet de bord (la passation est le seul, atomique). Puis enregistre ce que le message apprend
    (alias manquant ou changé, `chat_id`) en une écriture (`repo.rememberSender`) et **append** l'enveloppe à **sa** session via `brain.appendUserMessage` (dernier effet de bord → pas de doublon sur
    retry OpenWA). `inigo_athlete_id` = l'`athlete.id` interne (Neon), que l'agent repasse en
@@ -171,6 +172,10 @@ prompts. Le coordinateur reporte la date dans ses task-envelopes sous `date_du_j
 spécialistes.
 
 ## Migration lazy des sessions (INI-27)
+
+> **Spécifique à Claude Managed Agents.** Tout ce qui suit existe parce qu'une session y fige sa
+> version d'agent. Le routing n'en sait rien : il ne dépend que du port `TurnSessionResolver`
+> (`routeInboundMessage.ts`), dont `refreshAthleteSession` est l'implémentation Managed Agents.
 
 Une session Managed Agents garde **la version d'agent de sa création** : un `brain:agent:apply`
 n'atteint un athlète déjà actif qu'à travers une nouvelle session. `refreshAthleteSession` la
@@ -203,6 +208,16 @@ une passation, qui ouvre déjà une session neuve).
 - **Ordre de déploiement** : un prompt qui change l'enveloppe (ici `reprise_conversation`) est
   appliqué (`brain:agent:apply`) **avant** le deploy du coach, pour que chaque athlète migre vers
   un agent qui la connaît.
+
+**Quitter Managed Agents (ou un brain qui garde son propre historique)** : remplacer, dans
+`app/api/webhooks/whatsapp/route.ts`, `turnSession: createRefreshAthleteSession(…)` par un resolver
+qui rend la session de l'athlète, `carryOver: []` et un `delivered` vide. Puis supprimer :
+`use-cases/refreshAthleteSession.ts` (+ spec) ; dans `brain/managedAgents.ts`, `latestAgentVersion`,
+`readExchanges`, `archiveSession`, `toSessionExchange` ; `AthleteRepository.replaceSession` ;
+`turnMessage` (`brain/taskEnvelope.ts`) ; `SessionStatus` (`domain/brain.ts`). Le routing ne change
+pas. Le `carryOver` du port et la ligne `reprise_conversation` sont neutres (un contexte qu'une
+session n'a pas) : à garder si le nouveau brain en a l'usage, sinon à retirer avec leur puce dans
+les prompts.
 
 ## Identification d'un athlète (WhatsApp)
 

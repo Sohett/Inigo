@@ -166,13 +166,37 @@ describe("refreshAthleteSession", () => {
     expect(brain.archiveSession).not.toHaveBeenCalledWith("sesn_old");
   });
 
-  it("retires a session by archiving it, and swallows a refused archive", async () => {
-    const { refresh, brain } = makeDeps();
-    brain.archiveSession.mockRejectedValueOnce(new Error("archive refused"));
+  describe("resolve (the routing's port)", () => {
+    it("hands a moved turn the new session and the conversation, and archives the old one on delivery", async () => {
+      const { refresh, brain } = makeDeps();
 
-    await expect(refresh.retire("sesn_old")).resolves.toBeUndefined();
-    expect(brain.archiveSession).toHaveBeenCalledWith("sesn_old");
-    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("archive refused"));
+      const target = await refresh.resolve(ATHLETE, SESSION);
+
+      expect(target).toMatchObject({ sessionId: "sesn_new", carryOver: [{ author: "athlete" }, { author: "coach" }] });
+      expect(brain.archiveSession).not.toHaveBeenCalled();
+      await target.delivered();
+      expect(brain.archiveSession).toHaveBeenCalledWith("sesn_old");
+    });
+
+    it("keeps the athlete's session, carries nothing and archives nothing otherwise", async () => {
+      const { refresh, brain } = makeDeps(running({ agentVersion: 29 }), 29);
+
+      const target = await refresh.resolve(ATHLETE, SESSION);
+      await target.delivered();
+
+      expect(target).toMatchObject({ sessionId: "sesn_old", carryOver: [] });
+      expect(brain.archiveSession).not.toHaveBeenCalled();
+    });
+
+    it("never throws on delivery when the archive is refused", async () => {
+      const { refresh, brain } = makeDeps();
+      brain.archiveSession.mockRejectedValueOnce(new Error("archive refused"));
+
+      const target = await refresh.resolve(ATHLETE, SESSION);
+
+      await expect(target.delivered()).resolves.toBeUndefined();
+      expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("archive refused"));
+    });
   });
 });
 
