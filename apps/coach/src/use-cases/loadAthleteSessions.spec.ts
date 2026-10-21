@@ -55,6 +55,7 @@ function makeDeps(
       setSession: vi.fn(),
       listSessions,
       registerOnboardingAthlete: vi.fn(),
+      replaceSession: vi.fn(),
       completeOnboarding: vi.fn()
     },
     brain: {

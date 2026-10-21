@@ -5,6 +5,7 @@ import { createRegisterNewAthlete, RegisterStatus, type RegisterOutcome } from "
 import { createOpenWaChatReplier } from "../../../../src/whatsapp/chatReplier";
 import { createAssessOnboarding } from "../../../../src/use-cases/assessOnboarding";
 import { createHandOffToCoordinator } from "../../../../src/use-cases/handOffToCoordinator";
+import { createRefreshAthleteSession } from "../../../../src/use-cases/refreshAthleteSession";
 import { createDrizzleOnboardingFactsReader } from "../../../../src/repositories/drizzleOnboardingFactsReader";
 import { createIntervalsAthleteReader } from "../../../../src/intervals/intervalsAthleteReader";
 import { createHandleGatewaySessionEvent } from "../../../../src/use-cases/handleGatewaySessionEvent";
@@ -124,7 +125,8 @@ export async function POST(request: Request): Promise<Response> {
       brain: deps.brain,
       register,
       assessOnboarding,
-      handOff: createHandOffToCoordinator({ repo: deps.repo, settings: deps.onboardingSettings, brain: deps.brain })
+      handOff: createHandOffToCoordinator({ repo: deps.repo, settings: deps.onboardingSettings, brain: deps.brain }),
+      refreshSession: createRefreshAthleteSession({ repo: deps.repo, brain: deps.brain })
     });
     logOutcome(await routeInboundMessage.execute(payload));
   } catch (error) {

@@ -1,9 +1,11 @@
 import type { ManagedAgentBrain } from "../brain/managedAgents";
 import { formatHandoffTurn, formatOnboardingTurn, formatTurn } from "../brain/taskEnvelope";
-import type { Athlete, SenderChanges, SenderIdentity } from "../domain/athlete";
+import type { ActiveSession, Athlete, SenderChanges, SenderIdentity } from "../domain/athlete";
+import type { SessionExchange } from "../domain/brain";
 import type { AthleteRepository } from "../repositories/athleteRepository";
 import { AssessStatus, type AssessOnboarding } from "./assessOnboarding";
 import { HandOffStatus, type HandOffToCoordinator } from "./handOffToCoordinator";
+import { RefreshStatus, type RefreshAthleteSession } from "./refreshAthleteSession";
 import type { RegisterNewAthlete, RegisterOutcome } from "./registerNewAthlete";
 import {
   webhookEnvelopeSchema,
@@ -70,13 +72,15 @@ export type RouteOutcome =
 
 export interface RouteInboundMessageDeps {
   repo: AthleteRepository;
-  brain: ManagedAgentBrain;
+  brain: Pick<ManagedAgentBrain, "appendUserMessage">;
   /** What happens to a sender no athlete carries (INI-45). */
   register: RegisterNewAthlete;
   /** Where an athlete in onboarding stands, carried in each of their turns (INI-46). */
   assessOnboarding: AssessOnboarding;
   /** What happens to an athlete whose onboarding is complete (INI-49). */
   handOff: HandOffToCoordinator;
+  /** Moves an athlete off a session frozen on an outdated agent version (INI-27). */
+  refreshSession: RefreshAthleteSession;
 }
 
 export interface RouteInboundMessage {
@@ -135,7 +139,7 @@ export function createRouteInboundMessage(deps: RouteInboundMessageDeps): RouteI
       const { activeSession } = athlete;
       if (!activeSession) return ignored(IgnoreReason.NoSession);
 
-      const turn = await resolveTurn(athlete, activeSession.sessionId, text, deps);
+      const turn = await resolveTurn(athlete, activeSession, text, deps);
       if (typeof turn === "string") return ignored(turn);
 
       // Learn a new alias or reply address, then forward.
@@ -162,19 +166,29 @@ interface Turn {
  * An athlete in onboarding gets their checklist with it, until it is complete: their message then
  * goes to the coordinator, with the hand-off line. A paused one still talks to the coach (they may
  * be coming back). An ended or blocked one is stopped here, before any side effect.
+ *
+ * A message that stays on the athlete's session first moves them off it if it runs an outdated
+ * agent version (INI-27): the turn then goes to the new session, with the end of the previous
+ * conversation. A hand-off opens a new session anyway, so it is never refreshed.
  */
 async function resolveTurn(
   athlete: Athlete,
-  sessionId: string,
+  session: ActiveSession,
   text: string,
-  deps: Pick<RouteInboundMessageDeps, "assessOnboarding" | "handOff">
+  deps: Pick<RouteInboundMessageDeps, "assessOnboarding" | "handOff" | "refreshSession">
 ): Promise<Turn | IgnoreReason> {
   switch (athlete.status) {
     case "onboarding":
-      return resolveOnboardingTurn(athlete, sessionId, text, deps);
+      return resolveOnboardingTurn(athlete, session, text, deps);
     case "active":
-    case "paused":
-      return { sessionId, text: formatTurn(athlete, text), outcome: { status: RouteStatus.Forwarded } };
+    case "paused": {
+      const { sessionId, carryOver } = await refreshed(athlete, session, deps);
+      return {
+        sessionId,
+        text: formatTurn(athlete, text, new Date(), carryOver),
+        outcome: { status: RouteStatus.Forwarded }
+      };
+    }
     case "ended":
       return IgnoreReason.AthleteEnded;
     case "blocked":
@@ -184,16 +198,19 @@ async function resolveTurn(
 
 async function resolveOnboardingTurn(
   athlete: Athlete,
-  sessionId: string,
+  session: ActiveSession,
   text: string,
-  deps: Pick<RouteInboundMessageDeps, "assessOnboarding" | "handOff">
+  deps: Pick<RouteInboundMessageDeps, "assessOnboarding" | "handOff" | "refreshSession">
 ): Promise<Turn> {
   const assessed = await deps.assessOnboarding.execute(athlete.id);
   if (assessed.status === AssessStatus.UnknownAthlete) {
     throw new Error(`Athlete ${athlete.id} vanished while routing their message.`);
   }
-  const onboardingTurn = formatOnboardingTurn(athlete, assessed.state, text);
-  if (!assessed.state.complete) return { sessionId, text: onboardingTurn, outcome: { status: RouteStatus.Forwarded } };
+  const onboardingTurn = async (outcome: Turn["outcome"]): Promise<Turn> => {
+    const { sessionId, carryOver } = await refreshed(athlete, session, deps);
+    return { sessionId, text: formatOnboardingTurn(athlete, assessed.state, text, new Date(), carryOver), outcome };
+  };
+  if (!assessed.state.complete) return onboardingTurn({ status: RouteStatus.Forwarded });
 
   const handOff = await deps.handOff.execute(athlete);
   switch (handOff.status) {
@@ -204,11 +221,27 @@ async function resolveOnboardingTurn(
         outcome: { status: RouteStatus.HandedOff }
       };
     case HandOffStatus.NotConfigured:
-      return {
-        sessionId,
-        text: onboardingTurn,
-        outcome: { status: RouteStatus.HandoffNotConfigured, reason: handOff.reason }
-      };
+      return onboardingTurn({ status: RouteStatus.HandoffNotConfigured, reason: handOff.reason });
+  }
+}
+
+/**
+ * The session a turn that stays with the athlete goes to, and what of the previous conversation it
+ * carries: the new session and its carry-over after a move, the current session otherwise.
+ */
+async function refreshed(
+  athlete: Athlete,
+  session: ActiveSession,
+  deps: Pick<RouteInboundMessageDeps, "refreshSession">
+): Promise<{ sessionId: string; carryOver: SessionExchange[] }> {
+  const refresh = await deps.refreshSession.execute(athlete, session);
+  switch (refresh.status) {
+    case RefreshStatus.Migrated:
+      return { sessionId: refresh.sessionId, carryOver: refresh.carryOver };
+    case RefreshStatus.Current:
+    case RefreshStatus.Busy:
+    case RefreshStatus.Failed:
+      return { sessionId: refresh.sessionId, carryOver: [] };
   }
 }
 
