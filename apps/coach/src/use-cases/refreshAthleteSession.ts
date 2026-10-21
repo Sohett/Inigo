@@ -40,6 +40,11 @@ export type RefreshOutcome =
 
 export interface RefreshAthleteSession {
   execute(athlete: Athlete, session: ActiveSession): Promise<RefreshOutcome>;
+  /**
+   * Archive the session a `migrated` outcome replaced, once the first turn reached the new one.
+   * Best effort: an idle leftover session costs nothing. Never throws.
+   */
+  retire(previousSessionId: string): Promise<void>;
 }
 
 /**
@@ -56,8 +61,9 @@ export interface RefreshAthleteSession {
  * Intervals.icu, which the agent reads anyway; only the short thread lived in the session.
  *
  * Moving is an optimisation, never a reason to lose a message: until the athlete is repointed,
- * any failure leaves them on their session (`failed`), and the old session is archived only after,
- * on a best effort basis.
+ * any failure leaves them on their session (`failed`). The old session is archived by `retire`,
+ * which the caller runs only once the first turn reached the new session: a turn that fails to
+ * land leaves the old session as it was. (The carry-over itself is not replayed on a retry.)
  */
 export function createRefreshAthleteSession(deps: {
   repo: Pick<AthleteRepository, "replaceSession" | "findById">;
@@ -88,7 +94,6 @@ export function createRefreshAthleteSession(deps: {
     console.info(
       `[coach] athlete ${athlete.id} moved from session ${session.sessionId} to ${created.sessionId} (agent v${created.agentVersion})`
     );
-    await archive(session.sessionId);
     return {
       status: RefreshStatus.Migrated,
       sessionId: created.sessionId,
@@ -148,7 +153,9 @@ export function createRefreshAthleteSession(deps: {
         case SessionStatus.Terminated:
           return migrate(athlete, session, running);
       }
-    }
+    },
+
+    retire: archive
   };
 }
 

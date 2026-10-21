@@ -92,7 +92,8 @@ describe("refreshAthleteSession", () => {
         title: "Inigo · Thomas · 2026-10-21"
       });
       expect(repo.replaceSession).toHaveBeenCalledWith("a-1", "sesn_old", "sesn_new", "agent_coord");
-      expect(brain.archiveSession).toHaveBeenCalledWith("sesn_old");
+      // Archived by `retire`, once the first turn landed: not here.
+      expect(brain.archiveSession).not.toHaveBeenCalled();
       expect(outcome).toEqual({
         status: "migrated",
         sessionId: "sesn_new",
@@ -104,16 +105,6 @@ describe("refreshAthleteSession", () => {
       });
     }
   );
-
-  it("archives the old session only once the athlete points at the new one", async () => {
-    const { refresh, brain, repo } = makeDeps();
-
-    await refresh.execute(ATHLETE, SESSION);
-
-    expect(repo.replaceSession.mock.invocationCallOrder[0]).toBeLessThan(
-      brain.archiveSession.mock.invocationCallOrder[0] ?? 0
-    );
-  });
 
   it.each<SessionStatus>(["running", "rescheduling"])(
     "does not cut a %s turn: the outdated session keeps the message until the next one",
@@ -175,11 +166,12 @@ describe("refreshAthleteSession", () => {
     expect(brain.archiveSession).not.toHaveBeenCalledWith("sesn_old");
   });
 
-  it("still moves the athlete when the old session cannot be archived", async () => {
+  it("retires a session by archiving it, and swallows a refused archive", async () => {
     const { refresh, brain } = makeDeps();
     brain.archiveSession.mockRejectedValueOnce(new Error("archive refused"));
 
-    await expect(refresh.execute(ATHLETE, SESSION)).resolves.toMatchObject({ status: "migrated", sessionId: "sesn_new" });
+    await expect(refresh.retire("sesn_old")).resolves.toBeUndefined();
+    expect(brain.archiveSession).toHaveBeenCalledWith("sesn_old");
     expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("archive refused"));
   });
 });

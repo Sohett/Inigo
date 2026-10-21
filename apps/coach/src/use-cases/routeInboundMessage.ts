@@ -146,6 +146,8 @@ export function createRouteInboundMessage(deps: RouteInboundMessageDeps): RouteI
       const changes = senderChanges(athlete, sender, chatId);
       if (changes) await deps.repo.rememberSender(athlete.id, changes);
       await deps.brain.appendUserMessage(turn.sessionId, turn.text);
+      // Only now that the turn reached the new session is the outdated one archived.
+      if (turn.retiredSessionId) await deps.refreshSession.retire(turn.retiredSessionId);
 
       return { ...turn.outcome, athleteId: athlete.id, sessionId: turn.sessionId, chatId };
     }
@@ -156,6 +158,8 @@ export function createRouteInboundMessage(deps: RouteInboundMessageDeps): RouteI
 interface Turn {
   sessionId: string;
   text: string;
+  /** The outdated session this turn moved the athlete off (INI-27), to archive once it landed. */
+  retiredSessionId?: string;
   outcome:
     | { status: typeof RouteStatus.Forwarded | typeof RouteStatus.HandedOff }
     | { status: typeof RouteStatus.HandoffNotConfigured; reason: string };
@@ -182,11 +186,12 @@ async function resolveTurn(
       return resolveOnboardingTurn(athlete, session, text, deps);
     case "active":
     case "paused": {
-      const { sessionId, carryOver } = await refreshed(athlete, session, deps);
+      const { sessionId, carryOver, retiredSessionId } = await refreshed(athlete, session, deps);
       return {
         sessionId,
         text: formatTurn(athlete, text, new Date(), carryOver),
-        outcome: { status: RouteStatus.Forwarded }
+        outcome: { status: RouteStatus.Forwarded },
+        retiredSessionId
       };
     }
     case "ended":
@@ -207,8 +212,13 @@ async function resolveOnboardingTurn(
     throw new Error(`Athlete ${athlete.id} vanished while routing their message.`);
   }
   const onboardingTurn = async (outcome: Turn["outcome"]): Promise<Turn> => {
-    const { sessionId, carryOver } = await refreshed(athlete, session, deps);
-    return { sessionId, text: formatOnboardingTurn(athlete, assessed.state, text, new Date(), carryOver), outcome };
+    const { sessionId, carryOver, retiredSessionId } = await refreshed(athlete, session, deps);
+    return {
+      sessionId,
+      text: formatOnboardingTurn(athlete, assessed.state, text, new Date(), carryOver),
+      outcome,
+      retiredSessionId
+    };
   };
   if (!assessed.state.complete) return onboardingTurn({ status: RouteStatus.Forwarded });
 
@@ -233,11 +243,11 @@ async function refreshed(
   athlete: Athlete,
   session: ActiveSession,
   deps: Pick<RouteInboundMessageDeps, "refreshSession">
-): Promise<{ sessionId: string; carryOver: SessionExchange[] }> {
+): Promise<{ sessionId: string; carryOver: SessionExchange[]; retiredSessionId?: string }> {
   const refresh = await deps.refreshSession.execute(athlete, session);
   switch (refresh.status) {
     case RefreshStatus.Migrated:
-      return { sessionId: refresh.sessionId, carryOver: refresh.carryOver };
+      return { sessionId: refresh.sessionId, carryOver: refresh.carryOver, retiredSessionId: refresh.previousSessionId };
     case RefreshStatus.Current:
     case RefreshStatus.Busy:
     case RefreshStatus.Failed:

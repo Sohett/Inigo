@@ -187,7 +187,8 @@ une passation, qui ouvre déjà une session neuve).
   `repo.replaceSession` : repointage **conditionnel**, seulement si l'ancienne est toujours la
   session live. Deux messages d'une même rafale qui migrent en même temps : le second perd (index
   « une session live par athlète », batch annulé), archive sa session inutilisée et suit celle du
-  premier. La conversation ne se scinde jamais. L'ancienne session est ensuite archivée (best effort).
+  premier. La conversation ne se scinde jamais. L'ancienne session est archivée (`retire`, best
+  effort) **après** l'append du premier tour à la nouvelle : un tour qui n'arrive pas la laisse intacte.
 - **Reprise du fil** : le premier tour de la nouvelle session porte `reprise_conversation:`, les
   **12 derniers messages WhatsApp** (500 caractères max chacun), lus dans les events de l'ancienne
   session : la ligne `message:` des tours appendés (les tours sans texte, comme
@@ -197,8 +198,8 @@ une passation, qui ouvre déjà une session neuve).
   déploiement, contre un contexte d'ancienne session relu à chaque tour.
 - **Jamais un message perdu** : toute panne avant le repointage (lecture des versions, des events,
   création, écriture Neon) → `failed`, warning loggé, le message part à la session actuelle (pas
-  de 502). Après le repointage, un append qui échoue → 502 et retry OpenWA vers la nouvelle
-  session, sans la reprise.
+  de 502). Résidu assumé : création acceptée puis append refusé dans la foulée → 502 et retry
+  OpenWA vers la nouvelle session, sans la reprise (on ne la rejoue pas, ce serait un état de plus).
 - **Ordre de déploiement** : un prompt qui change l'enveloppe (ici `reprise_conversation`) est
   appliqué (`brain:agent:apply`) **avant** le deploy du coach, pour que chaque athlète migre vers
   un agent qui la connaît.

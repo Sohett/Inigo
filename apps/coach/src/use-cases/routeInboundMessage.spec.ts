@@ -63,7 +63,8 @@ const fakeRefresh = () => ({
   execute: vi.fn(
     (_athlete: Athlete, session: { sessionId: string }): Promise<RefreshOutcome> =>
       Promise.resolve({ status: "current", sessionId: session.sessionId })
-  )
+  ),
+  retire: vi.fn((_sessionId: string) => Promise.resolve())
 });
 
 function makeDeps(athlete: Athlete | null) {
@@ -288,6 +289,19 @@ describe("routeInboundMessage", () => {
         `${DATE_LINE}\ninigo_athlete_id: a-1\nathlete_display_name: Thomas\nlocale: fr\n${CARRY_OVER_LINE}\nmessage: "salut"`
       );
       expect(outcome).toMatchObject({ status: "forwarded", sessionId: "sesn_new" });
+      expect(refreshSession.retire).toHaveBeenCalledWith("sesn_abc");
+      expect(appendUserMessage.mock.invocationCallOrder[0]).toBeLessThan(
+        refreshSession.retire.mock.invocationCallOrder[0] ?? 0
+      );
+    });
+
+    it("leaves the outdated session alone when the first turn does not reach the new one", async () => {
+      const { deps, appendUserMessage, refreshSession } = makeDeps(makeAthlete());
+      refreshSession.execute.mockResolvedValueOnce(MIGRATED);
+      appendUserMessage.mockRejectedValueOnce(new Error("anthropic down"));
+
+      await expect(createRouteInboundMessage(deps).execute(inbound)).rejects.toThrow("anthropic down");
+      expect(refreshSession.retire).not.toHaveBeenCalled();
     });
 
     it("carries the conversation over in an onboarding turn too, after the checklist", async () => {
@@ -322,6 +336,7 @@ describe("routeInboundMessage", () => {
         await createRouteInboundMessage(deps).execute(inbound);
 
         expect(appendUserMessage).toHaveBeenCalledWith("sesn_abc", expect.not.stringContaining("reprise_conversation"));
+        expect(refreshSession.retire).not.toHaveBeenCalled();
       }
     });
 
