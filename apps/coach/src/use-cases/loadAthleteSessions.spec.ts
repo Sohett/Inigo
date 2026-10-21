@@ -61,7 +61,10 @@ function makeDeps(
       appendUserMessage: vi.fn(),
       createSession: vi.fn(),
       readSession,
-      listInventory
+      listInventory,
+      latestAgentVersion: vi.fn(),
+      readExchanges: vi.fn(),
+      archiveSession: vi.fn()
     }
   };
   return { deps, readSession, listInventory, listSessions };

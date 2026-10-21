@@ -38,7 +38,10 @@ function makeDeps(
       appendUserMessage: vi.fn(),
       createSession: vi.fn(),
       readSession: vi.fn(),
-      listInventory: vi.fn(overrides.listInventory ?? (() => Promise.resolve(inventory)))
+      listInventory: vi.fn(overrides.listInventory ?? (() => Promise.resolve(inventory))),
+      latestAgentVersion: vi.fn(),
+      readExchanges: vi.fn(),
+      archiveSession: vi.fn()
     }
   };
 }

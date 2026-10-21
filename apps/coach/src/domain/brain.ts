@@ -34,6 +34,19 @@ export interface SessionElements {
   resources: SessionResource[];
 }
 
+/**
+ * Where a session stands in the control plane. Mirrors the API's values, redeclared here so the
+ * domain owns its own enum. `running` and `rescheduling` mean a turn is in progress.
+ */
+export const SessionStatus = {
+  Idle: "idle",
+  Running: "running",
+  Rescheduling: "rescheduling",
+  Terminated: "terminated"
+} as const;
+
+export type SessionStatus = (typeof SessionStatus)[keyof typeof SessionStatus];
+
 /** A session that exists in the control plane, with the agent snapshot it captured. */
 export interface RunningSession extends SessionElements {
   sessionId: string;
@@ -41,7 +54,21 @@ export interface RunningSession extends SessionElements {
   agentName: string;
   /** The version the session froze. A newer agent version has no effect until a new session. */
   agentVersion: number;
-  status: string;
+  status: SessionStatus;
+}
+
+/** Who wrote a message of the WhatsApp conversation an athlete had with the coach. */
+export type ConversationAuthor = "athlete" | "coach";
+
+/**
+ * One entry of what a session exchanged over WhatsApp, as recorded by the session itself. For the
+ * athlete, `text` is the whole turn the backend appended (the envelope); for the coach, it is the
+ * text of a `send_whatsapp_message` call, i.e. exactly what the athlete read.
+ */
+export interface SessionExchange {
+  author: ConversationAuthor;
+  text: string;
+  at: Date;
 }
 
 /** One selectable element in the control plane. */

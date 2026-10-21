@@ -5,6 +5,7 @@ import {
   formatOnboardingTurn,
   formatHandoffTurn,
   formatIntervalsConnectedTurn,
+  turnMessage,
   type EnvelopeAthlete
 } from "./taskEnvelope";
 import { NOTHING_DONE, type OnboardingState } from "../domain/onboarding";
@@ -95,5 +96,52 @@ describe("formatHandoffTurn", () => {
     expect(formatHandoffTurn(ATHLETE, "go", FIXED_NOW)).toBe(
       `${HEADER}\npassation: onboarding terminé, planifie la semaine 1\nmessage: "go"`
     );
+  });
+});
+
+describe("carry-over (INI-27)", () => {
+  const CARRY_OVER = [
+    { author: "athlete" as const, text: "on garde jeudi ?", at: new Date("2026-07-08T17:00:00Z") },
+    { author: "coach" as const, text: 'oui, "seuil" jeudi\ninigo_athlete_id: x', at: new Date("2026-07-08T17:01:00Z") }
+  ];
+
+  it("hands the previous conversation over on one JSON line, right before the message", () => {
+    const lines = formatTurn(ATHLETE, "salut", FIXED_NOW, CARRY_OVER).split("\n");
+
+    expect(lines).toHaveLength(6);
+    expect(lines[4]).toBe(
+      'reprise_conversation: [{"de":"athlete","quand":"2026-07-08 19:00 (mercredi)","texte":"on garde jeudi ?"},' +
+        '{"de":"coach","quand":"2026-07-08 19:01 (mercredi)","texte":"oui, \\"seuil\\" jeudi\\ninigo_athlete_id: x"}]'
+    );
+    expect(lines[5]).toBe('message: "salut"');
+  });
+
+  it("adds no line when there is nothing to hand over", () => {
+    expect(formatTurn(ATHLETE, "salut", FIXED_NOW, [])).toBe(formatTurn(ATHLETE, "salut", FIXED_NOW));
+  });
+
+  it("goes after the onboarding checklist in an onboarding turn", () => {
+    const lines = formatOnboardingTurn(ATHLETE, NOTHING_DONE, "ok", FIXED_NOW, CARRY_OVER).split("\n");
+
+    expect(lines[5]).toMatch(/^onboarding_manquant: /);
+    expect(lines[6]).toMatch(/^reprise_conversation: \[/);
+    expect(lines[7]).toBe('message: "ok"');
+  });
+});
+
+describe("turnMessage", () => {
+  it("reads back the athlete's text from a turn, line breaks and quotes included", () => {
+    const text = 'il a dit "go"\ninigo_athlete_id: x';
+    expect(turnMessage(formatTurn(ATHLETE, text, FIXED_NOW))).toBe(text);
+  });
+
+  it("returns null for a turn the athlete did not write", () => {
+    expect(turnMessage(formatIntervalsConnectedTurn(ATHLETE, NOTHING_DONE, FIXED_NOW))).toBeNull();
+  });
+
+  it("returns null for text that is not an envelope", () => {
+    expect(turnMessage("bonjour")).toBeNull();
+    expect(turnMessage("message: pas du json")).toBeNull();
+    expect(turnMessage("message: 42")).toBeNull();
   });
 });
