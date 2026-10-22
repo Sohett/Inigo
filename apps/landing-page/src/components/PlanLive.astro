@@ -11,20 +11,29 @@ interface Props {
 
 const { demo } = Astro.props;
 const weekNote = `${demo.adjustedDays} ${demo.adjustedDays > 1 ? plan.adjustedMany : plan.adjustedOne}`;
+const stats = [
+  { label: plan.stats.target, field: "target", value: demo.goal.target },
+  { label: plan.stats.format, field: "format", value: demo.goal.format },
+  { label: plan.stats.hours, field: "hours", value: demo.goal.hours },
+];
 ---
 
-<section class="plan band" id="plan" data-demo-plan>
-  <div class="wrap reveal">
-    <div class="card plan-card" style={`--weeks:${demo.goal.weeks}`} data-demo-plan-card>
-      <div class="plan-head">
-        <div class="stack" style="gap:8px">
+<section class="band pt-6 pb-22" id="plan">
+  <div class="reveal mx-auto max-w-wrap">
+    <div
+      class="flex flex-col gap-[26px] rounded-md bg-white p-[clamp(18px,2.6vw,36px)] shadow-phone"
+      style={`--weeks:${demo.goal.weeks}`}
+      data-demo-plan-card
+    >
+      <div class="flex flex-wrap items-end justify-between gap-5">
+        <div class="flex flex-col gap-2">
           <span class="mono">{plan.eyebrow}</span>
-          <b class="plan-race" data-demo-field="race">{demo.goal.race}</b>
+          <b class="text-[clamp(26px,3vw,40px)] leading-none font-semibold tracking-[-0.02em]" data-demo-field="race">{demo.goal.race}</b>
         </div>
-        <div class="goals" role="group" aria-label={plan.goalsAriaLabel}>
+        <div class="inline-flex flex-wrap gap-0.5 rounded-[22px] bg-sand-50 p-1 sm:rounded-full" role="group" aria-label={plan.goalsAriaLabel}>
           {
             goals.map((goal) => (
-              <button type="button" data-demo-goal={goal.id} aria-pressed={goal.id === demo.goal.id ? "true" : "false"}>
+              <button type="button" class="goal" data-demo-goal={goal.id} aria-pressed={goal.id === demo.goal.id ? "true" : "false"}>
                 {goal.label}
               </button>
             ))
@@ -32,44 +41,67 @@ const weekNote = `${demo.adjustedDays} ${demo.adjustedDays > 1 ? plan.adjustedMa
         </div>
       </div>
 
-      <div class="plan-stats">
-        <div><span class="mono">{plan.stats.target}</span><b data-demo-field="target">{demo.goal.target}</b></div>
-        <div><span class="mono">{plan.stats.format}</span><b data-demo-field="format">{demo.goal.format}</b></div>
-        <div><span class="mono">{plan.stats.hours}</span><b data-demo-field="hours">{demo.goal.hours}</b></div>
-        <div>
-          <span class="mono">{plan.stats.duration}</span><b
-            ><span data-demo-field="weeks">{demo.goal.weeks}</span> {plan.weeksUnit}</b
-          >
+      <div class="flex flex-wrap gap-7 border-b border-ink/10 pb-[18px]">
+        {
+          stats.map((stat) => (
+            <div class="flex flex-col gap-1">
+              <span class="mono">{stat.label}</span>
+              <b class="text-[19px] font-medium" data-demo-field={stat.field}>
+                {stat.value}
+              </b>
+            </div>
+          ))
+        }
+        <div class="flex flex-col gap-1">
+          <span class="mono">{plan.stats.duration}</span>
+          <b class="text-[19px] font-medium"><span data-demo-field="weeks">{demo.goal.weeks}</span> {plan.weeksUnit}</b>
         </div>
       </div>
 
-      <div class="plan-chart-row">
-        <div class="plan-chart" role="img" aria-label={plan.chartAriaLabel} data-demo-weeks set:html={renderWeeks(demo.weeks)} />
-        <div class="race-day" aria-hidden="true"><span>{plan.raceDay}</span><i></i></div>
+      <div class="flex items-stretch gap-2.5">
+        <div
+          class="grid min-w-0 grow grid-cols-[repeat(var(--weeks),minmax(0,1fr))] items-end gap-0.5 bg-[linear-gradient(#1c1c1c0d_1px,transparent_1px)] bg-size-[100%_25%] pt-2 sm:gap-[5px]"
+          role="img"
+          aria-label={plan.chartAriaLabel}
+          data-demo-weeks
+          set:html={renderWeeks(demo.weeks)}
+        />
+        <div class="flex h-[188px] w-10 shrink-0 flex-col items-center gap-2 sm:h-[238px] sm:w-[60px]" aria-hidden="true">
+          <span
+            class="rounded-[3px] border border-effort bg-effort-bg px-[7px] py-1 font-mono text-[9px] leading-none font-semibold tracking-[0.06em] whitespace-nowrap text-effort-text sm:text-[11px]"
+            >{plan.raceDay}</span
+          >
+          <i class="w-0.5 grow bg-[repeating-linear-gradient(var(--color-effort)_0_6px,transparent_6px_11px)]"></i>
+        </div>
       </div>
-      <div class="plan-phases-row">
-        <div class="plan-phases" data-demo-phases set:html={renderPhases(demo.phases)} />
+      <div class="flex gap-2.5 after:w-10 after:shrink-0 sm:after:w-[60px]">
+        <div class="grid grow grid-cols-[repeat(var(--weeks),minmax(0,1fr))] gap-0.5 sm:gap-[5px]" data-demo-phases set:html={renderPhases(demo.phases)} />
       </div>
 
-      <div class="plan-this-week">
-        <div class="plan-this-week-head">
-          <span class="mono ink">{plan.thisWeek} <span data-demo-field="current-week">{demo.currentWeek}</span></span>
+      <div class="flex flex-col gap-3.5 border-t border-ink/10 pt-[22px]">
+        <div class="flex flex-wrap justify-between gap-3">
+          <span class="mono text-ink">{plan.thisWeek} <span data-demo-field="current-week">{demo.currentWeek}</span></span>
           <span
-            class="mono is-adjusted"
+            class="mono text-effort-strong"
             data-demo-week-note
             data-label-one={plan.adjustedOne}
             data-label-many={plan.adjustedMany}>{weekNote}</span
           >
         </div>
-        <div class="plan-days" data-demo-days data-badge={plan.adjustedBadge} set:html={renderDays(demo.days, plan.adjustedBadge)} />
+        <div
+          class="grid grid-cols-2 gap-2.5 tablet:grid-cols-4 wide:grid-cols-7"
+          data-demo-days
+          data-badge={plan.adjustedBadge}
+          set:html={renderDays(demo.days, plan.adjustedBadge)}
+        />
       </div>
 
-      <div class="plan-foot">
-        <div class="legend">
+      <div class="flex flex-wrap items-center justify-between gap-3.5">
+        <div class="flex flex-wrap gap-3.5">
           {
             plan.zones.map((zone, index) => (
-              <span class="mono">
-                <i class={`zone-${index + 1}`} />
+              <span class="mono inline-flex items-center gap-1.5">
+                <i class={`zone-${index + 1} inline-block h-2 w-3 rounded-[2px] border border-(--zone-solid)`} />
                 {zone}
               </span>
             ))
@@ -79,9 +111,9 @@ const weekNote = `${demo.adjustedDays} ${demo.adjustedDays > 1 ? plan.adjustedMa
       </div>
     </div>
 
-    <div class="compat">
+    <div class="mt-8 flex flex-wrap items-center justify-center gap-x-[22px] gap-y-2.5">
       <span class="mono">{plan.compat.label}</span>
-      {plan.compat.brands.map((brand) => <span>{brand}</span>)}
+      {plan.compat.brands.map((brand) => <span class="text-sm font-semibold">{brand}</span>)}
       <span class="mono">{plan.compat.via}</span>
     </div>
   </div>

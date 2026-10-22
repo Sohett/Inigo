@@ -38,7 +38,7 @@ apps/landing-page/
       plan-demo-view.ts            # rendus HTML partagés build / navigateur
       demo-controller.ts           # script client : rotation 6 s, clics, pause
       whatsapp-link.ts             # lien wa.me avec message prérempli
-    styles/global.css              # tokens + composants du DS, classes de section, motion
+    styles/global.css              # Tailwind 4 : tokens du DS (@theme) + primitives (@layer components)
 ```
 
 ## La démo interactive (hero + « Ton plan, en direct »)
@@ -65,9 +65,17 @@ dans l'admin du coach (Réglages, Onboarding) ; s'il change là-bas, le changer 
 
 ## Conventions du service
 
-- **Sections statiques en `.astro`**, CSS à plat dans `global.css` (pas de Tailwind, pas de
-  framework d'îlots). Seul JS client : la démo et le reveal.
-- **Bascule mobile/desktop** en CSS : `.only-mobile` / `.only-desktop` (breakpoint 1024px).
+- **Sections statiques en `.astro`, stylées en utilitaires Tailwind 4** (pas de framework
+  d'îlots). Seul JS client : la démo et le reveal.
+- **Tokens du DS dans `@theme`** (`global.css`) : `bg-paper`, `text-ink/75`, `border-effort`,
+  `bg-z3-soft`, `font-mono`… Jamais de hex en dur dans un composant quand un token existe.
+  Breakpoints du DS en plus des standards : `tablet:` (900px, une ou deux colonnes) et `wide:`
+  (1100px).
+- **`@layer components`** seulement pour les primitives répétées du DS (`pill` + `pill-dark|grey|light`,
+  `mono`, `display-1|2`, `card`, `phone`, `bub`…) et pour le markup généré par
+  `plan-demo-view.ts` (`plan-*`, `zone-*`), qui ne passe pas par un composant Astro.
+- **Bascule mobile/desktop** en CSS : `lg:hidden` / `max-lg:hidden` (1024px) pour WhatsApp direct
+  vs QR ; sous `md`, la barre CTA collante remplace la nav et le CTA du header.
 - **Motion** : transitions CSS + IntersectionObserver maison. Tout effet est neutralisé sous
   `prefers-reduced-motion`. Le reveal n'est actif que si JS l'est (classe `.js`).
 - **Contraste AA** : labels mono en `--ig-muted` réservés aux libellés courts ; texte orange en
@@ -87,7 +95,8 @@ dans l'admin du coach (Réglages, Onboarding) ; s'il change là-bas, le changer 
 ## Ajouter / modifier une section
 
 1. Édite la copy dans `src/content/copy.ts` (jamais de texte en dur dans les composants).
-2. Crée/édite le composant `.astro` ; ajoute `class="reveal"` (+ `--delay`) pour l'apparition
-   au scroll. Section ancrée : `id` (le header compense via `scroll-padding-top`).
+2. Crée/édite le composant `.astro` en utilitaires Tailwind (`band` + `mx-auto max-w-wrap` pour
+   la largeur) ; ajoute `class="reveal"` (+ `--delay`) pour l'apparition au scroll. Section
+   ancrée : `id` (le header compense via `scroll-padding-top`).
 3. Branche-le dans `src/pages/index.astro`.
 4. `pnpm verify`.

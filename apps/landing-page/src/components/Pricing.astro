@@ -3,32 +3,41 @@ import StartCta from "@/components/StartCta.astro";
 import { pricing } from "@/content/copy";
 ---
 
-<section class="sec alt band" id="tarifs">
-  <div class="wrap" style="max-width:960px">
-    <div class="sec-head center reveal">
+<section class="band bg-sand-50 py-22" id="tarifs">
+  <div class="mx-auto max-w-[960px]">
+    <div class="reveal mx-auto mb-12 max-w-[760px] text-center">
       <span class="mono">{pricing.eyebrow}</span>
-      <h2 class="display-2">{pricing.title}</h2>
-      <p class="r">{pricing.body}</p>
+      <h2 class="display-2 mt-3.5">{pricing.title}</h2>
+      <p class="mt-[18px] text-[17px] leading-[1.55] text-ink/75">{pricing.body}</p>
     </div>
-    <div class="offers reveal" style="--delay:100ms">
+    <div class="reveal grid gap-3 sm:grid-cols-2" style="--delay:100ms">
       {
         pricing.offers.map((offer) => (
-          <div class:list={["offer", { rec: offer.recommended }]}>
-            <span class="mono">{offer.label}</span>
-            <b class="price">
+          <div
+            class:list={[
+              "grid content-start gap-3 rounded-sm border p-[22px]",
+              offer.recommended ? "border-night bg-night text-paper" : "border-ink/10 bg-paper",
+            ]}
+          >
+            <span class:list={["mono", { "text-paper/75": offer.recommended }]}>{offer.label}</span>
+            <b class="text-[38px] leading-none font-medium tracking-[-0.02em]">
               {offer.price}
-              <small>{offer.unit}</small>
+              <small class="ml-1.5 font-mono text-xs font-medium tracking-[0.06em] opacity-75">{offer.unit}</small>
             </b>
-            <ul>
+            <ul class:list={["grid list-disc gap-[5px] pl-[18px] text-sm", offer.recommended ? "text-paper/75" : "text-ink/75"]}>
               {offer.items.map((item) => (
                 <li>{item}</li>
               ))}
             </ul>
-            {offer.cta && <StartCta label={offer.cta} class={offer.recommended ? "pill light" : "pill dark"} />}
+            {offer.cta && (
+              <div class="mt-1.5">
+                <StartCta label={offer.cta} class={offer.recommended ? "pill pill-light" : "pill pill-dark"} />
+              </div>
+            )}
           </div>
         ))
       }
     </div>
-    <p class="mono pricing-footnote">{pricing.footnote}</p>
+    <p class="mono mt-5 text-center">{pricing.footnote}</p>
   </div>
 </section>

@@ -46,7 +46,7 @@ export function renderDays(days: readonly DayCard[], adjustedBadge: string): str
   return days
     .map(
       (day) =>
-        `<div class="plan-day${day.adjusted ? " is-adjusted" : ""}"><div class="plan-day-head"><span class="mono ink">${escapeHtml(day.day)}</span><span class="mono">${escapeHtml(day.sport)}</span></div><div class="plan-day-bar zone-${day.zone}"></div><b>${escapeHtml(day.title)}</b><span class="mono">${escapeHtml(day.meta)}</span>${
+        `<div class="plan-day${day.adjusted ? " is-adjusted" : ""}"><div class="plan-day-head"><span class="mono text-ink">${escapeHtml(day.day)}</span><span class="mono">${escapeHtml(day.sport)}</span></div><div class="plan-day-bar zone-${day.zone}"></div><b>${escapeHtml(day.title)}</b><span class="mono">${escapeHtml(day.meta)}</span>${
           day.adjusted ? `<span class="plan-day-badge">${escapeHtml(adjustedBadge)}</span>` : ""
         }</div>`,
     )

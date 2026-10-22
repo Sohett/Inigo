@@ -9,7 +9,8 @@ Inigo (voir le [README racine](../../README.md)).
 ## Stack
 
 - **Astro 7**, site 100 % statique (SSG), sans framework d'îlots ; un script TS pour la démo
-- **CSS à plat** (`src/styles/global.css`) : tokens et composants du DS Inigo
+- **Tailwind CSS v4** (config CSS-first : tokens du DS Inigo dans `@theme`, `src/styles/global.css`,
+  `@tailwindcss/vite`)
 - **Polices self-hostées** via `@fontsource` (IBM Plex Sans, IBM Plex Mono)
 - **`qrcode`** : QR WhatsApp généré au build (SVG)
 - **Adapter `@astrojs/vercel`**

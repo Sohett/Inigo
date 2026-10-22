@@ -17,7 +17,7 @@ import { planDemo } from "@/lib/plan-demo";
 const initialDemo = planDemo(goals[0]?.id ?? "triathlon-l", scenarios[0]?.id ?? "bad-night");
 ---
 
-<Base bodyClass="has-mobile-bar">
+<Base bodyClass="max-md:pb-20">
   <SiteHeader />
   <main id="contenu">
     <Hero demo={initialDemo} />

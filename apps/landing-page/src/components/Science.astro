@@ -2,29 +2,35 @@
 import { science } from "@/content/copy";
 ---
 
-<section class="science dark band" id="science">
-  <div class="wrap split">
-    <div class="l stack reveal">
-      <span class="mono">{science.eyebrow}</span>
+<section class="band bg-night py-24 text-paper" id="science">
+  <div class="mx-auto grid max-w-wrap items-start gap-[30px] tablet:grid-cols-12">
+    <div class="reveal flex flex-col gap-5 tablet:col-span-5">
+      <span class="mono text-paper/40">{science.eyebrow}</span>
       <h2 class="display-2">{science.title}</h2>
-      <p class="lede">{science.body}</p>
-      <div class="bub large in" style="max-width:100%;margin-top:8px">
+      <p class="text-lg leading-[1.55] text-paper/75">{science.body}</p>
+      <div class="bub large in mt-2 max-w-full">
         {science.bubble.text}
         <time>{science.bubble.time}</time>
       </div>
     </div>
-    <div class="r reveal" style="--delay:100ms">
+    <div class="reveal tablet:col-span-6 tablet:col-start-7" style="--delay:100ms">
       {
         science.zones.map((zone) => (
-          <div class="zone-row">
+          <div class="grid grid-cols-[52px_1fr] gap-x-[18px] gap-y-1.5 border-t border-paper/14 py-[18px] last:border-b">
             {/* Z3 et Z4 sont clairs : texte nuit pour garder le contraste. */}
-            <span class:list={["zone-tag", `zone-${zone.zone}`, { "on-light": zone.zone === 3 || zone.zone === 4 }]}>
+            <span
+              class:list={[
+                `zone-${zone.zone}`,
+                "self-start rounded-[3px] bg-(--zone-solid) py-1 text-center font-mono text-[13px] font-semibold",
+                zone.zone === 3 || zone.zone === 4 ? "text-night" : "text-paper",
+              ]}
+            >
               Z{zone.zone}
             </span>
             <div>
-              <b>{zone.name}</b>
+              <b class="text-[22px] font-medium">{zone.name}</b>
               <div class={`zone-signal z${zone.zone}`} />
-              <p>{zone.body}</p>
+              <p class="text-[15px] leading-[1.55] text-paper/75">{zone.body}</p>
             </div>
           </div>
         ))

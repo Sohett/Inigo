@@ -2,10 +2,12 @@
 import { nav, whatsappContact } from "@/content/copy";
 import { whatsappLink } from "@/lib/whatsapp-link";
 
-/** Barre CTA collante en bas d'écran, sous 768px (le header n'a alors plus de place). */
+/** Barre CTA collante en bas d'écran, sous md (le header n'a alors plus de CTA). */
 const url = whatsappLink(whatsappContact.phoneNumber, whatsappContact.message);
 ---
 
-<div class="mobile-bar">
-  <a class="pill dark" href={url} rel="noopener"><span class="wa-dot"></span>{nav.cta}</a>
+<div
+  class="fixed inset-x-0 bottom-0 z-30 border-t border-ink/10 bg-paper/92 px-4 pt-2.5 pb-[calc(14px+env(safe-area-inset-bottom,0px))] backdrop-blur-md md:hidden"
+>
+  <a class="pill pill-dark w-full" href={url} rel="noopener"><span class="wa-dot"></span>{nav.cta}</a>
 </div>

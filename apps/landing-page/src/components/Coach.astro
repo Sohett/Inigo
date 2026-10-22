@@ -4,16 +4,27 @@ import photo from "@/assets/coach-col.jpg";
 import { coach } from "@/content/copy";
 ---
 
-<section class="coach" id="coach">
-  <Image src={photo} alt={coach.imageAlt} class="coach-photo" widths={[800, 1440, 2000]} sizes="100vw" quality={70} loading="lazy" />
-  <div class="coach-inner band">
-    <div class="wrap coach-grid reveal">
-      <div class="l">
-        <span class="mono">{coach.eyebrow}</span>
+<section
+  class="relative flex min-h-[620px] items-end overflow-hidden bg-night text-paper before:absolute before:inset-0 before:z-1 before:bg-linear-to-b before:from-transparent before:from-35% before:to-black/70"
+  id="coach"
+>
+  <Image
+    src={photo}
+    alt={coach.imageAlt}
+    class="absolute inset-0 size-full max-w-none object-cover object-[center_40%]"
+    widths={[800, 1440, 2000]}
+    sizes="100vw"
+    quality={70}
+    loading="lazy"
+  />
+  <div class="band relative z-2 w-full py-16">
+    <div class="reveal mx-auto grid max-w-wrap items-end gap-[30px] tablet:grid-cols-12">
+      <div class="flex flex-col gap-[18px] tablet:col-span-7">
+        <span class="mono text-paper/75">{coach.eyebrow}</span>
         <h2 class="display-2">{coach.titleLines[0]}<br />{coach.titleLines[1]}</h2>
-        <p>{coach.body}</p>
+        <p class="max-w-[560px] text-lg leading-normal text-paper/88">{coach.body}</p>
       </div>
-      <div class="r">
+      <div class="flex flex-col gap-2 tablet:col-span-4 tablet:col-start-9">
         {
           coach.bubbles.map((bubble) => (
             <div class={`bub large ${bubble.side}`}>

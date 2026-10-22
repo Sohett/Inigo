@@ -6,25 +6,26 @@ import { whatsappLink } from "@/lib/whatsapp-link";
 /** Démarrer (QR sur desktop, WhatsApp direct sur mobile) et footer, sur la bande sombre finale. */
 const url = whatsappLink(whatsappContact.phoneNumber, whatsappContact.message);
 const [firstStep, ...otherSteps] = start.steps;
+const stepClass = "grid grid-cols-[48px_1fr] gap-3 border-t border-paper/14 py-3.5 text-paper/75 last:border-b";
 ---
 
-<section class="start dark band" id="start">
-  <div class="wrap start-grid">
-    <div class="stack reveal" style="gap:26px">
-      <span class="mono">{start.eyebrow}</span>
-      <h2 class="display-1">{start.title}</h2>
-      <ol class="steps">
-        <li>
-          <span class="mono">01</span>
-          <span class="only-desktop"><b>{firstStep?.title}</b> {firstStep?.body}</span>
-          <span class="only-mobile"><b>{start.mobileFirstStep.title}</b> {start.mobileFirstStep.body}</span>
+<section class="band bg-night pt-26 text-paper" id="start">
+  <div class="mx-auto grid max-w-wrap items-center gap-12 tablet:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+    <div class="reveal flex flex-col gap-[26px]">
+      <span class="mono text-paper/40">{start.eyebrow}</span>
+      <h2 class="display-1 text-[clamp(46px,6vw,96px)] text-paper">{start.title}</h2>
+      <ol class="m-0 list-none p-0">
+        <li class={stepClass}>
+          <span class="mono text-teal-light">01</span>
+          <span class="max-lg:hidden"><b class="font-medium text-paper">{firstStep?.title}</b> {firstStep?.body}</span>
+          <span class="lg:hidden"><b class="font-medium text-paper">{start.mobileFirstStep.title}</b> {start.mobileFirstStep.body}</span>
         </li>
         {
           otherSteps.map((step, index) => (
-            <li>
-              <span class="mono">{String(index + 2).padStart(2, "0")}</span>
+            <li class={stepClass}>
+              <span class="mono text-teal-light">{String(index + 2).padStart(2, "0")}</span>
               <span>
-                <b>{step.title}</b> {step.body}
+                <b class="font-medium text-paper">{step.title}</b> {step.body}
               </span>
             </li>
           ))
@@ -32,22 +33,20 @@ const [firstStep, ...otherSteps] = start.steps;
       </ol>
     </div>
     <div class="reveal" style="--delay:100ms">
-      <div class="qr-panel only-desktop">
-        <WhatsAppQr label={start.qr.alt} />
-        <span class="mono with-dot"><span class="wa-dot"></span>{start.qr.title}</span>
-        <p>{start.qr.body}</p>
-        <a class="pill dark" href={url} target="_blank" rel="noopener"><span class="wa-dot"></span>{start.desktopLink}</a>
+      <div class="flex flex-col items-center gap-[18px] rounded-md bg-paper p-7 text-center text-ink max-lg:hidden">
+        <WhatsAppQr label={start.qr.alt} class="size-[220px]" />
+        <span class="mono inline-flex items-center gap-2 text-ink"><span class="wa-dot"></span>{start.qr.title}</span>
+        <p class="text-sm leading-[1.45] text-ink/75">{start.qr.body}</p>
+        <a class="pill pill-dark" href={url} target="_blank" rel="noopener"><span class="wa-dot"></span>{start.desktopLink}</a>
       </div>
-      <a class="pill light only-mobile" href={url} rel="noopener" style="width:100%"
-        ><span class="wa-dot"></span>{start.mobileCta}</a
-      >
+      <a class="pill pill-light w-full lg:hidden" href={url} rel="noopener"><span class="wa-dot"></span>{start.mobileCta}</a>
     </div>
   </div>
-  <footer class="wrap site-footer">
-    <span class="mono">{footer.copyright}</span>
-    <nav class="mono" aria-label={footer.navLabel}>
-      <a href="/confidentialite">{footer.privacy}</a>
-      <a href={`mailto:${footer.contactEmail}`}>{footer.contact}</a>
+  <footer class="mx-auto mt-22 flex max-w-wrap flex-wrap justify-between gap-4 border-t border-paper/14 py-[22px]">
+    <span class="mono text-paper/40">{footer.copyright}</span>
+    <nav class="mono flex gap-4 text-paper/40" aria-label={footer.navLabel}>
+      <a class="no-underline hover:text-paper" href="/confidentialite">{footer.privacy}</a>
+      <a class="no-underline hover:text-paper" href={`mailto:${footer.contactEmail}`}>{footer.contact}</a>
     </nav>
   </footer>
 </section>

@@ -4,12 +4,22 @@ import StartCta from "@/components/StartCta.astro";
 import { nav } from "@/content/copy";
 ---
 
-<header class="hdr band">
-  <div class="wrap">
-    <a class="logo" href="#top" aria-label={nav.homeLabel}><Logo /></a>
-    <nav class="nav" aria-label={nav.ariaLabel}>
-      {nav.items.map((item) => <a href={item.href}>{item.label}</a>)}
+<header class="band sticky top-0 z-20 border-b border-ink/10 bg-paper/92 backdrop-blur-md">
+  <div class="mx-auto flex h-15 max-w-wrap items-center justify-between gap-6">
+    <a class="inline-flex items-center gap-2.5 text-ink-strong" href="#top" aria-label={nav.homeLabel}><Logo /></a>
+    {/* Sous md, la barre CTA collante du bas remplace la nav et le CTA du header. */}
+    <nav class="flex min-w-0 gap-1 max-md:hidden" aria-label={nav.ariaLabel}>
+      {
+        nav.items.map((item) => (
+          <a
+            href={item.href}
+            class="rounded-[5px] border border-transparent px-2.5 pt-[5px] pb-1.5 text-[13px] whitespace-nowrap no-underline transition-colors hover:border-ink/20"
+          >
+            {item.label}
+          </a>
+        ))
+      }
     </nav>
-    <StartCta label={nav.cta} />
+    <div class="max-md:hidden"><StartCta label={nav.cta} /></div>
   </div>
 </header>

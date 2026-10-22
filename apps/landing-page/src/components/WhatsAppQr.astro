@@ -6,9 +6,10 @@ import { whatsappLink } from "@/lib/whatsapp-link";
 /** QR généré au build depuis le lien WhatsApp : il suit le numéro et le message, zéro JS. */
 interface Props {
   label: string;
+  class: string;
 }
 
-const { label } = Astro.props;
+const { label, class: className } = Astro.props;
 const url = whatsappLink(whatsappContact.phoneNumber, whatsappContact.message);
 const svg = await QRCode.toString(url, {
   type: "svg",
@@ -18,4 +19,4 @@ const svg = await QRCode.toString(url, {
 });
 ---
 
-<div class="qr" role="img" aria-label={label} set:html={svg} />
+<div class:list={["[&_svg]:size-full", className]} role="img" aria-label={label} set:html={svg} />

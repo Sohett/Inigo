@@ -5,16 +5,16 @@ import { whatsappLink } from "@/lib/whatsapp-link";
 /**
  * CTA principal. Sur mobile il ouvre WhatsApp, message prérempli (la conversation se vit dans
  * l'app native) ; sur desktop il descend vers le QR de « Démarrer », pour passer au téléphone.
- * Bascule en CSS (.only-mobile / .only-desktop, breakpoint 1024px), sans JS.
+ * Bascule en CSS (breakpoint lg), sans JS.
  */
 interface Props {
   label: string;
   class?: string;
 }
 
-const { label, class: className = "pill dark" } = Astro.props;
+const { label, class: className = "pill pill-dark" } = Astro.props;
 const url = whatsappLink(whatsappContact.phoneNumber, whatsappContact.message);
 ---
 
-<a href={url} rel="noopener" class:list={[className, "only-mobile"]}><span class="wa-dot"></span>{label}</a>
-<a href="#start" class:list={[className, "only-desktop"]}><span class="wa-dot"></span>{label}</a>
+<a href={url} rel="noopener" class:list={[className, "lg:hidden"]}><span class="wa-dot"></span>{label}</a>
+<a href="#start" class:list={[className, "max-lg:hidden"]}><span class="wa-dot"></span>{label}</a>

@@ -20,19 +20,19 @@ const { demo } = Astro.props;
 const url = whatsappLink(whatsappContact.phoneNumber, whatsappContact.message);
 ---
 
-<section class="hero band" id="top" data-demo-hero data-demo-state="paused">
-  <div class="wrap hero-grid">
-    <div class="l">
-      <span class="mono teal">{hero.eyebrow}</span>
+<section class="band pt-16 pb-10" id="top" data-demo-hero data-demo-state="paused">
+  <div class="mx-auto grid max-w-wrap items-center gap-[30px] tablet:grid-cols-12">
+    <div class="flex flex-col gap-[26px] tablet:col-span-7">
+      <span class="mono text-teal">{hero.eyebrow}</span>
       <h1 class="display-1">{hero.titleLines[0]}<br />{hero.titleLines[1]}</h1>
-      <p class="hero-subtitle">{hero.subtitle}</p>
+      <p class="max-w-[600px] text-[clamp(18px,1.6vw,22px)] leading-[1.4] text-ink/85">{hero.subtitle}</p>
 
-      <div class="demo-box">
-        <div class="demo-box-head">
-          <span class="mono ink" id="demo-label">{hero.demo.label}</span>
+      <div class="flex flex-col gap-3 rounded-md bg-sand-50 p-[18px]">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <span class="mono text-ink" id="demo-label">{hero.demo.label}</span>
           <button
             type="button"
-            class="demo-toggle"
+            class="inline-flex min-h-8 cursor-pointer items-center px-1 py-2 font-mono text-xs font-medium tracking-[0.06em] text-grey-700 uppercase hover:text-ink"
             data-demo-toggle
             hidden
             aria-label={hero.demo.pauseAria}
@@ -44,14 +44,14 @@ const url = whatsappLink(whatsappContact.phoneNumber, whatsappContact.message);
             {hero.demo.pause}
           </button>
         </div>
-        <div class="chips" role="group" aria-labelledby="demo-label">
+        <div class="flex flex-wrap gap-2" role="group" aria-labelledby="demo-label">
           {
             scenarios.map((scenario) => (
               <button
                 type="button"
                 class="chip"
                 data-demo-scenario={scenario.id}
-                aria-pressed={scenario.id === demo.scenario?.id ? "true" : "false"}
+                aria-pressed={scenario.id === demo.scenario.id ? "true" : "false"}
               >
                 {scenario.label}
               </button>
@@ -60,43 +60,47 @@ const url = whatsappLink(whatsappContact.phoneNumber, whatsappContact.message);
         </div>
       </div>
 
-      <div class="hero-cta-row">
-        <div class="card qr-card only-desktop">
-          <WhatsAppQr label={hero.qr.title} />
-          <div class="qr-card-text">
-            <span class="mono ink with-dot"><span class="wa-dot"></span>{hero.qr.title}</span>
-            <span>{hero.qr.body}</span>
+      <div class="flex flex-wrap items-center gap-[18px]">
+        <div class="card flex items-center gap-3.5 py-3 pr-4 pl-3 max-lg:hidden">
+          <WhatsAppQr label={hero.qr.title} class="size-[92px]" />
+          <div class="flex max-w-[190px] flex-col gap-1.5">
+            <span class="mono inline-flex items-center gap-1.5 text-ink"><span class="wa-dot"></span>{hero.qr.title}</span>
+            <span class="text-[13px] leading-[1.4] text-ink/75">{hero.qr.body}</span>
           </div>
         </div>
-        <div class="stack" style="gap:8px">
-          <a class="pill dark only-desktop" href={url} target="_blank" rel="noopener"
+        <div class="flex flex-col gap-2">
+          <a class="pill pill-dark max-lg:hidden" href={url} target="_blank" rel="noopener"
             ><span class="wa-dot"></span>{hero.desktopLink}</a
           >
-          <a class="pill dark only-mobile" href={url} rel="noopener"><span class="wa-dot"></span>{nav.cta}</a>
+          <a class="pill pill-dark lg:hidden" href={url} rel="noopener"><span class="wa-dot"></span>{nav.cta}</a>
           <span class="mono">{hero.noCommitment}</span>
         </div>
       </div>
     </div>
 
-    <div class="r">
-      <figure class="phone" aria-label={hero.phone.ariaLabel} style="margin:0">
+    <div class="relative flex justify-center max-sm:flex-col max-sm:items-center tablet:col-span-5 tablet:col-start-8">
+      <figure class="phone m-0" aria-label={hero.phone.ariaLabel}>
         <div class="screen">
-          <div class="top">
-            <div class="av"><Logo variant="mark" size={18} /></div>
-            <div><b>{hero.phone.name}</b><small>{hero.phone.status}</small></div>
+          <div class="flex items-center gap-2.5 border-b border-ink/10 bg-white px-4 pt-3.5 pb-3">
+            <div class="grid size-8 place-items-center rounded-[9px] bg-night text-paper"><Logo variant="mark" size={18} /></div>
+            <div>
+              <b class="block text-sm leading-tight font-semibold">{hero.phone.name}</b>
+              <small class="text-[11px] text-whatsapp-status">{hero.phone.status}</small>
+            </div>
           </div>
-          <div class="msgs">
-            <span class="day-l">{hero.phone.dayLabel}</span>
-            <div class="msgs" style="padding:0" data-demo-messages set:html={renderMessages(demo.messages)} />
+          <div class="msgs px-3 pt-3.5 pb-[18px]">
+            <span class="justify-self-center rounded-md bg-white px-2 py-[3px] text-[10.5px] text-whatsapp-meta">{hero.phone.dayLabel}</span>
+            <div class="msgs" data-demo-messages set:html={renderMessages(demo.messages)} />
           </div>
         </div>
       </figure>
       {/* Réponse du coach annoncée aux lecteurs d'écran, sur clic seulement (pas à chaque rotation). */}
       <p class="sr-only" aria-live="polite" data-demo-announce></p>
-      <div class="card counter">
+      <div class="card flex flex-col gap-1 px-3.5 py-3 max-sm:mt-3 sm:absolute sm:bottom-16 sm:left-0 tablet:-left-2">
         <span class="mono">{hero.counter.label}</span>
-        <b data-demo-count>0</b>
-        <span class="mono">{hero.counter.sub}</span>
+        {/* Grand chiffre : orange vif du DS, conforme AA grand texte. */}
+        <b class="text-[30px] leading-none font-medium tracking-[-0.02em] text-effort tabular-nums" data-demo-count>0</b>
+        <span class="mono text-[10px]">{hero.counter.sub}</span>
       </div>
     </div>
   </div>
