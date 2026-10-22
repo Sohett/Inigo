@@ -20,7 +20,7 @@ export function renderMessages(messages: readonly Message[]): string {
             .map((item) => `<div><i class="zone-${item.zone}"></i>${escapeHtml(item.text)}</div>`)
             .join("")}</div>`
         : "";
-      return `<div class="bub ${message.side}">${escapeHtml(message.text)}${attachments}<time>${message.time}</time></div>`;
+      return `<div class="bub ${message.side}">${escapeHtml(message.text)}${attachments}<time>${escapeHtml(message.time)}</time></div>`;
     })
     .join("");
 }

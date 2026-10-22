@@ -71,7 +71,9 @@ dans l'admin du coach (Réglages, Onboarding) ; s'il change là-bas, le changer 
 - **Motion** : transitions CSS + IntersectionObserver maison. Tout effet est neutralisé sous
   `prefers-reduced-motion`. Le reveal n'est actif que si JS l'est (classe `.js`).
 - **Contraste AA** : labels mono en `--ig-muted` réservés aux libellés courts ; texte orange en
-  `--ig-effort-text` (pas `--ig-effort`) sur fond clair.
+  `--ig-effort-text` (pas `--ig-effort`) sur fond clair. Exception voulue par le DS : les grands
+  chiffres (24px et plus, ex. compteur « Réajustements », chrono du jour J) gardent `--ig-effort`,
+  conforme AA grand texte (3:1).
 
 ## Tests
 

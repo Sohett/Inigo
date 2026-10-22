@@ -14,7 +14,7 @@ import { goals, scenarios } from "@/content/demo";
 import { planDemo } from "@/lib/plan-demo";
 
 // État initial de la démo (rendu au build) : premier objectif, premier imprévu.
-const initialDemo = planDemo(goals[0]?.id ?? "triathlon-l", scenarios[0]?.id ?? null);
+const initialDemo = planDemo(goals[0]?.id ?? "triathlon-l", scenarios[0]?.id ?? "bad-night");
 ---
 
 <Base bodyClass="has-mobile-bar">

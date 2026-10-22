@@ -615,9 +615,6 @@ section.alt {
 [data-demo-state="playing"] .chip[aria-pressed="true"]::after {
   animation: chip-progress var(--rotation-ms, 6000ms) linear forwards;
 }
-[data-demo-state="paused"] .chip[aria-pressed="true"]::after {
-  animation-play-state: paused;
-}
 @keyframes chip-progress {
   to {
     transform: scaleX(1);
@@ -815,10 +812,6 @@ section.alt {
 .plan-week.is-future .plan-bar {
   opacity: 0.6;
 }
-.plan-week.is-current .plan-bar {
-  outline: 2px solid var(--ig-ink-strong);
-  outline-offset: 3px;
-}
 .plan-week.is-adjusted .plan-bar {
   outline: 2px solid var(--ig-effort);
   outline-offset: 3px;
@@ -827,10 +820,6 @@ section.alt {
   font-size: 10px;
   height: 13px;
   white-space: nowrap;
-}
-.plan-week.is-current .plan-week-label {
-  color: var(--ig-ink-strong);
-  font-weight: 600;
 }
 .plan-week.is-adjusted .plan-week-label {
   color: #c2410c;
@@ -911,7 +900,6 @@ section.alt {
   .plan-week-label {
     visibility: hidden;
   }
-  .plan-week.is-current .plan-week-label,
   .plan-week.is-adjusted .plan-week-label {
     visibility: visible;
   }

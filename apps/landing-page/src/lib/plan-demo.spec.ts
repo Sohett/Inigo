@@ -5,17 +5,10 @@ import { planDemo } from "@/lib/plan-demo";
 const allGoals = goals.map((goal) => goal.id);
 const allScenarios = scenarios.map((scenario) => scenario.id);
 
-describe("planDemo without a scenario", () => {
-  const demo = planDemo("triathlon-l", null);
+describe("planDemo's Monday message", () => {
+  const demo = planDemo("triathlon-l", "rain");
 
-  it("shows the week as planned, with nothing adjusted", () => {
-    expect(demo.days).toHaveLength(7);
-    expect(demo.adjustedDays).toBe(0);
-    expect(demo.weeks.find((week) => week.state === "current")?.label).toBe("ICI");
-    expect(demo.messages).toHaveLength(1);
-  });
-
-  it("lists the three key sessions in the Monday message", () => {
+  it("lists the three key sessions as planned, whatever the scenario", () => {
     expect(demo.messages[0]?.attachments?.items.map((item) => item.text)).toEqual([
       "MAR · SWEET SPOT · Z3",
       "JEU · SEUIL · Z4",
@@ -25,7 +18,7 @@ describe("planDemo without a scenario", () => {
 });
 
 describe.each(allGoals)("planDemo for %s", (goalId: GoalId) => {
-  const demo = planDemo(goalId, null);
+  const demo = planDemo(goalId, "rain");
 
   it("draws one bar per week up to race day", () => {
     expect(demo.weeks).toHaveLength(demo.goal.weeks);
@@ -73,11 +66,11 @@ describe("scenario specifics", () => {
     expect(days[6]).toMatchObject({ day: "Dim", title: "Sortie longue", adjusted: true });
   });
 
-  it("missed session: the current week loses volume", () => {
-    const planned = planDemo("cyclo", null);
-    const adjusted = planDemo("cyclo", "missed-session");
-    const total = (demo: typeof planned) =>
+  it("missed session: the current week loses more volume than when it rains", () => {
+    const rain = planDemo("cyclo", "rain");
+    const missed = planDemo("cyclo", "missed-session");
+    const total = (demo: typeof rain) =>
       demo.weeks[demo.currentWeek - 1]?.segments.reduce((sum, segment) => sum + segment.height, 0) ?? 0;
-    expect(total(adjusted)).toBeLessThan(total(planned));
+    expect(total(missed)).toBeLessThan(total(rain));
   });
 });

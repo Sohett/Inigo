@@ -47,7 +47,7 @@ const [firstStep, ...otherSteps] = start.steps;
     <span class="mono">{footer.copyright}</span>
     <nav class="mono" aria-label={footer.navLabel}>
       <a href="/confidentialite">{footer.privacy}</a>
-      <a href="mailto:contact@inigo-coach.com">{footer.contact}</a>
+      <a href={`mailto:${footer.contactEmail}`}>{footer.contact}</a>
     </nav>
   </footer>
 </section>

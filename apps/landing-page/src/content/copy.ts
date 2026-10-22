@@ -46,11 +46,11 @@ export const hero = {
     "Inigo lit chaque séance que tu fais et réajuste ton plan dès que ta vie change. Ce que fait un coach. Ce qu'aucune app ne fait.",
   demo: {
     label: "Essaie · Dis lui ce qui t'arrive",
-    ariaLabel: "Imprévus de la semaine",
     pause: "Pause",
     play: "Lecture",
-    pauseAria: "Mettre en pause la démo automatique",
-    playAria: "Relancer la démo automatique",
+    // Libellés accessibles : ils contiennent le texte visible (WCAG 2.5.3, commande vocale).
+    pauseAria: "Pause de la démo automatique",
+    playAria: "Lecture de la démo automatique",
   },
   qr: {
     title: "Scanne pour commencer",
@@ -61,8 +61,7 @@ export const hero = {
   phone: {
     ariaLabel: "Conversation WhatsApp avec Inigo : il réajuste ta semaine selon l'imprévu choisi",
     name: "Inigo",
-    status: "en ligne",
-    statusAdjusted: "a réajusté ta semaine",
+    status: "a réajusté ta semaine",
     dayLabel: "Lundi",
   },
   counter: { label: "Réajustements", sub: "Pendant ta démo" },
@@ -76,7 +75,6 @@ export const plan = {
   chartAriaLabel: "Volume hebdomadaire par zone jusqu'au jour J",
   raceDay: "JOUR J",
   thisWeek: "Cette semaine · Semaine",
-  weekAsPlanned: "Telle que planifiée lundi",
   adjustedOne: "séance ajustée par Inigo",
   adjustedMany: "séances ajustées par Inigo",
   adjustedBadge: "AJUSTÉ PAR INIGO",
@@ -241,4 +239,5 @@ export const footer = {
   copyright: "© 2026 Inigo · Coaching d'endurance",
   privacy: "Confidentialité",
   contact: "Contact",
+  contactEmail: "contact@inigo-coach.com",
 } as const;

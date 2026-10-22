@@ -23,7 +23,7 @@ export function startDemo(): void {
   const chipsBox = hero.querySelector<HTMLElement>(".demo-box");
   const toggle = hero.querySelector<HTMLButtonElement>("[data-demo-toggle]");
   const counter = hero.querySelector<HTMLElement>("[data-demo-count]");
-  const status = hero.querySelector<HTMLElement>("[data-demo-status]");
+  const announce = hero.querySelector<HTMLElement>("[data-demo-announce]");
   const messages = hero.querySelector<HTMLElement>("[data-demo-messages]");
   const weeks = planCard.querySelector<HTMLElement>("[data-demo-weeks]");
   const phases = planCard.querySelector<HTMLElement>("[data-demo-phases]");
@@ -43,14 +43,12 @@ export function startDemo(): void {
   let timer: number | undefined;
 
   const render = () => {
-    const scenario = scenarios[state.scenarioIndex] ?? null;
-    const demo = planDemo(state.goal, scenario?.id ?? null);
+    const demo = planDemo(state.goal, scenarios[state.scenarioIndex]?.id ?? "bad-night");
 
-    chips.forEach((chip) => chip.setAttribute("aria-pressed", String(chip.dataset.demoScenario === scenario?.id)));
+    chips.forEach((chip) => chip.setAttribute("aria-pressed", String(chip.dataset.demoScenario === demo.scenario.id)));
     goalButtons.forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.demoGoal === state.goal)));
 
     if (messages) messages.innerHTML = renderMessages(demo.messages);
-    if (status) status.textContent = (scenario ? status.dataset.labelAdjusted : status.dataset.labelIdle) ?? "";
     if (counter) counter.textContent = String(state.clicks);
 
     planCard.style.setProperty("--weeks", String(demo.goal.weeks));
@@ -65,9 +63,9 @@ export function startDemo(): void {
     if (days) days.innerHTML = renderDays(demo.days, days.dataset.badge ?? "");
     if (weekNote) {
       const label = demo.adjustedDays > 1 ? weekNote.dataset.labelMany : weekNote.dataset.labelOne;
-      weekNote.textContent = scenario ? `${demo.adjustedDays} ${label ?? ""}` : (weekNote.dataset.labelPlanned ?? "");
-      weekNote.classList.toggle("is-adjusted", scenario !== null);
+      weekNote.textContent = `${demo.adjustedDays} ${label ?? ""}`;
     }
+    return demo;
   };
 
   /** Relance la barre de progression de l'imprévu actif (même s'il était déjà actif). */
@@ -112,7 +110,8 @@ export function startDemo(): void {
     chip.addEventListener("click", () => {
       state.scenarioIndex = index;
       state.clicks += 1;
-      render();
+      const demo = render();
+      if (announce) announce.textContent = demo.messages.at(-1)?.text ?? "";
       schedule();
     }),
   );
@@ -132,11 +131,15 @@ export function startDemo(): void {
       syncPlayback();
     });
   }
-  chipsBox?.addEventListener("mouseenter", () => {
+  // Survol à la souris seulement : un tap tactile émule un mouseenter sans mouseleave, ce qui
+  // figerait la rotation sur mobile.
+  chipsBox?.addEventListener("pointerenter", (event) => {
+    if (event.pointerType !== "mouse") return;
     state.hovered = true;
     syncPlayback();
   });
-  chipsBox?.addEventListener("mouseleave", () => {
+  chipsBox?.addEventListener("pointerleave", (event) => {
+    if (event.pointerType !== "mouse") return;
     state.hovered = false;
     syncPlayback();
   });

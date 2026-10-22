@@ -79,25 +79,20 @@ const url = whatsappLink(whatsappContact.phoneNumber, whatsappContact.message);
     </div>
 
     <div class="r">
-      <div class="phone" role="img" aria-label={hero.phone.ariaLabel}>
+      <figure class="phone" aria-label={hero.phone.ariaLabel} style="margin:0">
         <div class="screen">
           <div class="top">
             <div class="av"><Logo variant="mark" size={18} /></div>
-            <div>
-              <b>{hero.phone.name}</b><small
-                data-demo-status
-                data-label-idle={hero.phone.status}
-                data-label-adjusted={hero.phone.statusAdjusted}
-                >{demo.scenario ? hero.phone.statusAdjusted : hero.phone.status}</small
-              >
-            </div>
+            <div><b>{hero.phone.name}</b><small>{hero.phone.status}</small></div>
           </div>
           <div class="msgs">
             <span class="day-l">{hero.phone.dayLabel}</span>
             <div class="msgs" style="padding:0" data-demo-messages set:html={renderMessages(demo.messages)} />
           </div>
         </div>
-      </div>
+      </figure>
+      {/* Réponse du coach annoncée aux lecteurs d'écran, sur clic seulement (pas à chaque rotation). */}
+      <p class="sr-only" aria-live="polite" data-demo-announce></p>
       <div class="card counter">
         <span class="mono">{hero.counter.label}</span>
         <b data-demo-count>0</b>

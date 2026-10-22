@@ -12,9 +12,9 @@ import {
 } from "@/content/demo";
 
 /**
- * Calcul de la démo « Ton plan, en direct » : pour un objectif et un imprévu (ou aucun),
- * le plan jusqu'au jour J (volume par semaine et par zone), la semaine en cours et la
- * conversation avec le coach. Pur : le même état sert au rendu du build et du navigateur.
+ * Calcul de la démo « Ton plan, en direct » : pour un objectif et un imprévu, le plan jusqu'au
+ * jour J (volume par semaine et par zone), la semaine en cours réajustée et la conversation avec
+ * le coach. Pur : le même état sert au rendu du build et du navigateur.
  */
 
 export type Phase = "base" | "build" | "specific" | "taper";
@@ -31,7 +31,7 @@ const ZONE_SHARES: Record<Phase, readonly number[]> = {
 };
 const ZONES_TOP_DOWN: readonly Zone[] = [5, 4, 3, 2, 1];
 
-export type WeekState = "past" | "current" | "adjusted" | "future";
+export type WeekState = "past" | "adjusted" | "future";
 
 export interface WeekBar {
   /** Hauteur de chaque segment, en % de la hauteur du graphique. */
@@ -64,7 +64,7 @@ export interface Message {
 
 export interface PlanDemo {
   goal: Goal;
-  scenario: Scenario | null;
+  scenario: Scenario;
   /** Numéro (1 à N) de la semaine en cours. */
   currentWeek: number;
   weeks: WeekBar[];
@@ -74,25 +74,19 @@ export interface PlanDemo {
   messages: Message[];
 }
 
-export function findGoal(id: string): Goal | undefined {
-  return goals.find((goal) => goal.id === id);
-}
-
-export function findScenario(id: string): Scenario | undefined {
-  return scenarios.find((scenario) => scenario.id === id);
-}
-
-export function planDemo(goalId: GoalId, scenarioId: ScenarioId | null): PlanDemo {
-  const goal = findGoal(goalId);
+export function planDemo(goalId: GoalId, scenarioId: ScenarioId): PlanDemo {
+  const goal = goals.find((candidate) => candidate.id === goalId);
   if (!goal) throw new Error(`Objectif inconnu : ${goalId}`);
-  const scenario = scenarioId === null ? null : (findScenario(scenarioId) ?? null);
+  const scenario = scenarios.find((candidate) => candidate.id === scenarioId);
+  if (!scenario) throw new Error(`Imprévu inconnu : ${scenarioId}`);
 
   const discipline = disciplines[goal.discipline];
-  const changes = scenario?.changes({ discipline, week: discipline.week }) ?? new Map<number, Session>();
+  const context = { discipline, week: discipline.week };
+  const changes = scenario.changes(context);
   const days: DayCard[] = discipline.week.map((planned, index) => {
     const changed = changes.get(index);
     const day = changed ?? planned;
-    return { ...day, meta: day.zone === 0 ? demoLabels.rest : `${day.detail} · Z${day.zone}`, adjusted: changed !== undefined };
+    return { ...day, meta: day.zone === 0 ? demoLabels.rest : `${day.detail} · ${zoneLabel(day.zone)}`, adjusted: changed !== undefined };
   });
   const adjusted = days.filter((day) => day.adjusted);
 
@@ -110,28 +104,29 @@ export function planDemo(goalId: GoalId, scenarioId: ScenarioId | null): PlanDem
         }),
       },
     },
-  ];
-  if (scenario) {
-    const context = { discipline, week: discipline.week };
-    messages.push({ side: "out", text: scenario.athlete(context), time: demoLabels.times.athlete });
-    messages.push({
+    { side: "out", text: scenario.athlete(context), time: demoLabels.times.athlete },
+    {
       side: "in",
       text: scenario.coach(context),
       time: demoLabels.times.coach,
       attachments: { title: demoLabels.updatedWeek, items: adjusted.map(attachment) },
-    });
-  }
+    },
+  ];
 
   const { weeks, phases } = buildPlan(goal.weeks, currentIndex, scenario);
   return { goal, scenario, currentWeek: currentIndex + 1, weeks, phases, days, adjustedDays: adjusted.length, messages };
 }
 
+function zoneLabel(zone: Zone): string {
+  return `${demoLabels.zonePrefix}${zone}`;
+}
+
 function attachment(day: Session): MessageAttachment {
-  const zone = day.zone === 0 ? "" : ` · Z${day.zone}`;
+  const zone = day.zone === 0 ? "" : ` · ${zoneLabel(day.zone)}`;
   return { text: `${day.day} · ${day.title}${zone}`.toUpperCase(), zone: day.zone };
 }
 
-function buildPlan(total: number, currentIndex: number, scenario: Scenario | null): { weeks: WeekBar[]; phases: PhaseSpan[] } {
+function buildPlan(total: number, currentIndex: number, scenario: Scenario): { weeks: WeekBar[]; phases: PhaseSpan[] } {
   const base = Math.round(total * 0.35);
   const build = Math.round(total * 0.3);
   const peak = total - TAPER_WEEKS;
@@ -153,7 +148,7 @@ function buildPlan(total: number, currentIndex: number, scenario: Scenario | nul
       const height = Math.round(volume * (shares[position] ?? 0) * 1000) / 10;
       return height > 0 ? [{ zone, height }] : [];
     });
-    weeks.push({ segments, label: weekLabel(index, currentIndex, scenario), state: weekState(index, currentIndex, scenario) });
+    weeks.push({ segments, label: weekLabel(index, currentIndex), state: weekState(index, currentIndex) });
   }
 
   return {
@@ -168,14 +163,13 @@ function buildPlan(total: number, currentIndex: number, scenario: Scenario | nul
 }
 
 /** Volume relatif (0 à 1) : montée progressive, semaine allégée toutes les 4, affûtage à la fin. */
-function weekVolume(index: number, phase: Phase, peak: number, currentIndex: number, scenario: Scenario | null): number {
+function weekVolume(index: number, phase: Phase, peak: number, currentIndex: number, scenario: Scenario): number {
   if (phase === "taper") return index === peak ? 0.68 : 0.42;
 
   let volume = 0.42 + 0.58 * (index / Math.max(1, peak - 1));
   if (index % 4 === 3) volume *= 0.72;
-  if (!scenario) return volume;
-
   if (index === currentIndex) return Math.min(1, volume * scenario.volume);
+
   switch (scenario.id) {
     case "in-shape":
       return index > currentIndex ? Math.min(1, volume * 1.04) : volume;
@@ -188,13 +182,13 @@ function weekVolume(index: number, phase: Phase, peak: number, currentIndex: num
   }
 }
 
-function weekLabel(index: number, currentIndex: number, scenario: Scenario | null): string {
-  if (index === currentIndex) return scenario ? demoLabels.adjustedWeek : demoLabels.currentWeek;
-  return index === 0 || (index + 1) % 4 === 0 ? `S${index + 1}` : "";
+function weekLabel(index: number, currentIndex: number): string {
+  if (index === currentIndex) return demoLabels.adjustedWeek;
+  return index === 0 || (index + 1) % 4 === 0 ? `${demoLabels.weekShort}${index + 1}` : "";
 }
 
-function weekState(index: number, currentIndex: number, scenario: Scenario | null): WeekState {
+function weekState(index: number, currentIndex: number): WeekState {
   if (index < currentIndex) return "past";
   if (index > currentIndex) return "future";
-  return scenario ? "adjusted" : "current";
+  return "adjusted";
 }

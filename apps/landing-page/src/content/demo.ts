@@ -222,8 +222,10 @@ export const demoLabels = {
   keySessions: "SÉANCES CLÉS",
   updatedWeek: "SEMAINE MISE À JOUR",
   weekPrefix: "Semaine",
+  /** Préfixe des repères de semaine sous le graphique (S1, S4…). */
+  weekShort: "S",
+  zonePrefix: "Z",
   rest: "Récupération",
-  currentWeek: "ICI",
   adjustedWeek: "AJUSTÉE",
   phases: { base: "Base", build: "Construction", specific: "Spécifique", taper: "Affûtage" },
   times: { plan: "07:00", athlete: "07:12", coach: "07:13" },

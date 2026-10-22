@@ -10,10 +10,7 @@ interface Props {
 }
 
 const { demo } = Astro.props;
-const weekNote =
-  demo.scenario === null
-    ? plan.weekAsPlanned
-    : `${demo.adjustedDays} ${demo.adjustedDays > 1 ? plan.adjustedMany : plan.adjustedOne}`;
+const weekNote = `${demo.adjustedDays} ${demo.adjustedDays > 1 ? plan.adjustedMany : plan.adjustedOne}`;
 ---
 
 <section class="plan band" id="plan" data-demo-plan>
@@ -58,9 +55,8 @@ const weekNote =
         <div class="plan-this-week-head">
           <span class="mono ink">{plan.thisWeek} <span data-demo-field="current-week">{demo.currentWeek}</span></span>
           <span
-            class:list={["mono", { "is-adjusted": demo.scenario !== null }]}
+            class="mono is-adjusted"
             data-demo-week-note
-            data-label-planned={plan.weekAsPlanned}
             data-label-one={plan.adjustedOne}
             data-label-many={plan.adjustedMany}>{weekNote}</span
           >
