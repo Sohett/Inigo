@@ -1,0 +1,88 @@
+---
+import { analysis } from "@/content/copy";
+---
+
+<section class="band py-22" id="analyse">
+  <div class="mx-auto max-w-wrap">
+    <div class="reveal mb-12 grid gap-6 tablet:grid-cols-12">
+      <div class="grid content-start gap-3.5 tablet:col-span-6">
+        <span class="mono">{analysis.eyebrow}</span>
+        <h2 class="display-2">{analysis.title}</h2>
+      </div>
+      <p class="self-end text-[17px] leading-[1.55] text-ink/75 tablet:col-span-6">{analysis.body}</p>
+    </div>
+
+    <div class="reveal flex flex-col gap-[22px] rounded-md border border-ink/10 bg-white p-7">
+      <div class="flex flex-wrap justify-between gap-3">
+        <span class="mono text-ink">{analysis.session}</span><span class="mono">{analysis.sessionStats}</span>
+      </div>
+      {/* Séance illustrative : puissance (noir) face à la cible (or), FC en pointillés. */}
+      <svg class="h-auto w-full" viewBox="0 0 640 210" role="img" aria-label={analysis.chartAriaLabel}>
+        <g stroke="#1c1c1c0d"><line x1="0" y1="50" x2="640" y2="50"></line><line x1="0" y1="110" x2="640" y2="110"></line><line x1="0" y1="170" x2="640" y2="170"></line></g>
+        <rect x="105" y="45" width="84" height="10" fill="#f0dcae"></rect>
+        <rect x="217" y="45" width="84" height="10" fill="#f0dcae"></rect>
+        <rect x="329" y="45" width="84" height="10" fill="#f0dcae"></rect>
+        <polyline
+          points="0,124 40,116 70,112 105,110 108,50 150,49 189,50 192,116 217,116 220,50 260,51 301,50 304,116 329,116 332,48 352,50 372,55 392,59 413,63 416,118 504,120 560,124 640,128"
+          fill="none"
+          stroke="#0d0d0d"
+          stroke-width="2"></polyline>
+        <polyline
+          points="0,160 105,150 189,128 217,140 301,127 329,138 413,126 504,146 640,156"
+          fill="none"
+          stroke="#e9705c"
+          stroke-width="1.5"
+          stroke-dasharray="4 3"></polyline>
+        <g font-family="IBM Plex Mono, monospace" font-size="11" fill="#787873">
+          <text x="4" y="44">{analysis.axis.high}</text><text x="4" y="104">{analysis.axis.low}</text><text x="600" y="200">{analysis.axis.end}</text>
+        </g>
+        <g font-family="IBM Plex Mono, monospace" font-size="11" font-weight="600">
+          <circle cx="147" cy="28" r="10" fill="#0d0d0d"></circle><text x="143.5" y="32" fill="#fffdf9">1</text>
+          <circle cx="259" cy="28" r="10" fill="#0d0d0d"></circle><text x="255.5" y="32" fill="#fffdf9">2</text>
+          <circle cx="392" cy="28" r="10" fill="#ea580c"></circle><text x="388.5" y="32" fill="#ffffff">3</text>
+        </g>
+      </svg>
+      <div class="flex flex-wrap gap-[18px]">
+        <span class="mono inline-flex items-center gap-1.5"><i class="inline-block h-0.5 w-4 bg-ink-strong"></i>{analysis.legend.power}</span>
+        <span class="mono inline-flex items-center gap-1.5"><i class="inline-block h-0.5 w-4 bg-z4"></i>{analysis.legend.heartRate}</span>
+        <span class="mono inline-flex items-center gap-1.5"><i class="inline-block h-2 w-4 bg-z3-soft"></i>{analysis.legend.target}</span>
+      </div>
+      <div class="grid gap-4 tablet:grid-cols-3">
+        {
+          analysis.notes.map((note) => (
+            <div class:list={["flex flex-col gap-1.5 border-t pt-3", note.highlight ? "border-effort" : "border-ink/20"]}>
+              <span class:list={["mono", note.highlight ? "text-effort-strong" : "text-ink"]}>{note.label}</span>
+              <p class="text-[15px] leading-normal text-ink/75">{note.body}</p>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+
+    <div class="reveal mt-10 overflow-x-auto rounded-sm border border-ink/10 bg-paper">
+      <table class="w-full border-collapse text-sm max-sm:min-w-[620px]">
+        <caption class="sr-only">{analysis.comparison.caption}</caption>
+        <thead>
+          <tr class="border-b border-ink/10">
+            <td></td>
+            {analysis.comparison.headers.map((header) => <th scope="col" class="mono px-3.5 py-[11px] text-left text-[11.5px]">{header}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {
+            analysis.comparison.rows.map((row) => (
+              <tr class="border-b border-ink/10 last:border-b-0">
+                <th scope="row" class="px-3.5 py-[11px] text-left font-normal">
+                  {row.label}
+                </th>
+                {row.values.map((value, index) => (
+                  <td class:list={["px-3.5 py-[11px]", { "bg-effort-bg font-semibold": index === row.values.length - 1 }]}>{value}</td>
+                ))}
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>

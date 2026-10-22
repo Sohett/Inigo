@@ -4,11 +4,15 @@ Détails propres au service landing page. Les conventions transverses du monorep
 naming, imports sans extension, sécurité baseline, `pnpm verify`) sont dans l'`AGENTS.md`
 racine. Présentation et déploiement côté humain : `README.md`.
 
-**Direction artistique : clair & épuré, accent encre.** Base canvas (blanc froid), texte et
-boutons en encre (noir profond, token `encre`), pas de vert. La couleur « aube alpine »
-(bleu nuit → rose alpenglow → ambre) ne vit que dans le **visuel signature** du hero (dégradé
-`aube-gradient` + grain + courbe de puissance). La copy (FR) est centralisée dans
-`src/content/copy.ts` ; **aucun tiret `-` ni `—` dans le texte visible**.
+**Direction artistique : design system Inigo v3** (canvas « Inigo · Site web », variante A3').
+Fond papier `#fffdf9`, texte encre, IBM Plex Sans + Mono (self-hostées via `@fontsource`).
+Accents : teal pour les petits tags mono, orange « effort » pour ce que le coach ajuste, vert
+WhatsApp uniquement en pastille de CTA. Couleurs de zone Z1 à Z5 (pastel bordé dans les
+graphiques). La copy (FR) est centralisée dans `src/content/` ; **aucun tiret `-` ni `—` dans
+le texte visible** (vérifié par `copy.spec.ts`).
+
+Le site vend la **vision** d'Inigo (hook, promesse) : la copy n'est pas limitée au périmètre
+déjà construit côté coach (ex. objectif Marathon dans la démo).
 
 ## Architecture
 
@@ -16,57 +20,83 @@ boutons en encre (noir profond, token `encre`), pas de vert. La couleur « aube 
 apps/landing-page/
   astro.config.mjs                 # adapter Vercel, site 100 % statique
   src/
-    layouts/Base.astro             # <head>, SEO/OG, skip-link, classe .js (motion)
+    layouts/Base.astro             # <head>, SEO/OG, skip link, classe .js (motion)
     pages/
-      index.astro                  # assemble les sections + script reveal (IntersectionObserver)
+      index.astro                  # assemble les sections, lance la démo + le reveal
       confidentialite.astro        # page RGPD (lien du footer)
     components/
-      SiteHeader · Hero · Coach · Method · WhatsApp · Requirements · Demarrer · SiteFooter   (.astro, statiques)
-      StartCta.astro               # CTA principal : WhatsApp sur mobile, #demarrer (QR) sur desktop
-      Logo · PowerCurve · GrainOverlay   (.astro, visuels partagés)
-    content/copy.ts                # TOUTE la copy FR (source unique), dont numéro + code d'accès
-    lib/whatsapp-link.ts           # lien wa.me avec message prérempli
-    styles/global.css              # tokens (clair/encre + aube signature), polices, motion
+      SiteHeader · Hero · PlanLive · Coach · Analysis · Science · RaceDay · Pricing · Start
+      StartCta.astro               # CTA principal : WhatsApp sur mobile, #start (QR) sur desktop
+      WhatsAppQr.astro             # QR généré au build depuis le lien wa.me
+      MobileBar.astro              # barre CTA collante sous 768px
+      Logo.astro
+    content/
+      copy.ts                      # copy FR des sections, numéro + code d'accès WhatsApp
+      demo.ts                      # contenu de la démo : objectifs, imprévus, semaines types
+    lib/
+      plan-demo.ts                 # calcul pur : objectif × imprévu → plan, semaine, conversation
+      plan-demo-view.ts            # rendus HTML partagés build / navigateur
+      demo-controller.ts           # script client : rotation 6 s, clics, pause
+      whatsapp-link.ts             # lien wa.me avec message prérempli
+    styles/global.css              # Tailwind 4 : tokens du DS (@theme) + primitives (@layer components)
 ```
 
+## La démo interactive (hero + « Ton plan, en direct »)
+
+- **Rendu complet au build** : `index.astro` calcule l'état initial (`planDemo`) et les
+  composants l'injectent via les rendus de `plan-demo-view.ts`. Sans JS, la page est complète.
+- **Côté navigateur**, `demo-controller.ts` rebascule l'état avec les **mêmes** fonctions de
+  rendu (pas de duplication de markup) et met à jour les champs marqués `data-demo-*`.
+- **Rotation** : imprévu suivant toutes les 6 s (`ROTATION_MS`). Un clic charge l'imprévu choisi
+  et relance 6 s depuis lui ; le compteur « Réajustements » ne compte que les clics.
+  Pause au survol des imprévus, au focus clavier, hors écran, ou via le bouton Pause (WCAG 2.2.2).
+  Sous `prefers-reduced-motion`, rien ne tourne seul.
+- **Ajouter un imprévu** : une entrée dans `scenarios` (`demo.ts`) avec ses messages et ses
+  `changes` (séances réécrites par index de jour) ; un effet de volume au delà de la semaine en
+  cours se déclare dans le `switch` de `weekVolume` (`plan-demo.ts`).
+
 Flux de démarrage (INI-47) : l'athlète écrit en premier à Inigo sur WhatsApp, avec le code
-d'accès dans un message prérempli (`wa.me/<numéro>?text=…`). Le coach crée alors l'athlète en
-`onboarding` (INI-45). Sur mobile, les CTA ouvrent WhatsApp directement ; sur desktop, ils
-descendent vers un QR (généré au build depuis le même lien, lib `qrcode`) pour que la
-conversation se fasse sur le téléphone, avec un lien secondaire pour WhatsApp sur l'ordinateur.
+d'accès dans un message prérempli (`wa.me/<numéro>?text=…`). Sur mobile, les CTA ouvrent WhatsApp
+directement ; sur desktop, ils descendent vers le QR de « Démarrer » (`#start`), avec un lien
+secondaire pour WhatsApp sur l'ordinateur.
 
 **Numéro et code d'accès** : `whatsappContact` dans `copy.ts`. Le code doit rester celui saisi
 dans l'admin du coach (Réglages, Onboarding) ; s'il change là-bas, le changer ici et redéployer.
 
 ## Conventions du service
 
-- **Sections statiques en `.astro`** (zéro JS côté client hors reveal et navbar). Pas de
-  framework d'îlots : la bascule mobile/desktop des CTA se fait en CSS (breakpoint `lg`).
-- **Couleurs** : toute la page est claire (token `background` = canvas). Accent fonctionnel
-  = `encre` (boutons `bg-encre`, texte `text-foreground`/`text-encre-soft`, focus
-  `ring-encre`). **Pas de vert, pas d'aplat de couleur** : nuit/indigo/alpenglow/ambre/glacier
-  servent uniquement au dégradé signature (`aube-gradient`, texte `text-glacier` par-dessus).
-- **Contraste AA** : texte encre (`text-foreground`) ou `text-encre-soft` sur clair ; texte
-  glacier sur le dégradé signature (scrim implicite via le grain + l'opacité de l'aire).
-- **Navbar** : transparente en haut, verre clair au scroll (classe `.is-scrolled` togglée
-  par le `<script>` de `SiteHeader.astro` ; styles `.site-header` dans `global.css`).
-- **Motion** : transitions CSS + IntersectionObserver maison, pas de lib. Tout effet est
-  neutralisé sous `prefers-reduced-motion`. Le reveal n'est actif que si JS l'est (classe
-  `.js` posée par `Base.astro`) → sans JS, le contenu reste visible.
-- **Élément signature** : `PowerCurve.astro` — courbe puissance/durée (façon
-  Garmin/Intervals.icu), tracée une fois (`.draw-stroke`, `pathLength="1000"`), posée sur le
-  dégradé du hero avec grain.
+- **Sections statiques en `.astro`, stylées en utilitaires Tailwind 4** (pas de framework
+  d'îlots). Seul JS client : la démo et le reveal.
+- **Tokens du DS dans `@theme`** (`global.css`) : `bg-paper`, `text-ink/75`, `border-effort`,
+  `bg-z3-soft`, `font-mono`… Jamais de hex en dur dans un composant quand un token existe.
+  Breakpoints du DS en plus des standards : `tablet:` (900px, une ou deux colonnes) et `wide:`
+  (1100px).
+- **`@layer components`** seulement pour les primitives répétées du DS (`pill` + `pill-dark|grey|light`,
+  `mono`, `display-1|2`, `card`, `phone`, `bub`…) et pour le markup généré par
+  `plan-demo-view.ts` (`plan-*`, `zone-*`), qui ne passe pas par un composant Astro.
+- **Bascule mobile/desktop** en CSS : `lg:hidden` / `max-lg:hidden` (1024px) pour WhatsApp direct
+  vs QR ; sous `md`, la barre CTA collante remplace la nav et le CTA du header.
+- **Motion** : transitions CSS + IntersectionObserver maison. Tout effet est neutralisé sous
+  `prefers-reduced-motion`. Le reveal n'est actif que si JS l'est (classe `.js`).
+- **Contraste AA** : labels mono en `--ig-muted` réservés aux libellés courts ; texte orange en
+  `--ig-effort-text` (pas `--ig-effort`) sur fond clair. Exception voulue par le DS : les grands
+  chiffres (24px et plus, ex. compteur « Réajustements », chrono du jour J) gardent `--ig-effort`,
+  conforme AA grand texte (3:1).
 
 ## Tests
 
-- `src/lib/whatsapp-link.spec.ts` : chiffres seuls dans le numéro, encodage du message, code
-  d'accès présent dans le message de la landing, pas de tiret.
+- `src/lib/plan-demo.spec.ts` : chaque objectif × imprévu (barres, phases, semaine ajustée,
+  conversation), cas métier par imprévu.
+- `src/lib/plan-demo-view.spec.ts` : échappement HTML des rendus.
+- `src/content/copy.spec.ts` : pas de tiret dans la copy, ni dans aucun message de la démo.
+- `src/lib/whatsapp-link.spec.ts` : lien wa.me, code d'accès dans le message.
 - `vitest.config.ts` : environnement `node`. `pnpm verify` doit passer.
 
 ## Ajouter / modifier une section
 
 1. Édite la copy dans `src/content/copy.ts` (jamais de texte en dur dans les composants).
-2. Crée/édite le composant `.astro` correspondant ; ajoute `class="reveal"` (+ `--delay`)
-   pour l'apparition au scroll. Sections ancrées : `id` + `scroll-mt-20`.
+2. Crée/édite le composant `.astro` en utilitaires Tailwind (`band` + `mx-auto max-w-wrap` pour
+   la largeur) ; ajoute `class="reveal"` (+ `--delay`) pour l'apparition au scroll. Section
+   ancrée : `id` (le header compense via `scroll-padding-top`).
 3. Branche-le dans `src/pages/index.astro`.
 4. `pnpm verify`.

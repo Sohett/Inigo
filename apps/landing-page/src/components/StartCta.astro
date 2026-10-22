@@ -1,25 +1,20 @@
 ---
-import { start, whatsappContact } from "@/content/copy";
+import { whatsappContact } from "@/content/copy";
 import { whatsappLink } from "@/lib/whatsapp-link";
 
 /**
  * CTA principal. Sur mobile il ouvre WhatsApp, message prérempli (la conversation se vit dans
  * l'app native) ; sur desktop il descend vers le QR de « Démarrer », pour passer au téléphone.
- * Bascule en CSS (breakpoint lg), sans JS. Les wrappers `contents` laissent le lien se placer
- * dans la mise en page du parent.
+ * Bascule en CSS (breakpoint lg), sans JS.
  */
 interface Props {
   label: string;
-  class: string;
+  class?: string;
 }
 
-const { label, class: className } = Astro.props;
-const url = whatsappLink(whatsappContact.phoneNumber, start.message);
+const { label, class: className = "pill pill-dark" } = Astro.props;
+const url = whatsappLink(whatsappContact.phoneNumber, whatsappContact.message);
 ---
 
-<span class="contents lg:hidden">
-  <a href={url} rel="noopener" class={className}>{label}</a>
-</span>
-<span class="hidden lg:contents">
-  <a href="#demarrer" class={className}>{label}</a>
-</span>
+<a href={url} rel="noopener" class:list={[className, "lg:hidden"]}><span class="wa-dot"></span>{label}</a>
+<a href="#start" class:list={[className, "max-lg:hidden"]}><span class="wa-dot"></span>{label}</a>
