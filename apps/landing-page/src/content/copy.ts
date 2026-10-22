@@ -9,6 +9,8 @@ export const meta = {
   title: "Inigo, ton coach d'endurance sur WhatsApp",
   description:
     "Inigo lit chaque séance que tu fais et réajuste ton plan dès que ta vie change. Triathlon, vélo, course : un vrai coach, sur WhatsApp.",
+  ogImageAlt:
+    "Un vrai coach. Sur WhatsApp. Une conversation où Inigo réajuste la semaine d'un athlète après une mauvaise nuit.",
 } as const;
 
 /**
