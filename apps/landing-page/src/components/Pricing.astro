@@ -1,0 +1,34 @@
+---
+import StartCta from "@/components/StartCta.astro";
+import { pricing } from "@/content/copy";
+---
+
+<section class="sec alt band" id="tarifs">
+  <div class="wrap" style="max-width:960px">
+    <div class="sec-head center reveal">
+      <span class="mono">{pricing.eyebrow}</span>
+      <h2 class="display-2">{pricing.title}</h2>
+      <p class="r">{pricing.body}</p>
+    </div>
+    <div class="offers reveal" style="--delay:100ms">
+      {
+        pricing.offers.map((offer) => (
+          <div class:list={["offer", { rec: offer.recommended }]}>
+            <span class="mono">{offer.label}</span>
+            <b class="price">
+              {offer.price}
+              <small>{offer.unit}</small>
+            </b>
+            <ul>
+              {offer.items.map((item) => (
+                <li>{item}</li>
+              ))}
+            </ul>
+            {offer.cta && <StartCta label={offer.cta} class={offer.recommended ? "pill light" : "pill dark"} />}
+          </div>
+        ))
+      }
+    </div>
+    <p class="mono pricing-footnote">{pricing.footnote}</p>
+  </div>
+</section>

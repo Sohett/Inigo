@@ -1,0 +1,34 @@
+---
+import { science } from "@/content/copy";
+---
+
+<section class="science dark band" id="science">
+  <div class="wrap split">
+    <div class="l stack reveal">
+      <span class="mono">{science.eyebrow}</span>
+      <h2 class="display-2">{science.title}</h2>
+      <p class="lede">{science.body}</p>
+      <div class="bub large in" style="max-width:100%;margin-top:8px">
+        {science.bubble.text}
+        <time>{science.bubble.time}</time>
+      </div>
+    </div>
+    <div class="r reveal" style="--delay:100ms">
+      {
+        science.zones.map((zone) => (
+          <div class="zone-row">
+            {/* Z3 et Z4 sont clairs : texte nuit pour garder le contraste. */}
+            <span class:list={["zone-tag", `zone-${zone.zone}`, { "on-light": zone.zone === 3 || zone.zone === 4 }]}>
+              Z{zone.zone}
+            </span>
+            <div>
+              <b>{zone.name}</b>
+              <div class={`zone-signal z${zone.zone}`} />
+              <p>{zone.body}</p>
+            </div>
+          </div>
+        ))
+      }
+    </div>
+  </div>
+</section>

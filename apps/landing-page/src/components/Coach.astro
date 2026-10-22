@@ -1,0 +1,28 @@
+---
+import { Image } from "astro:assets";
+import photo from "@/assets/coach-col.jpg";
+import { coach } from "@/content/copy";
+---
+
+<section class="coach" id="coach">
+  <Image src={photo} alt={coach.imageAlt} class="coach-photo" widths={[800, 1440, 2000]} sizes="100vw" quality={70} loading="lazy" />
+  <div class="coach-inner band">
+    <div class="wrap coach-grid reveal">
+      <div class="l">
+        <span class="mono">{coach.eyebrow}</span>
+        <h2 class="display-2">{coach.titleLines[0]}<br />{coach.titleLines[1]}</h2>
+        <p>{coach.body}</p>
+      </div>
+      <div class="r">
+        {
+          coach.bubbles.map((bubble) => (
+            <div class={`bub large ${bubble.side}`}>
+              {bubble.text}
+              <time>{bubble.time}</time>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  </div>
+</section>

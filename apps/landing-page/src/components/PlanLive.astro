@@ -1,0 +1,92 @@
+---
+import { plan } from "@/content/copy";
+import { goals } from "@/content/demo";
+import type { PlanDemo } from "@/lib/plan-demo";
+import { renderDays, renderPhases, renderWeeks } from "@/lib/plan-demo-view";
+
+/** « Ton plan, en direct » : le plan jusqu'au jour J, qui suit l'objectif et l'imprévu choisis. */
+interface Props {
+  demo: PlanDemo;
+}
+
+const { demo } = Astro.props;
+const weekNote =
+  demo.scenario === null
+    ? plan.weekAsPlanned
+    : `${demo.adjustedDays} ${demo.adjustedDays > 1 ? plan.adjustedMany : plan.adjustedOne}`;
+---
+
+<section class="plan band" id="plan" data-demo-plan>
+  <div class="wrap reveal">
+    <div class="card plan-card" style={`--weeks:${demo.goal.weeks}`} data-demo-plan-card>
+      <div class="plan-head">
+        <div class="stack" style="gap:8px">
+          <span class="mono">{plan.eyebrow}</span>
+          <b class="plan-race" data-demo-field="race">{demo.goal.race}</b>
+        </div>
+        <div class="goals" role="group" aria-label={plan.goalsAriaLabel}>
+          {
+            goals.map((goal) => (
+              <button type="button" data-demo-goal={goal.id} aria-pressed={goal.id === demo.goal.id ? "true" : "false"}>
+                {goal.label}
+              </button>
+            ))
+          }
+        </div>
+      </div>
+
+      <div class="plan-stats">
+        <div><span class="mono">{plan.stats.target}</span><b data-demo-field="target">{demo.goal.target}</b></div>
+        <div><span class="mono">{plan.stats.format}</span><b data-demo-field="format">{demo.goal.format}</b></div>
+        <div><span class="mono">{plan.stats.hours}</span><b data-demo-field="hours">{demo.goal.hours}</b></div>
+        <div>
+          <span class="mono">{plan.stats.duration}</span><b
+            ><span data-demo-field="weeks">{demo.goal.weeks}</span> {plan.weeksUnit}</b
+          >
+        </div>
+      </div>
+
+      <div class="plan-chart-row">
+        <div class="plan-chart" role="img" aria-label={plan.chartAriaLabel} data-demo-weeks set:html={renderWeeks(demo.weeks)} />
+        <div class="race-day" aria-hidden="true"><span>{plan.raceDay}</span><i></i></div>
+      </div>
+      <div class="plan-phases-row">
+        <div class="plan-phases" data-demo-phases set:html={renderPhases(demo.phases)} />
+      </div>
+
+      <div class="plan-this-week">
+        <div class="plan-this-week-head">
+          <span class="mono ink">{plan.thisWeek} <span data-demo-field="current-week">{demo.currentWeek}</span></span>
+          <span
+            class:list={["mono", { "is-adjusted": demo.scenario !== null }]}
+            data-demo-week-note
+            data-label-planned={plan.weekAsPlanned}
+            data-label-one={plan.adjustedOne}
+            data-label-many={plan.adjustedMany}>{weekNote}</span
+          >
+        </div>
+        <div class="plan-days" data-demo-days data-badge={plan.adjustedBadge} set:html={renderDays(demo.days, plan.adjustedBadge)} />
+      </div>
+
+      <div class="plan-foot">
+        <div class="legend">
+          {
+            plan.zones.map((zone, index) => (
+              <span class="mono">
+                <i class={`zone-${index + 1}`} />
+                {zone}
+              </span>
+            ))
+          }
+        </div>
+        <span class="mono">{plan.hint}</span>
+      </div>
+    </div>
+
+    <div class="compat">
+      <span class="mono">{plan.compat.label}</span>
+      {plan.compat.brands.map((brand) => <span>{brand}</span>)}
+      <span class="mono">{plan.compat.via}</span>
+    </div>
+  </div>
+</section>

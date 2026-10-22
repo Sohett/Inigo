@@ -1,0 +1,15 @@
+---
+import Logo from "@/components/Logo.astro";
+import StartCta from "@/components/StartCta.astro";
+import { nav } from "@/content/copy";
+---
+
+<header class="hdr band">
+  <div class="wrap">
+    <a class="logo" href="#top" aria-label={nav.homeLabel}><Logo /></a>
+    <nav class="nav" aria-label={nav.ariaLabel}>
+      {nav.items.map((item) => <a href={item.href}>{item.label}</a>)}
+    </nav>
+    <StartCta label={nav.cta} />
+  </div>
+</header>

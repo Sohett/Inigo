@@ -1,0 +1,108 @@
+---
+import Logo from "@/components/Logo.astro";
+import WhatsAppQr from "@/components/WhatsAppQr.astro";
+import { hero, nav, whatsappContact } from "@/content/copy";
+import { scenarios } from "@/content/demo";
+import type { PlanDemo } from "@/lib/plan-demo";
+import { renderMessages } from "@/lib/plan-demo-view";
+import { whatsappLink } from "@/lib/whatsapp-link";
+
+/**
+ * Hero : les imprévus de la démo (rotation auto, cf. `lib/demo-controller.ts`) et la
+ * conversation WhatsApp qui en découle. Rendu complet au build ; le script ne fait que
+ * rebasculer l'état.
+ */
+interface Props {
+  demo: PlanDemo;
+}
+
+const { demo } = Astro.props;
+const url = whatsappLink(whatsappContact.phoneNumber, whatsappContact.message);
+---
+
+<section class="hero band" id="top" data-demo-hero data-demo-state="paused">
+  <div class="wrap hero-grid">
+    <div class="l">
+      <span class="mono teal">{hero.eyebrow}</span>
+      <h1 class="display-1">{hero.titleLines[0]}<br />{hero.titleLines[1]}</h1>
+      <p class="hero-subtitle">{hero.subtitle}</p>
+
+      <div class="demo-box">
+        <div class="demo-box-head">
+          <span class="mono ink" id="demo-label">{hero.demo.label}</span>
+          <button
+            type="button"
+            class="demo-toggle"
+            data-demo-toggle
+            hidden
+            aria-label={hero.demo.pauseAria}
+            data-label-pause={hero.demo.pause}
+            data-label-play={hero.demo.play}
+            data-aria-pause={hero.demo.pauseAria}
+            data-aria-play={hero.demo.playAria}
+          >
+            {hero.demo.pause}
+          </button>
+        </div>
+        <div class="chips" role="group" aria-labelledby="demo-label">
+          {
+            scenarios.map((scenario) => (
+              <button
+                type="button"
+                class="chip"
+                data-demo-scenario={scenario.id}
+                aria-pressed={scenario.id === demo.scenario?.id ? "true" : "false"}
+              >
+                {scenario.label}
+              </button>
+            ))
+          }
+        </div>
+      </div>
+
+      <div class="hero-cta-row">
+        <div class="card qr-card only-desktop">
+          <WhatsAppQr label={hero.qr.title} />
+          <div class="qr-card-text">
+            <span class="mono ink with-dot"><span class="wa-dot"></span>{hero.qr.title}</span>
+            <span>{hero.qr.body}</span>
+          </div>
+        </div>
+        <div class="stack" style="gap:8px">
+          <a class="pill dark only-desktop" href={url} target="_blank" rel="noopener"
+            ><span class="wa-dot"></span>{hero.desktopLink}</a
+          >
+          <a class="pill dark only-mobile" href={url} rel="noopener"><span class="wa-dot"></span>{nav.cta}</a>
+          <span class="mono">{hero.noCommitment}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="r">
+      <div class="phone" role="img" aria-label={hero.phone.ariaLabel}>
+        <div class="screen">
+          <div class="top">
+            <div class="av"><Logo variant="mark" size={18} /></div>
+            <div>
+              <b>{hero.phone.name}</b><small
+                data-demo-status
+                data-label-idle={hero.phone.status}
+                data-label-adjusted={hero.phone.statusAdjusted}
+                >{demo.scenario ? hero.phone.statusAdjusted : hero.phone.status}</small
+              >
+            </div>
+          </div>
+          <div class="msgs">
+            <span class="day-l">{hero.phone.dayLabel}</span>
+            <div class="msgs" style="padding:0" data-demo-messages set:html={renderMessages(demo.messages)} />
+          </div>
+        </div>
+      </div>
+      <div class="card counter">
+        <span class="mono">{hero.counter.label}</span>
+        <b data-demo-count>0</b>
+        <span class="mono">{hero.counter.sub}</span>
+      </div>
+    </div>
+  </div>
+</section>

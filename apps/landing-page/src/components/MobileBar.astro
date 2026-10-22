@@ -1,0 +1,11 @@
+---
+import { nav, whatsappContact } from "@/content/copy";
+import { whatsappLink } from "@/lib/whatsapp-link";
+
+/** Barre CTA collante en bas d'écran, sous 768px (le header n'a alors plus de place). */
+const url = whatsappLink(whatsappContact.phoneNumber, whatsappContact.message);
+---
+
+<div class="mobile-bar">
+  <a class="pill dark" href={url} rel="noopener"><span class="wa-dot"></span>{nav.cta}</a>
+</div>

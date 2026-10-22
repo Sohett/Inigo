@@ -1,14 +1,15 @@
 ---
 import "../styles/global.css";
-import { meta } from "@/content/copy";
+import { meta, nav } from "@/content/copy";
 
 interface Props {
   title?: string;
   description?: string;
   ogImage?: string;
+  bodyClass?: string;
 }
 
-const { title = meta.title, description = meta.description, ogImage = "/og.png" } = Astro.props;
+const { title = meta.title, description = meta.description, ogImage = "/og.png", bodyClass } = Astro.props;
 
 const origin = Astro.site ?? new URL(Astro.url.origin);
 const canonical = new URL(Astro.url.pathname, origin).toString();
@@ -19,7 +20,8 @@ const ogImageUrl = new URL(ogImage, origin).toString();
 <html lang="fr">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#fffdf9" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="generator" content={Astro.generator} />
@@ -46,13 +48,8 @@ const ogImageUrl = new URL(ogImage, origin).toString();
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={ogImageUrl} />
   </head>
-  <body>
-    <a
-      href="#contenu"
-      class="sr-only rounded-md bg-primary px-4 py-2 text-primary-foreground focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50"
-    >
-      Aller au contenu
-    </a>
+  <body class={bodyClass}>
+    <a href="#contenu" class="skip-link pill dark">{nav.skipLink}</a>
     <slot />
   </body>
 </html>

@@ -2,28 +2,41 @@
 import Base from "@/layouts/Base.astro";
 import SiteHeader from "@/components/SiteHeader.astro";
 import Hero from "@/components/Hero.astro";
+import PlanLive from "@/components/PlanLive.astro";
 import Coach from "@/components/Coach.astro";
-import Method from "@/components/Method.astro";
-import WhatsApp from "@/components/WhatsApp.astro";
-import Requirements from "@/components/Requirements.astro";
-import Demarrer from "@/components/Demarrer.astro";
-import SiteFooter from "@/components/SiteFooter.astro";
+import Analysis from "@/components/Analysis.astro";
+import Science from "@/components/Science.astro";
+import RaceDay from "@/components/RaceDay.astro";
+import Pricing from "@/components/Pricing.astro";
+import Start from "@/components/Start.astro";
+import MobileBar from "@/components/MobileBar.astro";
+import { goals, scenarios } from "@/content/demo";
+import { planDemo } from "@/lib/plan-demo";
+
+// État initial de la démo (rendu au build) : premier objectif, premier imprévu.
+const initialDemo = planDemo(goals[0]?.id ?? "triathlon-l", scenarios[0]?.id ?? null);
 ---
 
-<Base>
+<Base bodyClass="has-mobile-bar">
   <SiteHeader />
   <main id="contenu">
-    <Hero />
+    <Hero demo={initialDemo} />
+    <PlanLive demo={initialDemo} />
     <Coach />
-    <Method />
-    <WhatsApp />
-    <Requirements />
-    <Demarrer />
+    <Analysis />
+    <Science />
+    <RaceDay />
+    <Pricing />
+    <Start />
   </main>
-  <SiteFooter />
+  <MobileBar />
 </Base>
 
 <script>
+  import { startDemo } from "@/lib/demo-controller";
+
+  startDemo();
+
   // Reveal au scroll, une seule fois ; respecte prefers-reduced-motion et l'absence d'IO.
   const elements = document.querySelectorAll<HTMLElement>(".reveal");
   const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;

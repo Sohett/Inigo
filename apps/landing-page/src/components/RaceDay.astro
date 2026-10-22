@@ -1,0 +1,53 @@
+---
+import { raceDay } from "@/content/copy";
+---
+
+<section class="sec band" id="jourj">
+  <div class="wrap split">
+    <div class="l stack reveal">
+      <span class="mono">{raceDay.eyebrow}</span>
+      <h2 class="display-2">{raceDay.title}</h2>
+      <p class="lede">{raceDay.body}</p>
+    </div>
+    <div class="r reveal" style="--delay:100ms">
+      <div class="card race-card">
+        <div class="row-between" style="align-items:baseline">
+          <span class="mono ink">{raceDay.caption}</span>
+          <span class="race-total">{raceDay.total}</span>
+        </div>
+        <div class="stack" style="gap:8px">
+          <div class="race-legs">
+            {
+              raceDay.legs.map((leg, index) => (
+                <>
+                  {index > 0 && <div class="transition" aria-hidden="true" />}
+                  <div class={leg.tone} style={`width:${leg.width}%`}>
+                    {leg.name}
+                    <br />
+                    {leg.detail}
+                  </div>
+                </>
+              ))
+            }
+          </div>
+          <div class="row-between race-distances">
+            {raceDay.distances.map((distance) => <span class="mono">{distance}</span>)}
+          </div>
+        </div>
+        <div class="bigstats">
+          {
+            raceDay.stats.map((stat) => (
+              <div>
+                <span class="mono">{stat.label}</span>
+                <b>
+                  {stat.value}
+                  <small>{stat.unit}</small>
+                </b>
+              </div>
+            ))
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
