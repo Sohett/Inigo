@@ -1,9 +1,7 @@
-import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import type { Athlete } from "../../../../../../src/domain/athlete";
 import type { RunningSession } from "../../../../../../src/domain/brain";
-
-const ADMIN_USER = "inigo";
-const ADMIN_PASSWORD = "a-very-long-admin-password";
+import { AS_ATHLETE, AS_COACH, AS_UNCONFIGURED } from "../../../../../../src/identity/sessions.fake";
 
 const athlete: Athlete = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -36,7 +34,7 @@ const fake = {
   createSession: vi.fn()
 };
 
-// `requireAdmin` reads the credentials from the environment, not from here.
+vi.mock("../../../../../../src/identity/sessions", () => import("../../../../../../src/identity/sessions.fake"));
 vi.mock("../../../../../../src/deps", () => ({
   getDeps: () => ({
     repo: { findById: fake.findById, setSession: fake.setSession },
@@ -48,9 +46,6 @@ vi.mock("../../../../../../src/deps", () => ({
   })
 }));
 
-const basic = (user = ADMIN_USER, password = ADMIN_PASSWORD) =>
-  `Basic ${Buffer.from(`${user}:${password}`).toString("base64")}`;
-
 function post(athleteId: string, headers: Record<string, string> = {}, body?: string) {
   return new Request(`http://localhost/api/admin/athletes/${athleteId}/session`, {
     method: "POST",
@@ -61,14 +56,7 @@ function post(athleteId: string, headers: Record<string, string> = {}, body?: st
 
 const params = (athleteId: string) => ({ params: Promise.resolve({ athleteId }) });
 
-beforeAll(() => {
-  process.env["ADMIN_USER"] = ADMIN_USER;
-  process.env["ADMIN_PASSWORD"] = ADMIN_PASSWORD;
-});
-
 beforeEach(() => {
-  process.env["ADMIN_USER"] = ADMIN_USER;
-  process.env["ADMIN_PASSWORD"] = ADMIN_PASSWORD;
   fake.findById.mockReset().mockResolvedValue(athlete);
   fake.setSession.mockReset().mockResolvedValue(undefined);
   fake.readSession.mockReset().mockResolvedValue(running);
@@ -76,45 +64,36 @@ beforeEach(() => {
 });
 
 describe("POST /api/admin/athletes/[athleteId]/session", () => {
-  it("rejects a request with no credentials (401) and challenges the browser", async () => {
+  it("rejects a request without a session (401)", async () => {
     const { POST } = await import("./route");
     const response = await POST(post(athlete.id), params(athlete.id));
 
     expect(response.status).toBe(401);
-    expect(response.headers.get("WWW-Authenticate")).toContain("Basic");
     expect(fake.createSession).not.toHaveBeenCalled();
   });
 
-  it("fails closed with 503 when the admin is not configured", async () => {
-    delete process.env["ADMIN_USER"];
-    delete process.env["ADMIN_PASSWORD"];
+  it("fails closed with 503 when sign in is not configured", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const { POST } = await import("./route");
-    const response = await POST(
-      post(athlete.id, { authorization: basic() }),
-      params(athlete.id)
-    );
+    const response = await POST(post(athlete.id, { ...AS_UNCONFIGURED }), params(athlete.id));
 
     expect(response.status).toBe(503);
     await expect(response.json()).resolves.toMatchObject({ error: "admin_not_configured" });
     expect(fake.createSession).not.toHaveBeenCalled();
   });
 
-  it("rejects wrong credentials (401)", async () => {
+  it("rejects an athlete's session (403)", async () => {
     const { POST } = await import("./route");
-    const response = await POST(
-      post(athlete.id, { authorization: basic(ADMIN_USER, "a-very-long-wrong-password") }),
-      params(athlete.id)
-    );
+    const response = await POST(post(athlete.id, { ...AS_ATHLETE }), params(athlete.id));
 
-    expect(response.status).toBe(401);
+    expect(response.status).toBe(403);
     expect(fake.createSession).not.toHaveBeenCalled();
   });
 
   it("rejects a non-UUID athlete id (400)", async () => {
     const { POST } = await import("./route");
     const response = await POST(
-      post("not-a-uuid", { authorization: basic() }),
+      post("not-a-uuid", { ...AS_COACH }),
       params("not-a-uuid")
     );
 
@@ -126,7 +105,7 @@ describe("POST /api/admin/athletes/[athleteId]/session", () => {
   it("clones the running session and returns the new id (200)", async () => {
     const { POST } = await import("./route");
     const response = await POST(
-      post(athlete.id, { authorization: basic() }),
+      post(athlete.id, { ...AS_COACH }),
       params(athlete.id)
     );
 
@@ -146,7 +125,7 @@ describe("POST /api/admin/athletes/[athleteId]/session", () => {
     fake.findById.mockResolvedValue(null);
     const { POST } = await import("./route");
     const response = await POST(
-      post(athlete.id, { authorization: basic() }),
+      post(athlete.id, { ...AS_COACH }),
       params(athlete.id)
     );
 
@@ -158,7 +137,7 @@ describe("POST /api/admin/athletes/[athleteId]/session", () => {
     fake.findById.mockResolvedValue({ ...athlete, status: "blocked" });
     const { POST } = await import("./route");
     const response = await POST(
-      post(athlete.id, { authorization: basic() }),
+      post(athlete.id, { ...AS_COACH }),
       params(athlete.id)
     );
 
@@ -171,7 +150,7 @@ describe("POST /api/admin/athletes/[athleteId]/session", () => {
     fake.findById.mockResolvedValue({ ...athlete, activeSession: null });
     const { POST } = await import("./route");
     const response = await POST(
-      post(athlete.id, { authorization: basic() }),
+      post(athlete.id, { ...AS_COACH }),
       params(athlete.id)
     );
 
@@ -185,7 +164,7 @@ describe("POST /api/admin/athletes/[athleteId]/session", () => {
     const response = await POST(
       post(
         athlete.id,
-        { authorization: basic(), "content-type": "application/json" },
+        { ...AS_COACH, "content-type": "application/json" },
         JSON.stringify({ agentId: "agent_coord", environmentId: "env_1", vaultIds: ["vlt_1"] })
       ),
       params(athlete.id)
@@ -202,7 +181,7 @@ describe("POST /api/admin/athletes/[athleteId]/session", () => {
     const response = await POST(
       post(
         athlete.id,
-        { authorization: basic(), "content-type": "application/json" },
+        { ...AS_COACH, "content-type": "application/json" },
         JSON.stringify({ agentId: "nope", environmentId: "env_1" })
       ),
       params(athlete.id)
@@ -219,7 +198,7 @@ describe("POST /api/admin/athletes/[athleteId]/session", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const { POST } = await import("./route");
     const response = await POST(
-      post(athlete.id, { authorization: basic() }),
+      post(athlete.id, { ...AS_COACH }),
       params(athlete.id)
     );
 

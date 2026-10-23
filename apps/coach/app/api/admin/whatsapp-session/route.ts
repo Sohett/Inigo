@@ -17,8 +17,8 @@ const bodySchema = z.object({ sessionId: z.string().trim().min(1).max(200) });
  * voice must not need a redeploy.
  */
 export async function POST(request: Request): Promise<Response> {
-  const unauthorized = requireAdmin(request);
-  if (unauthorized) return unauthorized;
+  const { denied } = await requireAdmin(request);
+  if (denied) return denied;
 
   let payload: unknown;
   try {

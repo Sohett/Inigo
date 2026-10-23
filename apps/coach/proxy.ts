@@ -1,48 +1,33 @@
 import { NextResponse, type NextRequest } from "next/server";
-import {
-  adminCredentials,
-  ADMIN_PASSWORD_MIN_LENGTH,
-  ADMIN_USER_MIN_LENGTH,
-  BASIC_AUTH_CHALLENGE,
-  verifyBasicAuth
-} from "./src/auth";
+import { getSessionCookie } from "better-auth/cookies";
+import { authEnv } from "./src/identity/authEnv";
 
 /**
- * HTTP Basic gate on the admin surface.
+ * First gate on the admin surface (INI-85): no session cookie, no admin. A page goes to the
+ * Google sign in, an API call gets a 401.
  *
- * Scoped to `/admin` and `/api/admin/*` by the matcher below, deliberately: the OpenWA
- * webhook and the two MCP endpoints carry their own credentials (HMAC / bearer) and must
- * never see a Basic challenge, which would break the gateway and the brain.
+ * Only a quick check, on purpose: the proxy sees that a cookie is there, not whose it is. The
+ * admin layout and every admin route read the session itself (`requireAdmin`) and let only a
+ * coach in; an athlete's session never gets past them.
  *
- * `proxy.ts` is Next 16's name for what used to be `middleware.ts`, and Next always runs it
- * on the Node.js runtime — so the constant-time comparison in `src/auth.ts` (`node:crypto`)
- * works here. It reads the two admin variables straight from the environment rather than
- * through `loadConfig`, on purpose: the gate must not answer 500 (and leak a config dump
- * into the logs) because some unrelated variable is missing.
+ * Scoped to `/admin` and `/api/admin/*` by the matcher below, deliberately: the OpenWA webhook and
+ * the MCP endpoints carry their own credentials (HMAC / bearer), and the athletes' pages their own
+ * session. `proxy.ts` is Next 16's name for what used to be `middleware.ts`.
  *
- * Fails closed: no credentials configured means nobody gets in.
+ * Fails closed: sign in not configured means nobody gets in.
  */
 export function proxy(request: NextRequest): NextResponse {
-  const credentials = adminCredentials();
-  if (!credentials) {
-    // One template literal, not a concatenation: Turbopack folded the two-part version
-    // into a truncated message, and this is the line an operator reads when admin is down.
-    console.error(
-      `[coach] admin refuses to serve. Set ADMIN_USER (min ${ADMIN_USER_MIN_LENGTH} chars) and ADMIN_PASSWORD (min ${ADMIN_PASSWORD_MIN_LENGTH} chars).`
-    );
+  if (!authEnv()) {
+    console.error("[coach] admin refuses to serve: sign in is not configured (BETTER_AUTH_*, GOOGLE_CLIENT_*).");
     return new NextResponse("Admin is not configured.", { status: 503 });
   }
 
-  if (
-    !verifyBasicAuth(request.headers.get("authorization"), credentials.user, credentials.password)
-  ) {
-    return new NextResponse("Authentication required.", {
-      status: 401,
-      headers: { "WWW-Authenticate": BASIC_AUTH_CHALLENGE }
-    });
-  }
+  if (getSessionCookie(request)) return NextResponse.next();
 
-  return NextResponse.next();
+  if (request.nextUrl.pathname.startsWith("/api/")) {
+    return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  }
+  return NextResponse.redirect(new URL("/login", request.url));
 }
 
 export const config = {
