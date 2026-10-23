@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { json, requireAdmin } from "../../../../src/admin/guard";
 import { getDeps } from "../../../../src/deps";
-import { STAFF_ROLES, type StaffRole } from "../../../../src/domain/staff";
+import { StaffRole } from "../../../../src/domain/staff";
 import { createInviteStaffMember } from "../../../../src/use-cases/inviteStaffMember";
 import { createRemoveStaffMember } from "../../../../src/use-cases/removeStaffMember";
 
@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 const emailSchema = z.object({ email: z.email() });
 const inviteSchema = emailSchema.extend({
-  roles: z.array(z.enum(STAFF_ROLES as [StaffRole, ...StaffRole[]])).min(1)
+  roles: z.array(z.enum(StaffRole)).min(1)
 });
 
 async function readBody<T>(request: Request, schema: z.ZodType<T>, invalid: string): Promise<T | Response> {
