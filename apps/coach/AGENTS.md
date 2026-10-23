@@ -49,9 +49,10 @@ app/
 src/
   config/config.ts                 # env zod (ANTHROPIC_API_KEY, DATABASE_URL, DB_ENCRYPTION_KEY, WHATSAPP_WEBHOOK_SECRET, MCP_BEARER_TOKEN, INTERVALS_BASE_URL?) — PAS les vars d'admin
   auth.ts                          # verifyWebhookSignature + verifyBearerToken (constant-time) : webhook OpenWA et MCP
-  admin/guard.ts                   # requireAdmin(request) : relit la session dans chaque route admin → coach, ou 401/403/503
-  identity/                        # Better Auth (INI-85) : authEnv (vars hors configSchema), betterAuth (factory), auth (instance Neon, lazy),
-                                   #   sessions (whoIsSignedIn, magicLinkIssuer), magicLinkCapture, athleteEmail, authClient (navigateur)
+  admin/guard.ts                   # requireAdmin(request) : relit la session dans chaque route admin → staff, ou 401/403/503
+  identity/                        # Better Auth (INI-85, INI-87, voir « Identité ») : authEnv, betterAuth (config, plugin admin), auth (instance Neon, lazy),
+                                   #   accounts (adapters athlete/staff via auth.api), magicLinks (lien capturé),
+                                   #   sessions (whoIsSignedIn), magicLinkCapture, athleteEmail, authClient (navigateur)
   lib/utils.ts                     # cn() (clsx + tailwind-merge)
   components/ui/*                  # composants shadcn (button, card, table, badge, input, label, sidebar et ses dépendances)
   domain/
@@ -70,7 +71,8 @@ src/
     drizzleIntervalsCredentialStore.ts # ADAPTER IntervalsCredentialStore : setIntervalsCredential (secret chiffré, id en clair)
     drizzleAthleteRosterReader.ts  # ADAPTER Drizzle du port AthleteRosterReader : athlètes + plan (actif, sinon le plus récent) + dernière proposition, une requête (joins latéraux)
     drizzleOnboardingFactsReader.ts # ADAPTER Drizzle du port OnboardingFactsReader (profil + goals actifs + credential, une requête) + toOnboardingFacts
-    staffRepository.ts / drizzleStaffRepository.ts  # PORT + ADAPTER : staff_member + staff d'auth_user (retrait = membre + user en un db.batch)
+    staffRepository.ts             # PORT StaffRepository (list, create, remove) ; adapter : identity/accounts.ts (plugin admin)
+    athleteAccountRepository.ts    # PORT AthleteAccountRepository (ensure) ; adapter : identity/accounts.ts (plugin admin)
   use-cases/
     routeInboundMessage.ts         # use-case de routing : une seule fonction publique execute()
     startAthleteSession.ts         # use-case admin : clone la session courante avec l'agent de son statut (INI-74), repointe l'athlète
@@ -83,7 +85,7 @@ src/
     handleGatewaySessionEvent.ts   # use-case : webhook session.* OpenWA → alerte « down » / « recovered »
     checkGatewaySession.ts         # use-case watchdog : session enregistrée en Neon → GET OpenWA → alerte si pas ready
     registerNewAthlete.ts          # use-case : expéditeur inconnu → réponse fixe, ou athlète en onboarding + sa session (PORT ChatReplier)
-    createAthleteLink.ts           # use-case : magic link vers une destination fermée (outil get_intervals_connect_link, INI-85) ; PORT AthleteLinkIssuer
+    createAthleteLink.ts           # use-case : findById → accounts.ensure → issuer.issue (outil get_intervals_connect_link) ; PORT SignInLinkIssuer
     startIntervalsConnection.ts    # use-case : ce que montre la page (bouton vers Intervals, ou pourquoi elle ne peut pas), athlète lu dans la session
     listStaff.ts, inviteStaffMember.ts, removeStaffMember.ts  # use-cases admin de l'équipe (INI-85) ; PORT StaffRepository
     completeIntervalsConnection.ts # use-case : callback OAuth → token chiffré + tour `evenement: intervals_connecte` à l'agent d'onboarding
@@ -570,48 +572,89 @@ coordinateur et en fait la session active de l'athlète dans `athlete_session`.
   `configSchema`.** Gardé par les specs des routes webhook et MCP, qui tournent avec une connexion
   volontairement inutilisable (`BETTER_AUTH_SECRET` trop court, pas de client Google).
 
-## Connexion (Better Auth) — INI-85
+## Identité : qui se connecte, et qui crée les users — INI-85, INI-87
 
-Une seule librairie, **Better Auth**, pour deux populations, séparées par `auth_user.role`
-(`athlete` | `staff`, décidé à la création par `databaseHooks.user.create.before`, jamais par une
-requête). Tables `auth_*` et `staff_member` dans `@inigo/db`, adaptateur Drizzle sur `neon-http`
-(`transaction: false` : Better Auth n'en ouvre pas en Postgres).
+**La règle : un user n'est jamais créé en se connectant.** Il est créé (et supprimé) **uniquement
+par un use-case**, via l'API publique du plugin `admin` de **Better Auth**. Se connecter (Google
+pour le staff, magic link pour l'athlète) ne fait qu'**authentifier un user qui existe déjà**. La
+config Better Auth (`identity/betterAuth.ts`) est de la **plomberie** : aucun hook, aucune règle
+métier, aucune vérification de rôle.
 
-- **Athlètes : tout part de WhatsApp.** La conversation est la seule preuve d'identité, le lien la
-  porte. Un tool MCP appelle `createAthleteLink(athleteId, destination)` : **destination dans une
-  enum fermée** (aujourd'hui `intervals_connect` → `/connect/intervals`), jamais une URL, pour
-  qu'aucun message, même manipulé, ne fasse sortir d'Inigo. Le use-case demande un **magic link**
-  (`auth.api.signInMagicLink`, `callbackURL` = `errorCallbackURL` = la page) ; le tool rend l'URL
-  au brain, qui l'écrit sur WhatsApp. Un tool par action (pas de tool générique) : les prompts
-  nomment l'action, la destination est à nous.
-- **Jamais de lien sur demande** : `/sign-in/magic-link` est dans `disabledPaths` (404 en HTTP,
-  `auth.api` reste appelable), et `sendMagicLink` n'envoie rien : il dépose l'URL dans la capture
-  (`AsyncLocalStorage`) ouverte par le use-case, et refuse hors capture ou pour un user qui n'est
-  pas `athlete` en base (le staff passe par Google seulement).
-- **Athlète ↔ user** : `auth_user.athlete_id`, clé étrangère unique vers `athlete` (`on delete
-  cascade`) ; CHECK `role = 'athlete'` ⇔ `athlete_id` renseigné. Le user athlète est **créé par
-  notre code** avec son `athleteId` avant son premier lien (`ensureAthleteUser`) ; un magic link ne
-  crée jamais de user (`disableSignUp`). Le hook donne `athlete` à un user créé avec un `athleteId`.
-  On ne relit jamais l'athlète depuis l'email : la session passe par la FK. L'email reste
-  obligatoire chez Better Auth : `<athlete.id>@athletes.inigo.betterauth`, une étiquette sur
-  laquelle aucun mail n'est envoyé. Un athlète qui est aussi staff a deux users (deux identités).
-- **Lien** : 1 h (`MAGIC_LINK_TTL_SECONDS`), jeton stocké haché, **usage unique imposé** par Better
-  Auth (non configurable). Expiré ou déjà utilisé donnent la même erreur (`INVALID_TOKEN`) : la page
-  montre « lien expiré », sauf si ce navigateur a déjà la session (deuxième clic).
-- **Aperçus de lien** : la vérification est un `GET`. Si la passerelle ou WhatsApp ouvrent l'URL pour
-  un aperçu, le jeton est consommé avant le clic. À vérifier avec la vraie passerelle ; si c'est le
-  cas, faire pointer le lien vers une page Inigo intermédiaire dont le bouton déclenche la vérif.
-- **Staff (le backoffice) : Google seul, sur invitation.** `staff_member` (email en minuscules,
-  `roles` ⊆ {`admin`, `coach`}, au moins un). Un membre peut être admin, coach ou les deux ; **les
-  rôles sont enregistrés et affichés mais n'autorisent encore rien** : tout membre a le même accès
-  (l'autorisation viendra dans une carte dédiée). Le hook refuse (`APIError` 403) un compte Google
-  non membre, Better Auth le renvoie sur `/login?error=`. Retirer un membre supprime sa ligne et son
-  user en un `db.batch` : ses sessions tombent (cascade) et il ne peut pas se recréer. On ne se
-  retire jamais soi-même. Premier membre (`admin` + `coach`) invité par la migration `0015`. Pas
-  d'email d'invitation : on transmet `/login`.
-- **Lire la session** : toujours `whoIsSignedIn(headers)` (`identity/sessions.ts`) → `SignedIn`
-  (`domain/signedIn.ts`), jamais Better Auth directement dans un use-case. Les specs de route
-  mockent `identity/sessions` par `identity/sessions.fake.ts` (`AS_STAFF`, `AS_ATHLETE`…).
+### Une table d'identité : `auth_user`
+
+| Colonne | Athlète | Staff (backoffice) |
+|---|---|---|
+| `role` (plugin admin) | `athlete` | `admin`, `coach` ou `admin,coach` |
+| `athlete_id` | FK unique vers `athlete` (`on delete cascade`) | null |
+| `email` | `<athlete.id>@athletes.inigo.betterauth` (étiquette, aucun mail envoyé, jamais relue) | son email Google, en minuscules |
+| `email_verified` | true | false = **invité**, true = **actif** (Google l'a vérifié en liant son compte) |
+| `invited_by` | null | email du membre qui l'a invité |
+
+CHECK : rôle dans ces 4 valeurs ; `role = 'athlete'` ⇔ `athlete_id` renseigné ; email en
+minuscules. Les sessions (`auth_session`) et le compte Google (`auth_account`) tombent avec le user
+(cascade). Colonnes `banned`, `ban_*`, `impersonated_by` : exigées par le plugin, inutilisées.
+
+### Qui crée quoi
+
+```
+ATHLÈTE (tout part de WhatsApp)
+  agent ──get_intervals_connect_link──▶ createAthleteLink(athleteId, destination)
+      1. destination → chemin (enum fermée : intervals_connect → /connect/intervals)
+      2. athletes.findById                         (AthleteRepository, Drizzle)
+      3. athleteAccounts.ensure(athlete)           (AthleteAccountRepository → auth.api.createUser,
+                                                    rôle athlete + athleteId ; idempotent)
+      4. signInLinks.issue(athleteId, chemin)      (SignInLinkIssuer → auth.api.signInMagicLink, capturé)
+  athlète clique ──▶ /api/auth/magic-link/verify ──▶ session ──▶ /connect/intervals
+
+STAFF (sur invitation, sans email)
+  /admin/team ──▶ inviteStaffMember(email, rôles, invitedBy)
+      1. rôles dédupliqués, au moins un
+      2. staff.create(...)                         (StaffRepository → auth.api.createUser, au nom du membre connecté)
+  → bouton « Copier le lien » (/login), envoyé à la main
+  invité ──Google──▶ /api/auth/callback/google ──▶ compte Google lié à SON user existant ──▶ session
+  /admin/team ──▶ removeStaffMember(email, by) ──▶ staff.remove ──▶ auth.api.removeUser (sessions incluses)
+  /admin/team ──▶ listStaff() ──▶ staff.list ──▶ auth.api.listUsers (rôle ≠ athlete)
+```
+
+Adapters : `identity/accounts.ts` (`betterAuthAthleteAccounts`, `betterAuthStaff`, et leurs
+fabriques `athleteAccountsOnDeployment` / `staffOnDeployment`), `identity/magicLinks.ts`
+(`magicLinkIssuer`). Ils n'utilisent que `auth.api`, jamais les tables Better Auth directement.
+
+### Better Auth, la config (plomberie)
+
+- **Google** `disableSignUp: true` : un compte non invité → `/login?error=signup_disabled`, aucun user.
+  `accountLinking.requireLocalEmailVerified: false` pour que Google se lie au user invité (email pas
+  encore vérifié) ; sans risque ici, personne ne peut s'inscrire.
+- **Magic link** `disableSignUp: true`, 1 h (`MAGIC_LINK_TTL_SECONDS`), jeton haché, usage unique
+  (imposé par Better Auth). `sendMagicLink` n'envoie rien : il dépose l'URL dans la capture
+  (`AsyncLocalStorage`, `identity/magicLinkCapture.ts`) ouverte par `magicLinkIssuer` ; hors capture,
+  il échoue. Expiré ou réutilisé → `?error=INVALID_TOKEN` : la page dit « lien expiré », sauf si ce
+  navigateur a déjà la session (deuxième clic).
+- **Plugin `admin`**, contrôle d'accès natif : `admin` et `coach` ont **les mêmes permissions**
+  (créer avec un rôle, lister, supprimer des users et leurs sessions) ; `athlete` aucune. Les
+  différencier est une décision produit à venir, qui se fera dans `ROLES`.
+- **`disabledPaths`** : `/sign-in/magic-link` et **toutes** les routes HTTP `/admin/*` du plugin.
+  Tout passe par nos routes et nos use-cases ; `auth.api` reste appelable côté serveur.
+- **Instance** : `identity/auth.ts`, construite à la première utilisation, variables hors
+  `configSchema` (`authEnv`), adaptateur Drizzle sur `neon-http` (`transaction: false`).
+
+### Lire la session
+
+Toujours `whoIsSignedIn(headers)` (`identity/sessions.ts`) → `SignedIn` (`domain/signedIn.ts`) :
+`athlete` (lu par la FK `athleteId`, jamais par l'email), `staff` (rôle `admin`/`coach`),
+`signed_out`, `unavailable`. Jamais Better Auth directement dans un use-case. `proxy.ts`, le layout
+admin et `requireAdmin` ne laissent passer que le staff. Les specs de route mockent
+`identity/sessions` par `identity/sessions.fake.ts` (`AS_STAFF`, `AS_ATHLETE`…).
+
+### À savoir
+
+- **Tester par le vrai chemin** : `identity/betterAuth.spec.ts` passe par le handler HTTP (sign in
+  Google + callback, token Google simulé par msw ; magic links). Un test qui crée des users par les
+  internals de Better Auth saute sa validation : c'est ainsi qu'INI-85 a cassé la connexion en prod.
+- `listUsers` du plugin renvoie une liste vide (pas une erreur) si la base tombe : la page Équipe
+  s'afficherait vide.
+- **Aperçus de lien** : la vérification d'un magic link est un `GET`. Si la passerelle ou WhatsApp
+  ouvrent l'URL pour un aperçu, le jeton est consommé avant le clic : à vérifier en prod.
 - **Pas de connexion Google sur les previews Vercel** (Google refuse les URL joker) : prod et local.
 
 ## Conventions (en plus de la racine)
@@ -658,10 +701,11 @@ le skill Claude Code `managed-agents-api`.
 - Composants client : `*.spec.tsx` avec `// @vitest-environment happy-dom` en tête de fichier
   (le reste tourne en `node`), rendus avec `react-dom/client` + `act`, `next/navigation` mocké.
 - Couvre : config (dont `MCP_BEARER_TOKEN` ; et le fait qu'elle **ignore** les vars de connexion),
-  auth (HMAC + bearer), **Better Auth sur l'adaptateur mémoire** (`identity/betterAuth.spec.ts` :
-  lien capturé, session athlète, usage unique, expiration à 1 h, endpoint HTTP en 404, refus hors
-  capture ou pour un non athlète, rôle décidé par l'email, compte non invité refusé),
-  `whoIsSignedIn` / `magicLinkIssuer`, `createAthleteLink`, les use-cases staff (rôles, jamais soi-même), le proxy (athlète refusé, RSC compris),
+  auth (HMAC + bearer), **Better Auth par son vrai chemin** (`identity/betterAuth.spec.ts`, adaptateur
+  mémoire, Google simulé par msw : Thomas lié et actif, compte non invité refusé sans user créé,
+  membre retiré refusé ; user athlète créé une fois, lien → session, usage unique, expiration à 1 h,
+  pas de user sans lien ; session athlète sans pouvoir sur l'équipe ; `/admin/*` et
+  `/sign-in/magic-link` en 404), `whoIsSignedIn`, `magicLinkIssuer`, `createAthleteLink`, les use-cases staff (rôles, jamais soi-même), le proxy (athlète refusé, RSC compris),
   **routes webhook et MCP bootées avec une connexion inutilisable** (la régression de prod),
   parsing/normalisation du payload + `senderPhone`, mapping `toAthlete` / `toAthleteSession`
   (intégration Neon, skippée sans `DATABASE_URL` : bascule de session qui garde l'ancienne,
