@@ -14,8 +14,8 @@ import { createDrizzleStaffRepository } from "./drizzleStaffRepository";
  *   DATABASE_URL=postgres://... pnpm --filter @inigo/coach test
  */
 const databaseUrl = process.env.DATABASE_URL;
-const INVITED = "staff-integration-invited@example.invalid";
-const ACTIVE = "staff-integration-active@example.invalid";
+const INVITED = "staff-integration-invited@example.com";
+const ACTIVE = "staff-integration-active@example.com";
 const EMAILS = [INVITED, ACTIVE];
 
 describe.skipIf(!databaseUrl)("drizzleStaffRepository (integration)", () => {

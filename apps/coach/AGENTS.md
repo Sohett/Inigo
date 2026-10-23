@@ -586,14 +586,15 @@ requête). Tables `auth_*` et `staff_member` dans `@inigo/db`, adaptateur Drizzl
   nomment l'action, la destination est à nous.
 - **Jamais de lien sur demande** : `/sign-in/magic-link` est dans `disabledPaths` (404 en HTTP,
   `auth.api` reste appelable), et `sendMagicLink` n'envoie rien : il dépose l'URL dans la capture
-  (`AsyncLocalStorage`) ouverte par le use-case, et refuse hors capture ou pour un email qui n'est
-  pas d'athlète.
+  (`AsyncLocalStorage`) ouverte par le use-case, et refuse hors capture ou pour un user qui n'est
+  pas `athlete` en base (le staff passe par Google seulement).
 - **Athlète ↔ user** : `auth_user.athlete_id`, clé étrangère unique vers `athlete` (`on delete
-  cascade`), posée par le hook ; CHECK `role = 'athlete'` ⇔ `athlete_id` renseigné. La session se
-  relit par la FK. L'email reste obligatoire chez Better Auth : synthétique,
-  `<athlete.id>@athletes.inigo.invalid` (`identity/athleteEmail.ts`), sur un domaine réservé
-  (RFC 2606) : aucun mail, aucun compte Google ne peut le porter. Un athlète qui est aussi staff a
-  deux users (deux identités).
+  cascade`) ; CHECK `role = 'athlete'` ⇔ `athlete_id` renseigné. Le user athlète est **créé par
+  notre code** avec son `athleteId` avant son premier lien (`ensureAthleteUser`) ; un magic link ne
+  crée jamais de user (`disableSignUp`). Le hook donne `athlete` à un user créé avec un `athleteId`.
+  On ne relit jamais l'athlète depuis l'email : la session passe par la FK. L'email reste
+  obligatoire chez Better Auth : `<athlete.id>@athletes.inigo.betterauth`, une étiquette sur
+  laquelle aucun mail n'est envoyé. Un athlète qui est aussi staff a deux users (deux identités).
 - **Lien** : 1 h (`MAGIC_LINK_TTL_SECONDS`), jeton stocké haché, **usage unique imposé** par Better
   Auth (non configurable). Expiré ou déjà utilisé donnent la même erreur (`INVALID_TOKEN`) : la page
   montre « lien expiré », sauf si ce navigateur a déjà la session (deuxième clic).

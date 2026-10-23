@@ -1,20 +1,13 @@
-import { UUID_PATTERN } from "../mcp/athleteId";
-
 /**
  * The email of an athlete's Better Auth user (INI-85). Better Auth keys every user by email, and
- * an athlete has none: WhatsApp is their only identity. So their email is derived from
- * `athlete.id`, on `.invalid`, a domain reserved never to resolve (RFC 2606): no mail can ever
- * be sent to it, and no Google account can ever carry it.
+ * an athlete has none: WhatsApp is their only identity. So their email is made from `athlete.id`,
+ * on a domain that is only a label for Better Auth: no mail is ever sent to it.
+ *
+ * One way only: the athlete behind a user is `auth_user.athlete_id`, a foreign key, never read
+ * back from this email.
  */
-const ATHLETE_EMAIL_DOMAIN = "athletes.inigo.invalid";
+const ATHLETE_EMAIL_DOMAIN = "athletes.inigo.betterauth";
 
 export function athleteEmail(athleteId: string): string {
   return `${athleteId.toLowerCase()}@${ATHLETE_EMAIL_DOMAIN}`;
-}
-
-/** The athlete behind a Better Auth email, or null when it is not an athlete's (a coach's). */
-export function athleteIdOf(email: string): string | null {
-  const [local, domain, extra] = email.toLowerCase().split("@");
-  if (!local || domain !== ATHLETE_EMAIL_DOMAIN || extra !== undefined) return null;
-  return UUID_PATTERN.test(local) ? local : null;
 }

@@ -1,3 +1,4 @@
+import type { Athlete } from "../domain/athlete";
 import { SignInState, type SignedIn } from "../domain/signedIn";
 import type { AthleteLinkIssuer } from "../use-cases/createAthleteLink";
 import { athleteEmail } from "./athleteEmail";
@@ -29,18 +30,20 @@ export async function whoIsSignedIn(headers: Headers, auth: InigoAuth | null = i
  * `AthleteLinkIssuer` over Better Auth: a magic link that signs the athlete in and lands them on
  * `path`, also where a used or expired link lands (with `?error=`), so that a second click from a
  * browser already signed in still shows the page. Null when sign in is not configured.
+ *
+ * The athlete's user is made here, with its `athleteId`, before their first link: Better Auth
+ * never creates one from a link, and nothing ever reads the athlete back from an email.
  */
 export function magicLinkIssuer(auth: InigoAuth | null = inigoAuth(), now: () => Date = () => new Date()): AthleteLinkIssuer | null {
   if (!auth) return null;
   return {
     async issue(athlete, path) {
+      await ensureAthleteUser(auth, athlete);
       const expiresAt = new Date(now().getTime() + MAGIC_LINK_TTL_SECONDS * 1000);
       const url = await captureMagicLink(() =>
         auth.api.signInMagicLink({
           body: {
             email: athleteEmail(athlete.id),
-            // Only used when the athlete's user is created, on their first link.
-            name: athlete.displayName ?? "",
             callbackURL: path,
             errorCallbackURL: path
           },
@@ -50,4 +53,21 @@ export function magicLinkIssuer(auth: InigoAuth | null = inigoAuth(), now: () =>
       return { url, expiresAt };
     }
   };
+}
+
+/** The athlete's Better Auth user, created on their first link. Two first links at once: one wins. */
+async function ensureAthleteUser(auth: InigoAuth, athlete: Pick<Athlete, "id" | "displayName">): Promise<void> {
+  const context = await auth.$context;
+  const email = athleteEmail(athlete.id);
+  if (await context.internalAdapter.findUserByEmail(email)) return;
+  try {
+    await context.internalAdapter.createUser(
+      { email, name: athlete.displayName ?? "", emailVerified: true, athleteId: athlete.id },
+      { method: "magic-link" }
+    );
+  } catch (error) {
+    // The unique email lost a race with a concurrent first link: that user is the same athlete's.
+    if (await context.internalAdapter.findUserByEmail(email)) return;
+    throw error;
+  }
 }

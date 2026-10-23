@@ -2,7 +2,6 @@ import { betterAuth } from "better-auth";
 import { APIError } from "better-auth/api";
 import { magicLink } from "better-auth/plugins";
 import type { AuthEnv } from "./authEnv";
-import { athleteIdOf } from "./athleteEmail";
 import { deliverMagicLink } from "./magicLinkCapture";
 
 /**
@@ -11,6 +10,8 @@ import { deliverMagicLink } from "./magicLinkCapture";
  *
  * - **Athletes** sign in with a magic link that the agent sends on WhatsApp, the only proof of who
  *   they are. Never by request: the public endpoint is disabled and the link is captured, not sent.
+ *   Their user is created by our code with its `athleteId` before the first link (`./sessions`);
+ *   a magic link never creates a user.
  * - **Staff** (the backoffice team: admins, coaches) sign in with Google, on invitation only.
  *
  * Built by a factory so the specs run it on Better Auth's memory adapter; `inigoAuth()` in
@@ -57,8 +58,15 @@ export function createInigoAuth(deps: InigoAuthDeps) {
       magicLink({
         expiresIn: MAGIC_LINK_TTL_SECONDS,
         storeToken: "hashed",
-        sendMagicLink: async ({ email, url }) => {
-          if (athleteIdOf(email) === null) throw new Error("A magic link is only ever made for an athlete.");
+        // The athlete's user exists before their first link: a link that names nobody signs in nobody.
+        disableSignUp: true,
+        // Never sent: handed to the capture our code opened, refused outside one, and only ever
+        // for an athlete's user (a staff member signs in with Google, never by link).
+        sendMagicLink: async ({ email, url }, ctx) => {
+          const found = await ctx?.context.internalAdapter.findUserByEmail(email);
+          // The adapter's user type does not carry our additional fields; the row does.
+          const role: unknown = (found?.user as { role?: unknown } | undefined)?.role;
+          if (role !== "athlete") throw new Error("A magic link is only ever made for an athlete.");
           deliverMagicLink(url);
         }
       })
@@ -66,10 +74,11 @@ export function createInigoAuth(deps: InigoAuthDeps) {
     databaseHooks: {
       user: {
         create: {
-          // Who a new user is decides their role, once, here: never anything a request sent. An
-          // athlete user is tied to their athlete by a foreign key, so it can only exist for one.
+          // A new user's role is decided once, here, never by a request. An `athleteId` can only
+          // come from our own code (`input: false`, and Google's profile carries none): that user
+          // is an athlete, tied to them by a foreign key. Anyone else must be a staff member.
           before: async (user) => {
-            const athleteId = athleteIdOf(user.email);
+            const athleteId = typeof user.athleteId === "string" ? user.athleteId : null;
             if (athleteId !== null) return { data: { ...user, role: "athlete", athleteId } };
             if (await deps.isStaffMember(user.email.toLowerCase())) return { data: { ...user, role: "staff", athleteId: null } };
             throw new APIError("FORBIDDEN", { message: "This account has not been invited." });

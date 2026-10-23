@@ -44,6 +44,20 @@ describe("magicLinkIssuer", () => {
   });
 });
 
+describe("magicLinkIssuer, the athlete's user", () => {
+  it("is created once, with the athlete id, on the first link only", async () => {
+    const auth = makeAuth();
+    const issuer = magicLinkIssuer(auth, () => NOW)!;
+    await issuer.issue(ATHLETE, "/connect/intervals");
+    await issuer.issue(ATHLETE, "/connect/intervals");
+
+    const context = await auth.$context;
+    const users = await context.adapter.findMany<{ email: string; role: string; athleteId: string | null }>({ model: "user" });
+    expect(users).toHaveLength(1);
+    expect(users[0]).toMatchObject({ email: athleteEmail(ATHLETE.id), role: "athlete", athleteId: ATHLETE.id });
+  });
+});
+
 describe("whoIsSignedIn", () => {
   it("reads unavailable when sign in is not configured", async () => {
     expect(await whoIsSignedIn(new Headers(), null)).toEqual({ state: SignInState.Unavailable });
