@@ -1,6 +1,7 @@
 import { getDeps } from "../../../../src/deps";
 import { ConnectionResult } from "../../../../src/domain/intervalsConnection";
 import { intervalsOAuth } from "../../../../src/intervals/oauth/intervalsOAuth";
+import { whoIsSignedIn } from "../../../../src/identity/sessions";
 import { createStartIntervalsConnection } from "../../../../src/use-cases/startIntervalsConnection";
 import { cameFromOurPage, connectionFlowCookie } from "../_components/connection-flow";
 
@@ -13,18 +14,13 @@ function redirect(location: string, cookie?: string): Response {
 }
 
 /**
- * The "Connecter Intervals.icu" button (INI-69): checks the link again, keeps the flow (`state`
- * and PKCE verifier) in a cookie, and sends the athlete to Intervals.icu.
- * A link that cannot be used goes to the result page instead, and a request that did not come
- * from the page goes back to it, so the athlete always sees whose account they connect.
+ * The "Connecter Intervals.icu" button (INI-69): checks the athlete's session again (INI-85),
+ * keeps the flow (`state` and PKCE verifier) in a cookie, and sends the athlete to Intervals.icu.
+ * No session goes to the result page instead, and a request that did not come from the page goes
+ * back to it, so the athlete always sees whose account they connect.
  */
 export async function GET(request: Request): Promise<Response> {
-  const token = new URL(request.url).searchParams.get("t") ?? undefined;
-  if (!cameFromOurPage(request)) {
-    const page = new URL("/connect/intervals", request.url);
-    if (token) page.searchParams.set("t", token);
-    return redirect(page.toString());
-  }
+  if (!cameFromOurPage(request)) return redirect(new URL("/connect/intervals", request.url).toString());
   const done = (result: ConnectionResult) => {
     const url = new URL("/connect/intervals/done", request.url);
     url.searchParams.set("result", result);
@@ -32,7 +28,11 @@ export async function GET(request: Request): Promise<Response> {
   };
 
   try {
-    const outcome = await createStartIntervalsConnection({ oauth: intervalsOAuth(), repo: getDeps().repo }).execute(token);
+    const signedIn = await whoIsSignedIn(request.headers);
+    const outcome = await createStartIntervalsConnection({ oauth: intervalsOAuth(), repo: getDeps().repo }).execute({
+      signedIn,
+      linkFailed: false
+    });
     if (outcome.status !== "ready") return done(outcome.status);
     return redirect(outcome.authorizeUrl, connectionFlowCookie(outcome.flow));
   } catch (error) {

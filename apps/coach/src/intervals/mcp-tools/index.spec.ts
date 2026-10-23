@@ -5,7 +5,7 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { IntervalsIcuApiError, type IntervalsIcuClient } from "../client";
 import { registerIntervalsIcuTools } from "./index";
 import { createReadActivityStreams } from "../../use-cases/readActivityStreams";
-import type { CreateIntervalsConnectLink } from "../../use-cases/createIntervalsConnectLink";
+import type { CreateAthleteLink } from "../../use-cases/createAthleteLink";
 import type { ResolveClient } from "./result";
 import { DEFAULT_READ_BOUNDS } from "../../domain/training";
 
@@ -32,17 +32,21 @@ function recordingResolver(client: IntervalsIcuClient) {
   return { resolve, calls };
 }
 
-const link = { status: "link" as const, url: "https://app.inigo-coach.com/connect/intervals?t=x.y", expiresAt: "2026-10-18T10:00:00.000Z" };
+const link = {
+  status: "link" as const,
+  url: "https://app.inigo-coach.com/api/auth/magic-link/verify?token=abc&callbackURL=%2Fconnect%2Fintervals",
+  expiresAt: "2026-10-15T11:00:00.000Z"
+};
 
 async function connect(
   resolve: ResolveClient,
-  connectLink: CreateIntervalsConnectLink = { execute: vi.fn(async () => link) }
+  athleteLink: CreateAthleteLink = { execute: vi.fn(async () => link) }
 ) {
   const server = new McpServer({ name: "test", version: "0.0.0" });
   registerIntervalsIcuTools(server, {
     resolve,
     readActivityStreams: createReadActivityStreams({ resolveClient: resolve }),
-    connectLink
+    athleteLink
   });
 
   const client = new Client({ name: "test-client", version: "0.0.0" });
@@ -186,8 +190,17 @@ describe("get_intervals_connect_link", () => {
 
     const result = await mcpClient.callTool({ name: "get_intervals_connect_link", arguments: { athleteId: ATHLETE_ID } });
 
-    expect(execute).toHaveBeenCalledWith(ATHLETE_ID);
+    expect(execute).toHaveBeenCalledWith(ATHLETE_ID, "intervals_connect");
     expect(JSON.parse((result.content as TextContent)[0]!.text)).toEqual(link);
+  });
+
+  it("keeps the agents' contract: an unavailable link reads oauth_unavailable", async () => {
+    const execute = vi.fn(async () => ({ status: "unavailable" as const, reason: "not open here" }));
+    const mcpClient = await connect(recordingResolver(createMockClient()).resolve, { execute });
+
+    const result = await mcpClient.callTool({ name: "get_intervals_connect_link", arguments: { athleteId: ATHLETE_ID } });
+
+    expect(JSON.parse((result.content as TextContent)[0]!.text)).toEqual({ status: "oauth_unavailable", reason: "not open here" });
   });
 
   it("refuses a malformed athlete id before asking for a link", async () => {

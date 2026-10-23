@@ -22,8 +22,8 @@ const bodySchema = z.object({
  * its session is set, hence the 409 before that.
  */
 export async function POST(request: Request): Promise<Response> {
-  const unauthorized = requireAdmin(request);
-  if (unauthorized) return unauthorized;
+  const { denied } = await requireAdmin(request);
+  if (denied) return denied;
 
   let payload: unknown;
   try {

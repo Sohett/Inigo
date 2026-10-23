@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ResolveClient } from "./result";
 import type { ReadActivityStreams } from "../../use-cases/readActivityStreams";
-import type { CreateIntervalsConnectLink } from "../../use-cases/createIntervalsConnectLink";
+import type { CreateAthleteLink } from "../../use-cases/createAthleteLink";
 import { registerCredentialTools } from "./tools/credentials";
 import { registerAthleteTools, registerAthleteWriteTools } from "./tools/athlete";
 import { registerActivityTools } from "./tools/activities";
@@ -23,8 +23,8 @@ export interface IntervalsToolDeps {
   resolve: ResolveClient;
   /** Owns the window rule and the refusal above the value cap. */
   readActivityStreams: ReadActivityStreams;
-  /** The OAuth connection link the onboarding agent sends (INI-69). */
-  connectLink: CreateIntervalsConnectLink;
+  /** The links agents send athletes (INI-85): here, the Intervals.icu connection (INI-69). */
+  athleteLink: CreateAthleteLink;
 }
 
 export function registerIntervalsIcuTools(server: McpServer, deps: IntervalsToolDeps): void {
@@ -38,7 +38,7 @@ export function registerIntervalsIcuTools(server: McpServer, deps: IntervalsTool
   registerEventReadTools(server, resolve);
 
   registerAthleteWriteTools(server, resolve);
-  registerCredentialTools(server, deps.connectLink);
+  registerCredentialTools(server, deps.athleteLink);
   registerEventWriteTools(server, resolve);
 }
 

@@ -76,11 +76,11 @@ describe("loadConfig", () => {
   // Regression: the admin credentials once lived in this schema, which is parsed on every
   // request path — so an admin credential that was missing, or merely too short, took the
   // WhatsApp webhook and both MCP endpoints down with it. The admin must never be able to
-  // break the coach, so this schema ignores it entirely (see `adminCredentials`).
-  it("ignores the admin credentials, absent or malformed", () => {
+  // break the coach, so this schema ignores sign in entirely (see `authEnv`).
+  it("ignores sign in's variables, absent or malformed", () => {
     expect(() => loadConfig(base)).not.toThrow();
     expect(() =>
-      loadConfig({ ...base, ADMIN_USER: "a", ADMIN_PASSWORD: "short" })
+      loadConfig({ ...base, BETTER_AUTH_SECRET: "short", BETTER_AUTH_URL: "not a url", GOOGLE_CLIENT_ID: "" })
     ).not.toThrow();
     expect(loadConfig(base).MCP_BEARER_TOKEN).toBe("a-very-long-mcp-bearer-token");
   });

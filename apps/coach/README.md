@@ -76,15 +76,17 @@ Validées au boot par `src/config/config.ts`. Copie `.env.example` → `.env` **
 | `INTERVALS_BASE_URL` | Optionnel : override de l'URL de l'API Intervals.icu (défaut `https://intervals.icu/api/v1`) |
 | `OPENWA_BASE_URL` | URL de la passerelle OpenWA vers laquelle le coach relaie les réponses |
 | `OPENWA_API_KEY` | Clé API OpenWA (rôle OPERATOR), server-side |
-| `ADMIN_USER` | Identifiant HTTP Basic de l'admin (`/admin`, `/api/admin/*`), min 3 car. |
-| `ADMIN_PASSWORD` | Mot de passe HTTP Basic de l'admin, min 16 car., server-side |
+| `BETTER_AUTH_SECRET` | Signe les cookies de session (Better Auth), min 32 car., un par environnement |
+| `BETTER_AUTH_URL` | Origine publique de l'app (`https://app.inigo-coach.com`) : magic links et redirect URI Google |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Client OAuth Google (Web) de la connexion du staff (backoffice), redirect URI `<BETTER_AUTH_URL>/api/auth/callback/google` |
 | `SLACK_ALERT_WEBHOOK_URL` | Optionnel : Incoming Webhook Slack des alertes de session WhatsApp (absente → log seul) |
 | `CRON_SECRET` | Secret du cron watchdog (`/api/cron/whatsapp-watchdog`) ; Vercel l'envoie en Bearer. Absente → le watchdog refuse de tourner |
 
-Les deux variables d'admin ne sont **pas** dans le schéma zod de `config.ts` : ce schéma est
-validé à chaque requête, donc une valeur d'admin absente **ou trop courte** ferait tomber le
-webhook WhatsApp et les deux MCP avec elle. Elles sont lues et validées là où elles servent
-(`adminCredentials()`), et l'admin refuse de servir (503) si elles sont inutilisables.
+Les variables de connexion (Better Auth, Google) ne sont **pas** dans le schéma zod de
+`config.ts` : ce schéma est validé à chaque requête, donc une valeur absente **ou trop courte**
+ferait tomber le webhook WhatsApp et les MCP avec elle. Elles sont lues et validées là où elles
+servent (`authEnv()`) : incomplètes, l'admin refuse de servir (503) et les liens athlètes sont
+indisponibles, rien d'autre ne bouge.
 
 ## Setup (résumé)
 
@@ -126,12 +128,13 @@ bouton remplace la manœuvre d'avant (commande locale, puis `UPDATE` SQL à la m
 - **Une limite assumée** : une session montant un `github_repository` ne peut pas être clonée,
   parce que la création exige un `authorization_token` que l'API ne renvoie jamais. Le cas est
   refusé bruyamment plutôt que d'ouvrir une session amputée de son credential.
-- **Auth** : HTTP Basic (`ADMIN_USER` / `ADMIN_PASSWORD`), posée par `proxy.ts` sur
-  `/admin` et `/api/admin/*` **seulement** — le webhook OpenWA et les deux MCP gardent
-  leurs propres credentials et ne voient jamais de challenge Basic. Chaque route admin
-  revérifie l'en-tête elle-même (l'autorisation ne repose pas sur le seul proxy).
-- **L'admin ne peut pas casser le coach** : ses identifiants ne sont pas dans le schéma d'env
-  partagé. Mal réglés, l'admin répond 503 et le log dit quoi corriger ; le webhook et les MCP
+- **Auth** (INI-85) : connexion Google du staff, **sur invitation** (`/admin/team`, rôles admin
+  et/ou coach, qui n'autorisent encore rien de plus), via Better Auth. `proxy.ts` relit la session
+  et ne laisse passer que le staff (sinon `/login`, ou 401/403 sur `/api/admin/*`) ; le layout et
+  chaque route admin revérifient. Le webhook OpenWA et les MCP gardent leurs propres credentials.
+  Premier membre : `sohet.thomas@gmail.com` (admin + coach), invité par la migration.
+- **L'admin ne peut pas casser le coach** : ses variables ne sont pas dans le schéma d'env
+  partagé. Mal réglées, l'admin répond 503 et le log dit quoi corriger ; le webhook et les MCP
   continuent de tourner.
 - **Ce que l'admin ne fait pas** : appliquer les configs d'agents depuis le snapshot et
   re-pinner le roster du coordinateur. Ça reste `@inigo/brain` en local (`brain:deploy`),
@@ -169,7 +172,7 @@ l'isolation repose sur l'`athleteId` passé par l'agent (durcissement futur : be
 ```bash
 pnpm dev:coach     # next dev (depuis la racine)
 
-# Admin : http://localhost:3000/admin — le navigateur demande ADMIN_USER / ADMIN_PASSWORD.
+# Admin : http://localhost:3000/admin → /login, connexion Google (client OAuth local, compte invité).
 
 # Tester le webhook (livraison signée comme le fait OpenWA, avec le secret de apps/coach/.env) :
 BODY='{"chatId":"628@c.us","body":"salut coach","type":"text"}'
@@ -210,9 +213,13 @@ puis, côté OpenWA, abonner le webhook du coach à `session.status`, `session.d
 `session.reconnect_loop` et `session.restriction` (en plus de `message.received`). Le cron quotidien est déclaré dans
 `vercel.json` ; pour le tester à la main : `vercel crons run /api/cron/whatsapp-watchdog`.
 
-Pour utiliser l'admin, poser `ADMIN_USER` (min 3 car.) et `ADMIN_PASSWORD` (min 16 car.).
-Absentes ou trop courtes, seul l'admin est indisponible (503, avec un log qui dit quoi
-corriger) : le webhook et les MCP continuent de tourner.
+Pour utiliser l'admin et les liens athlètes, poser `BETTER_AUTH_SECRET` (min 32 car.),
+`BETTER_AUTH_URL=http://localhost:3000` et le client OAuth Google **local** (`GOOGLE_CLIENT_ID`,
+`GOOGLE_CLIENT_SECRET`, redirect URI `http://localhost:3000/api/auth/callback/google`), puis
+appliquer les migrations (tables `auth_*` et `staff_member`). Absentes ou trop courtes, seuls
+l'admin et les liens sont indisponibles (503, avec un log qui dit quoi corriger) : le webhook et
+les MCP continuent de tourner. Pas de connexion Google sur les previews Vercel (Google n'accepte
+pas d'URL joker).
 
 ## Contribuer
 

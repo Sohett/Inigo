@@ -2,8 +2,8 @@ import type { ManagedAgentBrain } from "../brain/managedAgents";
 import { formatIntervalsConnectedTurn, formatIntervalsReconnectedTurn } from "../brain/taskEnvelope";
 import type { Athlete } from "../domain/athlete";
 import { canConnectIntervals, ConnectionResult, missingScopes } from "../domain/intervalsConnection";
-import { verifyConnectLinkToken } from "../intervals/oauth/connectLinkToken";
-import { linkTokenOf, type ConnectionFlow, type IntervalsOAuth } from "../intervals/oauth/intervalsOAuth";
+import { SignInState, type SignedIn } from "../domain/signedIn";
+import type { ConnectionFlow, IntervalsOAuth } from "../intervals/oauth/intervalsOAuth";
 import type { AthleteRepository } from "../repositories/athleteRepository";
 import { AssessStatus, type AssessOnboarding } from "./assessOnboarding";
 
@@ -13,6 +13,8 @@ export interface ConnectionCallback {
   query: URLSearchParams;
   /** The flow from the cookie `/connect/intervals/start` set in this browser, if any. */
   flow?: ConnectionFlow;
+  /** Who this browser is signed in as: the athlete the connection is for (INI-85). */
+  signedIn: SignedIn;
 }
 
 /** Port: the Intervals.icu athlete id an athlete is already connected to, or null. Reads no secret. */
@@ -55,8 +57,8 @@ export interface CompleteIntervalsConnectionDeps {
 
 /**
  * The OAuth callback (INI-69): Intervals.icu sends the athlete back with a code, or a refusal.
- * Nothing is stored unless the flow comes back to the browser that started it, the link is ours
- * and still valid, the athlete can still be coached, the code trades for a token (with this
+ * Nothing is stored unless the flow comes back to the browser that started it, that browser is
+ * signed in as an athlete who can still be coached, the code trades for a token (with this
  * browser's PKCE verifier), every scope the coach needs was granted, and the account is the one
  * already connected, if any (never swapped silently). Then the token is stored (encrypted,
  * replacing the previous one), and an athlete in onboarding gets a turn so their agent confirms on
@@ -76,16 +78,9 @@ export function createCompleteIntervalsConnection(deps: CompleteIntervalsConnect
       const { flow } = callback;
       if (!flow) return { result: ConnectionResult.SessionMismatch };
 
-      const link = await verifyConnectLinkToken(linkTokenOf(flow.state) ?? undefined, deps.oauth.config.clientSecret, now());
-      switch (link.status) {
-        case "invalid":
-          return { result: ConnectionResult.InvalidLink };
-        case "expired":
-          return { result: ConnectionResult.ExpiredLink };
-        case "valid":
-          break;
-      }
-      const athlete = await deps.repo.findById(link.athleteId);
+      const athleteId = connectingAthlete(callback.signedIn);
+      if (athleteId === null) return { result: ConnectionResult.InvalidLink };
+      const athlete = await deps.repo.findById(athleteId);
       if (!athlete || !canConnectIntervals(athlete.status)) return { result: ConnectionResult.InvalidLink };
 
       const outcome = await deps.oauth.client.complete(callback.query, flow);
@@ -156,5 +151,21 @@ async function notifyAgent(
   } catch (error) {
     console.error(`[coach] could not tell athlete ${athlete.id}'s agent about the Intervals.icu connection`, error);
     return AgentNotice.Failed;
+  }
+}
+
+/**
+ * The athlete a callback connects: the one this browser is signed in as, by the magic link that
+ * opened the page (INI-85). Anyone else (signed out, staff) connects nobody. Sign in that is
+ * not configured never reaches here: the link could not have been made.
+ */
+function connectingAthlete(signedIn: SignedIn): string | null {
+  switch (signedIn.state) {
+    case SignInState.Athlete:
+      return signedIn.athleteId;
+    case SignInState.Unavailable:
+    case SignInState.SignedOut:
+    case SignInState.Staff:
+      return null;
   }
 }

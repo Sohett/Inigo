@@ -8,17 +8,18 @@ const SECRET = "a-very-long-webhook-secret";
  * messages never reach the coach. This spec boots the route against the real config
  * loader, so anything that makes booting stricter is caught here.
  *
- * The admin credentials here are deliberately UNUSABLE (a too-short password, the exact
- * state that broke production): the admin must never be a dependency of this route. When
- * they lived in the shared config schema, this very value turned every delivery into a 500.
+ * Sign in is deliberately UNUSABLE here (a too-short `BETTER_AUTH_SECRET`, no Google client):
+ * the admin must never be a dependency of this route. When the admin's credentials lived in the
+ * shared config schema, a too-short password turned every delivery into a 500 (INI-85 kept the
+ * rule for Better Auth's variables).
  */
 beforeAll(() => {
   process.env["ANTHROPIC_API_KEY"] = "sk-ant-test";
   process.env["DATABASE_URL"] = "postgresql://user:pass@host/db?sslmode=require";
   process.env["DB_ENCRYPTION_KEY"] = Buffer.alloc(32).toString("base64");
   process.env["MCP_BEARER_TOKEN"] = "a-very-long-mcp-bearer-token";
-  process.env["ADMIN_USER"] = "x";
-  process.env["ADMIN_PASSWORD"] = "short";
+  process.env["BETTER_AUTH_SECRET"] = "short";
+  delete process.env["GOOGLE_CLIENT_ID"];
   process.env["WHATSAPP_WEBHOOK_SECRET"] = SECRET;
   delete process.env["SLACK_ALERT_WEBHOOK_URL"];
 });

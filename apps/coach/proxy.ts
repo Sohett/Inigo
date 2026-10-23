@@ -1,48 +1,53 @@
 import { NextResponse, type NextRequest } from "next/server";
-import {
-  adminCredentials,
-  ADMIN_PASSWORD_MIN_LENGTH,
-  ADMIN_USER_MIN_LENGTH,
-  BASIC_AUTH_CHALLENGE,
-  verifyBasicAuth
-} from "./src/auth";
+import { getSessionCookie } from "better-auth/cookies";
+import { SignInState } from "./src/domain/signedIn";
+import { authEnv } from "./src/identity/authEnv";
+import { whoIsSignedIn } from "./src/identity/sessions";
 
 /**
- * HTTP Basic gate on the admin surface.
+ * The gate on the admin surface (INI-85): only a signed in staff member gets through, on every request,
+ * page or API, client navigation included. An athlete's session is a valid session too (any
+ * magic link opens one), so checking that a cookie exists is not enough, and neither is the admin
+ * layout alone: Next does not render a layout again on client navigation, so a page segment can
+ * be fetched without it. The layout and every admin route still check again (`requireAdmin`).
  *
- * Scoped to `/admin` and `/api/admin/*` by the matcher below, deliberately: the OpenWA
- * webhook and the two MCP endpoints carry their own credentials (HMAC / bearer) and must
- * never see a Basic challenge, which would break the gateway and the brain.
+ * A page goes to the Google sign in, an API call gets a 401 (signed out) or 403 (athlete).
  *
- * `proxy.ts` is Next 16's name for what used to be `middleware.ts`, and Next always runs it
- * on the Node.js runtime — so the constant-time comparison in `src/auth.ts` (`node:crypto`)
- * works here. It reads the two admin variables straight from the environment rather than
- * through `loadConfig`, on purpose: the gate must not answer 500 (and leak a config dump
- * into the logs) because some unrelated variable is missing.
+ * Scoped to `/admin` and `/api/admin/*` by the matcher below, deliberately: the OpenWA webhook and
+ * the MCP endpoints carry their own credentials (HMAC / bearer), and the athletes' pages their own
+ * session. `proxy.ts` is Next 16's name for what used to be `middleware.ts`, and it runs on the
+ * Node.js runtime, so it can read the session from Neon.
  *
- * Fails closed: no credentials configured means nobody gets in.
+ * Fails closed: sign in not configured means nobody gets in.
  */
-export function proxy(request: NextRequest): NextResponse {
-  const credentials = adminCredentials();
-  if (!credentials) {
-    // One template literal, not a concatenation: Turbopack folded the two-part version
-    // into a truncated message, and this is the line an operator reads when admin is down.
-    console.error(
-      `[coach] admin refuses to serve. Set ADMIN_USER (min ${ADMIN_USER_MIN_LENGTH} chars) and ADMIN_PASSWORD (min ${ADMIN_PASSWORD_MIN_LENGTH} chars).`
-    );
-    return new NextResponse("Admin is not configured.", { status: 503 });
-  }
+export async function proxy(request: NextRequest): Promise<NextResponse> {
+  if (!authEnv()) return notConfigured();
+  // No cookie at all: no need to ask the database.
+  if (!getSessionCookie(request)) return refuse(request, 401);
 
-  if (
-    !verifyBasicAuth(request.headers.get("authorization"), credentials.user, credentials.password)
-  ) {
-    return new NextResponse("Authentication required.", {
-      status: 401,
-      headers: { "WWW-Authenticate": BASIC_AUTH_CHALLENGE }
-    });
+  const signedIn = await whoIsSignedIn(request.headers);
+  switch (signedIn.state) {
+    case SignInState.Staff:
+      return NextResponse.next();
+    case SignInState.Unavailable:
+      return notConfigured();
+    case SignInState.SignedOut:
+      return refuse(request, 401);
+    case SignInState.Athlete:
+      return refuse(request, 403);
   }
+}
 
-  return NextResponse.next();
+function notConfigured(): NextResponse {
+  console.error("[coach] admin refuses to serve: sign in is not configured (BETTER_AUTH_*, GOOGLE_CLIENT_*).");
+  return new NextResponse("Admin is not configured.", { status: 503 });
+}
+
+function refuse(request: NextRequest, status: 401 | 403): NextResponse {
+  if (request.nextUrl.pathname.startsWith("/api/")) {
+    return NextResponse.json({ ok: false, error: status === 401 ? "unauthorized" : "forbidden" }, { status });
+  }
+  return NextResponse.redirect(new URL("/login", request.url));
 }
 
 export const config = {
