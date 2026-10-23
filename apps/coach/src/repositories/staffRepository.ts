@@ -1,20 +1,28 @@
 import type { StaffMember, StaffRole } from "../domain/staff";
 
+/** A staff member to create: their invitation. */
+export interface NewStaffMember {
+  /** Lower-cased. */
+  email: string;
+  /** At least one. */
+  roles: StaffRole[];
+  /** The member who invites them. */
+  invitedBy: string;
+}
+
 /**
- * Port for the backoffice team (INI-85): its members (invitation and roles) and, once they signed
- * in, their Better Auth user. Emails are always passed lower-cased.
+ * Port for the backoffice team (INI-87). A member is a user of the coach app, created at their
+ * invitation; their Google account is linked to it on their first sign in. Emails are always
+ * passed lower-cased.
  */
 export interface StaffRepository {
-  /** Whether this email is a member: Better Auth asks before creating a Google user. */
-  isMember(email: string): Promise<boolean>;
-  /** Every member, active or invited, oldest invitation first. */
+  /** Every member, oldest invitation first: invited until they first signed in, then active. */
   list(): Promise<StaffMember[]>;
-  /** Invite this email with these roles. `false` when it already was a member: nothing is changed. */
-  invite(email: string, roles: StaffRole[], invitedBy: string): Promise<boolean>;
+  /** Create the member's user. `false` when a user with this email exists already: nothing is changed. */
+  create(member: NewStaffMember): Promise<boolean>;
   /**
-   * Take the backoffice away from this email: the membership and the staff user go together, so
-   * their sessions end at once (cascade) and Google can never sign them up again. `false` when
-   * the email was not a member.
+   * Delete the member's user, with their sessions and Google account: signed out at once, and
+   * they can never sign in again. `false` when no member has this email.
    */
   remove(email: string): Promise<boolean>;
 }

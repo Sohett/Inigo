@@ -4,7 +4,8 @@ import { registerIntervalsIcuTools } from "../../../../src/intervals/mcp-tools";
 import { createReadActivityStreams } from "../../../../src/use-cases/readActivityStreams";
 import { createCreateAthleteLink } from "../../../../src/use-cases/createAthleteLink";
 import { intervalsOAuthConfig } from "../../../../src/intervals/oauth/credentials";
-import { magicLinkIssuer } from "../../../../src/identity/sessions";
+import { athleteAccountsOnDeployment } from "../../../../src/identity/accounts";
+import { magicLinkIssuer } from "../../../../src/identity/magicLinks";
 import { getDeps } from "../../../../src/deps";
 import { verifyBearerToken } from "../../../../src/auth";
 
@@ -24,6 +25,7 @@ const handler = createMcpHandler(
       readActivityStreams: createReadActivityStreams({ resolveClient: intervalsResolver }),
       athleteLink: createCreateAthleteLink({
         issuer: magicLinkIssuer(),
+        accounts: athleteAccountsOnDeployment(),
         intervalsOAuthConfigured: intervalsOAuthConfig() !== null,
         repo
       })

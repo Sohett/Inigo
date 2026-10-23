@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AS_ATHLETE, AS_STAFF, FAKE_STAFF_EMAIL } from "../../../../src/identity/sessions.fake";
 
-const invite = vi.fn();
+const create = vi.fn();
 const remove = vi.fn();
 
 vi.mock("../../../../src/identity/sessions", () => import("../../../../src/identity/sessions.fake"));
-vi.mock("../../../../src/deps", () => ({ getDeps: () => ({ staff: { invite, remove } }) }));
+vi.mock("../../../../src/identity/accounts", () => ({ staffOnDeployment: () => ({ create, remove, list: vi.fn() }) }));
 
 function request(method: "POST" | "DELETE", body: unknown, headers: Record<string, string> = { ...AS_STAFF }) {
   return new Request("http://localhost/api/admin/staff", {
@@ -16,7 +16,7 @@ function request(method: "POST" | "DELETE", body: unknown, headers: Record<strin
 }
 
 beforeEach(() => {
-  invite.mockReset().mockResolvedValue(true);
+  create.mockReset().mockResolvedValue(true);
   remove.mockReset().mockResolvedValue(true);
   vi.spyOn(console, "info").mockImplementation(() => undefined);
   vi.spyOn(console, "error").mockImplementation(() => undefined);
@@ -28,11 +28,11 @@ describe("POST /api/admin/staff", () => {
     const { POST } = await import("./route");
     const response = await POST(request("POST", { email: "New@Example.com", roles: ["coach"] }));
     expect(response.status).toBe(200);
-    expect(invite).toHaveBeenCalledWith("new@example.com", ["coach"], FAKE_STAFF_EMAIL);
+    expect(create).toHaveBeenCalledWith({ email: "new@example.com", roles: ["coach"], invitedBy: FAKE_STAFF_EMAIL });
   });
 
   it("answers 409 for an email already a member", async () => {
-    invite.mockResolvedValue(false);
+    create.mockResolvedValue(false);
     const { POST } = await import("./route");
     expect((await POST(request("POST", { email: "a@example.com", roles: ["admin"] }))).status).toBe(409);
   });
@@ -46,7 +46,7 @@ describe("POST /api/admin/staff", () => {
     const { POST } = await import("./route");
     const response = await POST(request("POST", body));
     expect(response.status).toBe(400);
-    expect(invite).not.toHaveBeenCalled();
+    expect(create).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -55,11 +55,11 @@ describe("POST /api/admin/staff", () => {
   ])("refuses %s", async (_label, headers, status) => {
     const { POST } = await import("./route");
     expect((await POST(request("POST", { email: "a@example.com", roles: ["admin"] }, headers))).status).toBe(status);
-    expect(invite).not.toHaveBeenCalled();
+    expect(create).not.toHaveBeenCalled();
   });
 
   it("answers 502 when the database refuses the write", async () => {
-    invite.mockRejectedValue(new Error("neon down"));
+    create.mockRejectedValue(new Error("neon down"));
     const { POST } = await import("./route");
     expect((await POST(request("POST", { email: "a@example.com", roles: ["admin"] }))).status).toBe(502);
   });

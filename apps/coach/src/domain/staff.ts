@@ -1,6 +1,6 @@
 /**
- * The backoffice team (INI-85). Invitation only: a member is first an invited email, then, once
- * they sign in with Google, an active member. Their roles say what they do (`admin`, `coach`, or
+ * The backoffice team (INI-85, INI-87). Invitation only: a member is a user of the coach app from
+ * their invitation on, invited until they first sign in with Google, then active. Their roles say what they do (`admin`, `coach`, or
  * both); they grant nothing yet: every member has the same access to the backoffice.
  */
 
@@ -35,6 +35,15 @@ export interface StaffMember {
   /** Who invited them; null for the first member, seeded with the database. */
   invitedBy: string | null;
   invitedAt: Date;
+}
+
+/**
+ * The staff roles in a stored role (`admin,coach`: Better Auth's admin plugin joins several with a
+ * comma), in a stable order. Empty for an athlete, or for anything that is not staff.
+ */
+export function staffRolesOf(role: string | null | undefined): StaffRole[] {
+  const stored = (role ?? "").split(",").map((entry) => entry.trim());
+  return STAFF_ROLES.filter((known) => stored.includes(known));
 }
 
 /** An email typed in the backoffice, as a membership key: trimmed and lower-cased. */

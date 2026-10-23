@@ -1,4 +1,4 @@
-import type { Athlete } from "../domain/athlete";
+import type { AthleteAccountRepository } from "../repositories/athleteAccountRepository";
 import type { AthleteRepository } from "../repositories/athleteRepository";
 
 /**
@@ -19,9 +19,9 @@ export type AthleteLinkOutcome =
   | { status: "unavailable"; reason: string }
   | { status: "unknown_athlete"; reason: string };
 
-/** Port: a link that signs this athlete in and lands them on `path`. */
-export interface AthleteLinkIssuer {
-  issue(athlete: Pick<Athlete, "id" | "displayName">, path: string): Promise<{ url: string; expiresAt: Date }>;
+/** Port: a link that signs this athlete's existing user in and lands them on `path`. */
+export interface SignInLinkIssuer {
+  issue(athleteId: string, path: string): Promise<{ url: string; expiresAt: Date }>;
 }
 
 export interface CreateAthleteLink {
@@ -31,14 +31,18 @@ export interface CreateAthleteLink {
 /**
  * The link an agent sends on WhatsApp so the athlete reaches a page of Inigo in one click, already
  * signed in (INI-85). Everything starts from WhatsApp: the conversation is the only proof of who
- * the athlete is, and the link carries it. Short lived and single use (Better Auth), so it can
- * only ever sign in the athlete it was made for.
+ * the athlete is, and the link carries it. Short lived and single use (Better Auth).
+ *
+ * In order: the destination's page, the athlete, **their user** (created here on their first
+ * link, INI-87: signing in never creates one), then the link that signs that user in.
  */
 export function createCreateAthleteLink(deps: {
-  issuer: AthleteLinkIssuer | null;
+  issuer: SignInLinkIssuer | null;
   /** Whether the Intervals.icu OAuth app is configured (INI-69). */
   intervalsOAuthConfigured: boolean;
   repo: Pick<AthleteRepository, "findById">;
+  /** Null, like `issuer`, when sign in is not configured on this deployment. */
+  accounts: AthleteAccountRepository | null;
 }): CreateAthleteLink {
   return {
     async execute(athleteId, destination) {
@@ -49,7 +53,7 @@ export function createCreateAthleteLink(deps: {
           reason: "The Intervals.icu connection is not open on this deployment: tell the athlete it is temporarily unavailable."
         };
       }
-      if (!deps.issuer) {
+      if (!deps.issuer || !deps.accounts) {
         return {
           status: "unavailable",
           reason: "Links to Inigo are not available on this deployment: tell the athlete it is temporarily unavailable."
@@ -58,7 +62,8 @@ export function createCreateAthleteLink(deps: {
       const athlete = await deps.repo.findById(athleteId);
       if (!athlete) return { status: "unknown_athlete", reason: `No athlete ${athleteId}: pass the inigo_athlete_id of the envelope.` };
 
-      const { url, expiresAt } = await deps.issuer.issue(athlete, path);
+      await deps.accounts.ensure(athlete);
+      const { url, expiresAt } = await deps.issuer.issue(athlete.id, path);
       return { status: "link", url, expiresAt: expiresAt.toISOString() };
     }
   };

@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
-import { getDeps } from "@/deps";
 import { StaffRole, StaffStatus } from "@/domain/staff";
 import { SignInState } from "@/domain/signedIn";
+import { staffOnDeployment } from "@/identity/accounts";
 import { whoIsSignedIn } from "@/identity/sessions";
 import { createListStaff } from "@/use-cases/listStaff";
 import { Badge } from "@/components/ui/badge";
@@ -23,14 +23,17 @@ const ROLE_LABEL: Record<StaffRole, string> = {
 };
 
 /**
- * The backoffice team (INI-85): invitation only, Google sign in. Roles say who does what (admin,
- * coach, or both) but grant nothing yet: every member sees everything, and can invite or remove
- * another one (never themselves).
+ * The backoffice team (INI-85, INI-87): invitation only, Google sign in. Inviting someone creates
+ * their user; they become active on their first Google sign in. Roles say who does what (admin,
+ * coach, or both) but grant nothing more yet: every member can invite or remove another one
+ * (never themselves).
  */
 export default async function TeamPage() {
+  const requestHeaders = await headers();
+  const team = staffOnDeployment(requestHeaders);
   const [members, signedIn] = await Promise.all([
-    createListStaff({ staff: getDeps().staff }).execute(),
-    whoIsSignedIn(await headers())
+    team ? createListStaff({ staff: team }).execute() : Promise.resolve([]),
+    whoIsSignedIn(requestHeaders)
   ]);
   const me = signedIn.state === SignInState.Staff ? signedIn.email : null;
 
@@ -43,7 +46,7 @@ export default async function TeamPage() {
           <CardTitle>Inviter un membre</CardTitle>
           <CardDescription>
             L'admin est réservé à l'équipe, sur invitation. Invite l'adresse de son compte Google, choisis son rôle,
-            et partage le lien de connexion : la personne entre la première fois qu'elle se connecte avec ce compte.
+            puis copie le lien de connexion pour la personne : elle entre en se connectant avec ce compte.
           </CardDescription>
         </CardHeader>
         <CardContent>

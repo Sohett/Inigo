@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Loader2 } from "lucide-react";
+import { Check, Copy, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,6 +30,7 @@ export function InviteStaffForm() {
   const [roles, setRoles] = useState<StaffRole[]>([StaffRole.Coach]);
   const [message, setMessage] = useState<string | null>(null);
   const [invited, setInvited] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const [pending, startTransition] = useTransition();
   const router = useRouter();
 
@@ -40,6 +41,7 @@ export function InviteStaffForm() {
     event.preventDefault();
     setMessage(null);
     setInvited(null);
+    setCopied(false);
     if (roles.length === 0) {
       setMessage("Coche au moins un rôle.");
       return;
@@ -99,12 +101,36 @@ export function InviteStaffForm() {
           Inviter
         </Button>
       </div>
-      {invited ? (
-        <p className="flex items-center gap-1 text-xs text-muted-foreground">
-          <Check className="size-3" /> {invited} est invité. Lien à partager : {window.location.origin}/login
-        </p>
-      ) : null}
+      {invited ? <SignInLink invited={invited} copied={copied} onCopied={() => setCopied(true)} /> : null}
       {message ? <p className="text-xs text-destructive">{message}</p> : null}
     </form>
+  );
+}
+
+/** What to send the invited member: the sign in page, to open with the Google account of their email. */
+function SignInLink({ invited, copied, onCopied }: { invited: string; copied: boolean; onCopied: () => void }) {
+  const link = `${window.location.origin}/login`;
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(link);
+      onCopied();
+    } catch {
+      // Clipboard refused (permissions): the link stays on screen to copy by hand.
+    }
+  };
+
+  return (
+    <div className="grid gap-2 rounded-lg bg-muted px-3 py-2 text-sm">
+      <p className="flex items-center gap-1">
+        <Check className="size-4" /> {invited} est invité. Lien à lui envoyer, à ouvrir avec le compte Google de cette adresse :
+      </p>
+      <div className="flex items-center gap-2">
+        <code className="truncate text-xs">{link}</code>
+        <Button type="button" variant="outline" size="sm" onClick={copy}>
+          {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+          {copied ? "Copié" : "Copier le lien"}
+        </Button>
+      </div>
+    </div>
   );
 }
