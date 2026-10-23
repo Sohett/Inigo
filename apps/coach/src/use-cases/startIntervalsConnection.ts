@@ -1,5 +1,5 @@
 import { canConnectIntervals, ConnectionResult, phoneHint } from "../domain/intervalsConnection";
-import { verifyConnectLinkToken } from "../intervals/oauth/connectLinkToken";
+import { SignInState, type SignedIn } from "../domain/signedIn";
 import type { ConnectionFlow, IntervalsOAuth } from "../intervals/oauth/intervalsOAuth";
 import type { AthleteRepository } from "../repositories/athleteRepository";
 
@@ -23,38 +23,38 @@ export type StartConnectionOutcome =
       status: typeof ConnectionResult.ExpiredLink | typeof ConnectionResult.InvalidLink | typeof ConnectionResult.Unavailable;
     };
 
+/** A visit to the connection page. */
+export interface ConnectionVisit {
+  /** Who this browser is signed in as (INI-85): the magic link signed the athlete in on the way. */
+  signedIn: SignedIn;
+  /** The magic link that led here could not sign in: used already, or past its hour. */
+  linkFailed: boolean;
+}
+
 export interface StartIntervalsConnection {
-  execute(token: string | undefined): Promise<StartConnectionOutcome>;
+  execute(visit: ConnectionVisit): Promise<StartConnectionOutcome>;
 }
 
 /**
- * What a connection link opens (INI-69): whose account it connects and the way to Intervals.icu,
- * or why the link cannot be used. Each call draws a fresh flow (`state` and PKCE verifier), kept
- * in a cookie by the route, so only the browser that started the flow can finish it.
+ * What the connection page shows (INI-69): whose account it connects and the way to Intervals.icu,
+ * or why it cannot. The athlete comes from their session, opened by the magic link sent on
+ * WhatsApp (INI-85). Each call draws a fresh flow (`state` and PKCE verifier), kept in a cookie
+ * by the route, so only the browser that started the flow can finish it.
  */
 export function createStartIntervalsConnection(deps: {
   oauth: IntervalsOAuth | null;
   repo: Pick<AthleteRepository, "findById">;
-  now?: () => Date;
 }): StartIntervalsConnection {
-  const now = deps.now ?? (() => new Date());
   return {
-    async execute(token) {
+    async execute(visit) {
       if (!deps.oauth) return { status: ConnectionResult.Unavailable };
-      const link = await verifyConnectLinkToken(token, deps.oauth.config.clientSecret, now());
-      switch (link.status) {
-        case "invalid":
-          return { status: ConnectionResult.InvalidLink };
-        case "expired":
-          return { status: ConnectionResult.ExpiredLink };
-        case "valid":
-          break;
-      }
-      const athlete = await deps.repo.findById(link.athleteId);
+      const visitor = visitingAthlete(visit);
+      if (visitor.refused) return { status: visitor.refused };
+
+      const athlete = await deps.repo.findById(visitor.athleteId);
       if (!athlete || !canConnectIntervals(athlete.status)) return { status: ConnectionResult.InvalidLink };
 
-      // `token` is defined here: an absent token never verifies.
-      const { authorizeUrl, flow } = await deps.oauth.client.begin(token ?? "");
+      const { authorizeUrl, flow } = await deps.oauth.client.begin();
       return {
         status: "ready",
         holder: { displayName: athlete.displayName, phoneHint: phoneHint(athlete.phoneNum) },
@@ -63,4 +63,24 @@ export function createStartIntervalsConnection(deps: {
       };
     }
   };
+}
+
+/**
+ * The athlete on the page, or why there is none. A signed in athlete wins over a failed link: a
+ * second click on the same link, from the browser the first one signed in, still shows the page.
+ */
+function visitingAthlete(
+  visit: ConnectionVisit
+):
+  | { refused: null; athleteId: string }
+  | { refused: typeof ConnectionResult.ExpiredLink | typeof ConnectionResult.InvalidLink | typeof ConnectionResult.Unavailable } {
+  switch (visit.signedIn.state) {
+    case SignInState.Athlete:
+      return { refused: null, athleteId: visit.signedIn.athleteId };
+    case SignInState.Unavailable:
+      return { refused: ConnectionResult.Unavailable };
+    case SignInState.SignedOut:
+    case SignInState.Staff:
+      return { refused: visit.linkFailed ? ConnectionResult.ExpiredLink : ConnectionResult.InvalidLink };
+  }
 }

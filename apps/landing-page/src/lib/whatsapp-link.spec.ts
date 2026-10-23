@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { start, whatsappContact } from "@/content/copy";
+import { whatsappContact } from "@/content/copy";
 import { whatsappLink } from "@/lib/whatsapp-link";
 
 describe("whatsappLink", () => {
@@ -15,11 +15,11 @@ describe("whatsappLink", () => {
 
 describe("the landing's start message", () => {
   it("carries the access code, which the coach needs to start onboarding", () => {
-    const url = new URL(whatsappLink(whatsappContact.phoneNumber, start.message));
+    const url = new URL(whatsappLink(whatsappContact.phoneNumber, whatsappContact.message));
     expect(url.searchParams.get("text")).toContain(whatsappContact.accessCode);
   });
 
   it("contains no dash, like all visible copy", () => {
-    expect(start.message).not.toMatch(/[-—–]/);
+    expect(whatsappContact.message).not.toMatch(/[-—–]/);
   });
 });

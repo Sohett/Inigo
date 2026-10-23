@@ -1,45 +1,107 @@
 ---
-import HeroShowcase from "@/components/HeroShowcase.astro";
-import StartCta from "@/components/StartCta.astro";
-import { hero } from "@/content/copy";
+import Logo from "@/components/Logo.astro";
+import WhatsAppQr from "@/components/WhatsAppQr.astro";
+import { hero, nav, whatsappContact } from "@/content/copy";
+import { scenarios } from "@/content/demo";
+import type { PlanDemo } from "@/lib/plan-demo";
+import { renderMessages } from "@/lib/plan-demo-view";
+import { whatsappLink } from "@/lib/whatsapp-link";
+
+/**
+ * Hero : les imprévus de la démo (rotation auto, cf. `lib/demo-controller.ts`) et la
+ * conversation WhatsApp qui en découle. Rendu complet au build ; le script ne fait que
+ * rebasculer l'état.
+ */
+interface Props {
+  demo: PlanDemo;
+}
+
+const { demo } = Astro.props;
+const url = whatsappLink(whatsappContact.phoneNumber, whatsappContact.message);
 ---
 
-<section class="relative bg-background px-6">
-  <div class="mx-auto flex max-w-4xl flex-col items-center pt-28 text-center sm:pt-36">
-    <p class="eyebrow rise-in text-encre-soft" style="--delay:0ms">{hero.eyebrow}</p>
-    <h1
-      class="rise-in mt-6 text-balance font-display font-bold leading-[1.04] tracking-[-0.03em] text-foreground"
-      style="--delay:80ms; font-size:clamp(2.5rem,6vw,4.75rem)"
-    >
-      {hero.title}
-    </h1>
-    <p
-      class="rise-in mt-6 max-w-2xl text-lg leading-relaxed text-muted-foreground"
-      style="--delay:160ms"
-    >
-      {hero.subtitle}
-    </p>
-    <div
-      class="rise-in mt-10 flex flex-col items-center gap-3 sm:flex-row"
-      style="--delay:240ms"
-    >
-      <StartCta
-        label={hero.ctaPrimary.label}
-        class="inline-flex h-12 items-center justify-center rounded-xl bg-encre px-6 text-base font-semibold text-white transition hover:-translate-y-0.5 hover:bg-encre/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-encre focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-      />
-      <a
-        href={hero.ctaSecondary.href}
-        class="inline-flex h-12 items-center justify-center rounded-xl border border-encre/15 px-6 text-base font-medium text-foreground transition hover:border-encre/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-encre/40"
-      >
-        {hero.ctaSecondary.label}
-      </a>
-    </div>
-  </div>
+<section class="band pt-16 pb-10" id="top" data-demo-hero data-demo-state="paused">
+  <div class="mx-auto grid max-w-wrap items-center gap-[30px] tablet:grid-cols-12">
+    <div class="flex flex-col gap-[26px] tablet:col-span-7">
+      <span class="mono text-teal">{hero.eyebrow}</span>
+      <h1 class="display-1">{hero.titleLines[0]}<br />{hero.titleLines[1]}</h1>
+      <p class="max-w-[600px] text-[clamp(18px,1.6vw,22px)] leading-[1.4] text-ink/85">{hero.subtitle}</p>
 
-  {/* Visuel signature : photo + démo produit WhatsApp (cf. HeroShowcase). */}
-  <div class="mx-auto mt-16 max-w-[1320px] pb-24 sm:mt-20 lg:pb-32">
-    <div class="rise-in" style="--delay:360ms">
-      <HeroShowcase />
+      <div class="flex flex-col gap-3 rounded-md bg-sand-50 p-[18px]">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <span class="mono text-ink" id="demo-label">{hero.demo.label}</span>
+          <button
+            type="button"
+            class="inline-flex min-h-8 cursor-pointer items-center px-1 py-2 font-mono text-xs font-medium tracking-[0.06em] text-grey-700 uppercase hover:text-ink"
+            data-demo-toggle
+            hidden
+            aria-label={hero.demo.pauseAria}
+            data-label-pause={hero.demo.pause}
+            data-label-play={hero.demo.play}
+            data-aria-pause={hero.demo.pauseAria}
+            data-aria-play={hero.demo.playAria}
+          >
+            {hero.demo.pause}
+          </button>
+        </div>
+        <div class="flex flex-wrap gap-2" role="group" aria-labelledby="demo-label">
+          {
+            scenarios.map((scenario) => (
+              <button
+                type="button"
+                class="chip"
+                data-demo-scenario={scenario.id}
+                aria-pressed={scenario.id === demo.scenario.id ? "true" : "false"}
+              >
+                {scenario.label}
+              </button>
+            ))
+          }
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-[18px]">
+        <div class="card flex items-center gap-3.5 py-3 pr-4 pl-3 max-lg:hidden">
+          <WhatsAppQr label={hero.qr.title} class="size-[92px]" />
+          <div class="flex max-w-[190px] flex-col gap-1.5">
+            <span class="mono inline-flex items-center gap-1.5 text-ink"><span class="wa-dot"></span>{hero.qr.title}</span>
+            <span class="text-[13px] leading-[1.4] text-ink/75">{hero.qr.body}</span>
+          </div>
+        </div>
+        <div class="flex flex-col gap-2">
+          <a class="pill pill-dark max-lg:hidden" href={url} target="_blank" rel="noopener"
+            ><span class="wa-dot"></span>{hero.desktopLink}</a
+          >
+          <a class="pill pill-dark lg:hidden" href={url} rel="noopener"><span class="wa-dot"></span>{nav.cta}</a>
+          <span class="mono">{hero.noCommitment}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="relative flex justify-center max-sm:flex-col max-sm:items-center tablet:col-span-5 tablet:col-start-8">
+      <figure class="phone m-0" aria-label={hero.phone.ariaLabel}>
+        <div class="screen">
+          <div class="flex items-center gap-2.5 border-b border-ink/10 bg-white px-4 pt-3.5 pb-3">
+            <div class="grid size-8 place-items-center rounded-[9px] bg-night text-paper"><Logo variant="mark" size={18} /></div>
+            <div>
+              <b class="block text-sm leading-tight font-semibold">{hero.phone.name}</b>
+              <small class="text-[11px] text-whatsapp-status">{hero.phone.status}</small>
+            </div>
+          </div>
+          <div class="msgs px-3 pt-3.5 pb-[18px]">
+            <span class="justify-self-center rounded-md bg-white px-2 py-[3px] text-[10.5px] text-whatsapp-meta">{hero.phone.dayLabel}</span>
+            <div class="msgs" data-demo-messages set:html={renderMessages(demo.messages)} />
+          </div>
+        </div>
+      </figure>
+      {/* Réponse du coach annoncée aux lecteurs d'écran, sur clic seulement (pas à chaque rotation). */}
+      <p class="sr-only" aria-live="polite" data-demo-announce></p>
+      <div class="card flex flex-col gap-1 px-3.5 py-3 max-sm:mt-3 sm:absolute sm:bottom-16 sm:left-0 tablet:-left-2">
+        <span class="mono">{hero.counter.label}</span>
+        {/* Grand chiffre : orange vif du DS, conforme AA grand texte. */}
+        <b class="text-[30px] leading-none font-medium tracking-[-0.02em] text-effort tabular-nums" data-demo-count>0</b>
+        <span class="mono text-[10px]">{hero.counter.sub}</span>
+      </div>
     </div>
   </div>
 </section>

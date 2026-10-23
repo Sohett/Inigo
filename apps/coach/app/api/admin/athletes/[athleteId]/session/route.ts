@@ -26,8 +26,8 @@ export async function POST(
   request: Request,
   context: { params: Promise<{ athleteId: string }> }
 ): Promise<Response> {
-  const unauthorized = requireAdmin(request);
-  if (unauthorized) return unauthorized;
+  const { denied } = await requireAdmin(request);
+  if (denied) return denied;
 
   const { athleteId } = await context.params;
   const parsed = athleteIdSchema.safeParse(athleteId);

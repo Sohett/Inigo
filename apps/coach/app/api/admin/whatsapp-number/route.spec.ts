@@ -1,29 +1,20 @@
-import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
-
-const ADMIN_USER = "inigo";
-const ADMIN_PASSWORD = "a-very-long-admin-password";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { AS_ATHLETE, AS_STAFF } from "../../../../src/identity/sessions.fake";
 
 const setWhatsappNumber = vi.fn();
 
-// `requireAdmin` reads the credentials from the environment, not from here.
+vi.mock("../../../../src/identity/sessions", () => import("../../../../src/identity/sessions.fake"));
 vi.mock("../../../../src/deps", () => ({
   getDeps: () => ({ whatsappGateway: { setWhatsappNumber } })
 }));
 
-const basic = `Basic ${Buffer.from(`${ADMIN_USER}:${ADMIN_PASSWORD}`).toString("base64")}`;
-
-function post(body: unknown, headers: Record<string, string> = { authorization: basic }) {
+function post(body: unknown, headers: Record<string, string> = { ...AS_STAFF }) {
   return new Request("http://localhost/api/admin/whatsapp-number", {
     method: "POST",
     headers: { "content-type": "application/json", ...headers },
     body: JSON.stringify(body)
   });
 }
-
-beforeAll(() => {
-  process.env["ADMIN_USER"] = ADMIN_USER;
-  process.env["ADMIN_PASSWORD"] = ADMIN_PASSWORD;
-});
 
 beforeEach(() => {
   setWhatsappNumber.mockReset();
@@ -59,7 +50,14 @@ describe("POST /api/admin/whatsapp-number", () => {
     expect(await response.json()).toEqual({ ok: false, error: "whatsapp_session_missing" });
   });
 
-  it("refuses without admin credentials", async () => {
+  it("refuses an athlete's session", async () => {
+    const { POST } = await import("./route");
+    const response = await POST(post({ whatsappNumber: null }, { ...AS_ATHLETE }));
+    expect(response.status).toBe(403);
+    expect(setWhatsappNumber).not.toHaveBeenCalled();
+  });
+
+  it("refuses without a session", async () => {
     const { POST } = await import("./route");
     const response = await POST(post({ whatsappNumber: null }, {}));
     expect(response.status).toBe(401);

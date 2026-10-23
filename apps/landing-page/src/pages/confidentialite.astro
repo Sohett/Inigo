@@ -2,39 +2,38 @@
 import Base from "@/layouts/Base.astro";
 import Logo from "@/components/Logo.astro";
 
-const link = "font-medium text-foreground underline underline-offset-4 hover:opacity-70";
 ---
 
 <Base
   title="Confidentialité · Inigo"
   description="Comment Inigo traite ton numéro WhatsApp, tes échanges de coaching et tes données Intervals.icu."
 >
-  <header class="border-b border-border bg-background px-6">
-    <div class="mx-auto flex h-16 max-w-3xl items-center">
-      <a href="/" class="text-foreground transition-opacity hover:opacity-70" aria-label="Inigo, accueil">
-        <Logo />
-      </a>
+  <header class="band sticky top-0 z-20 border-b border-ink/10 bg-paper/92 backdrop-blur-md">
+    <div class="mx-auto flex h-15 max-w-wrap items-center">
+      <a class="inline-flex items-center gap-2.5 text-ink-strong" href="/" aria-label="Inigo, accueil"><Logo /></a>
     </div>
   </header>
 
-  <main id="contenu" class="bg-background px-6">
-    <div class="mx-auto max-w-3xl py-20">
-      <h1 class="text-3xl font-bold sm:text-4xl">Confidentialité</h1>
-      <p class="mt-3 text-muted-foreground">Dernière mise à jour : octobre 2026.</p>
+  <main id="contenu" class="band">
+    <div class="mx-auto max-w-[760px] pt-18 pb-24">
+      <h1 class="text-[clamp(34px,4vw,48px)] font-semibold tracking-[-0.02em]">Confidentialité</h1>
+      <p class="mono mt-3">Dernière mise à jour : octobre 2026.</p>
 
-      <div class="mt-10 flex flex-col gap-8 leading-relaxed">
+      <div
+        class="[&_a]:font-medium [&_a]:text-ink [&_a]:underline [&_a]:underline-offset-4 [&_h2]:mb-2 [&_h2]:text-[22px] [&_li]:leading-relaxed [&_li]:text-ink/75 [&_p]:leading-relaxed [&_p]:text-ink/75 [&_section]:mt-9 [&_ul]:mt-3 [&_ul]:grid [&_ul]:list-disc [&_ul]:gap-2 [&_ul]:pl-5"
+      >
         <section>
-          <h2 class="font-display text-xl font-semibold">Qui est responsable</h2>
-          <p class="mt-2 text-muted-foreground">
+          <h2>Qui est responsable</h2>
+          <p>
             Inigo est un service de <strong>Poincenot Consulting BE</strong>, responsable du
             traitement de tes données. Pour toute question, écris à{" "}
-            <a class={link} href="mailto:contact@inigo-coach.com">contact@inigo-coach.com</a>.
+            <a href="mailto:contact@inigo-coach.com">contact@inigo-coach.com</a>.
           </p>
         </section>
 
         <section>
-          <h2 class="font-display text-xl font-semibold">Les données qu'on collecte</h2>
-          <ul class="mt-2 flex list-disc flex-col gap-2 pl-5 text-muted-foreground">
+          <h2>Les données qu'on collecte</h2>
+          <ul>
             <li>
               <strong>Conversation WhatsApp</strong> : quand tu écris à Inigo, ton numéro, ton nom
               affiché et les messages que tu échanges avec Inigo.
@@ -55,14 +54,14 @@ const link = "font-medium text-foreground underline underline-offset-4 hover:opa
         </section>
 
         <section>
-          <h2 class="font-display text-xl font-semibold">Connexion à Intervals.icu</h2>
-          <p class="mt-2 text-muted-foreground">
+          <h2>Connexion à Intervals.icu</h2>
+          <p>
             Pour te coacher, Inigo s'appuie sur ton compte{" "}
-            <a class={link} href="https://intervals.icu" rel="noopener">Intervals.icu</a>. Tu
+            <a href="https://intervals.icu" rel="noopener">Intervals.icu</a>. Tu
             autorises cet accès toi même, sur Intervals.icu, et tu choisis de le donner ou non.
             Avec ton accord, Inigo peut :
           </p>
-          <ul class="mt-3 flex list-disc flex-col gap-2 pl-5 text-muted-foreground">
+          <ul>
             <li>
               <strong>lire</strong> tes activités (séances, intervalles, puissance, fréquence
               cardiaque, allure), ta forme (fitness, fatigue, fraîcheur) et ton wellness ;
@@ -80,7 +79,7 @@ const link = "font-medium text-foreground underline underline-offset-4 hover:opa
               fatigue, courbatures, douleur), pour qu'il apparaisse à côté de tes données.
             </li>
           </ul>
-          <p class="mt-3 text-muted-foreground">
+          <p>
             Intervals.icu reste la référence pour ces données : on les lit quand ton coaching en
             a besoin, et on ne garde chez nous que ce qui sert à ton suivi (ton plan, l'historique
             de tes seuils, nos analyses de tes séances). Le jeton d'accès qu'Intervals.icu
@@ -88,7 +87,7 @@ const link = "font-medium text-foreground underline underline-offset-4 hover:opa
             affiché ni partagé. On n'utilise tes données Intervals.icu que pour ton propre
             coaching : ni revente, ni publicité, ni partage avec d'autres athlètes.
           </p>
-          <p class="mt-3 text-muted-foreground">
+          <p>
             Tu peux <strong>retirer cet accès à tout moment</strong> depuis Intervals.icu, dans
             Settings, puis Apps. Inigo n'aura alors plus accès à ton compte. Tu peux aussi nous
             demander de supprimer le jeton de notre côté.
@@ -96,8 +95,8 @@ const link = "font-medium text-foreground underline underline-offset-4 hover:opa
         </section>
 
         <section>
-          <h2 class="font-display text-xl font-semibold">À quoi elles servent</h2>
-          <ul class="mt-2 flex list-disc flex-col gap-2 pl-5 text-muted-foreground">
+          <h2>À quoi elles servent</h2>
+          <ul>
             <li>
               <strong>Te coacher</strong> : analyser tes séances, préparer et ajuster ton plan,
               te répondre sur WhatsApp. C'est le service que tu nous demandes.
@@ -110,18 +109,18 @@ const link = "font-medium text-foreground underline underline-offset-4 hover:opa
               <strong>Sécuriser le service</strong> : éviter les abus et corriger les erreurs.
             </li>
           </ul>
-          <p class="mt-3 text-muted-foreground">
+          <p>
             <strong>Aucune revente, aucune publicité, aucune cession à des tiers.</strong>
           </p>
         </section>
 
         <section>
-          <h2 class="font-display text-xl font-semibold">Qui les traite pour nous</h2>
-          <p class="mt-2 text-muted-foreground">
+          <h2>Qui les traite pour nous</h2>
+          <p>
             Quelques prestataires techniques font tourner le service pour notre compte, sous
             contrat, et uniquement pour ça :
           </p>
-          <ul class="mt-3 flex list-disc flex-col gap-2 pl-5 text-muted-foreground">
+          <ul>
             <li><strong>Vercel</strong> : hébergement du site et du service.</li>
             <li><strong>Neon</strong> : base de données (profil de coaching, jetons chiffrés).</li>
             <li>
@@ -132,7 +131,7 @@ const link = "font-medium text-foreground underline underline-offset-4 hover:opa
             <li><strong>WhatsApp</strong> : transport des messages.</li>
             <li><strong>Intervals.icu</strong> : si tu y connectes ton compte.</li>
           </ul>
-          <p class="mt-3 text-muted-foreground">
+          <p>
             Certains de ces prestataires sont situés hors de l'Union européenne, notamment aux
             États Unis. Ces transferts sont encadrés par les clauses contractuelles types de la
             Commission européenne ou par le cadre de protection des données UE États Unis.
@@ -140,8 +139,8 @@ const link = "font-medium text-foreground underline underline-offset-4 hover:opa
         </section>
 
         <section>
-          <h2 class="font-display text-xl font-semibold">Sécurité</h2>
-          <p class="mt-2 text-muted-foreground">
+          <h2>Sécurité</h2>
+          <p>
             Les échanges passent par des connexions chiffrées. Les accès à tes comptes, comme le
             jeton Intervals.icu, sont chiffrés dans notre base de données. Seules les personnes
             qui font tourner Inigo peuvent accéder aux données, et uniquement pour le service.
@@ -149,8 +148,8 @@ const link = "font-medium text-foreground underline underline-offset-4 hover:opa
         </section>
 
         <section>
-          <h2 class="font-display text-xl font-semibold">Conservation</h2>
-          <p class="mt-2 text-muted-foreground">
+          <h2>Conservation</h2>
+          <p>
             Ton numéro, tes échanges, ton profil de coaching et ton accès Intervals.icu sont
             conservés tant que tu es en relation avec Inigo. Quand tu arrêtes, on les supprime sur simple demande, et au
             plus tard un an après notre dernier échange.
@@ -158,19 +157,19 @@ const link = "font-medium text-foreground underline underline-offset-4 hover:opa
         </section>
 
         <section>
-          <h2 class="font-display text-xl font-semibold">Tes droits</h2>
-          <p class="mt-2 text-muted-foreground">
+          <h2>Tes droits</h2>
+          <p>
             Tu peux accéder à tes données, les corriger, les supprimer, en demander une copie,
             t'opposer à leur traitement ou retirer ton consentement : il suffit de le demander,
             par WhatsApp ou à{" "}
-            <a class={link} href="mailto:contact@inigo-coach.com">contact@inigo-coach.com</a>.
+            <a href="mailto:contact@inigo-coach.com">contact@inigo-coach.com</a>.
             On te répond dans le mois. Si tu estimes que tes droits ne sont pas respectés, tu peux
-            saisir l'<a class={link} href="https://www.autoriteprotectiondonnees.be" rel="noopener">Autorité de protection des données</a>.
+            saisir l'<a href="https://www.autoriteprotectiondonnees.be" rel="noopener">Autorité de protection des données</a>.
           </p>
         </section>
       </div>
 
-      <a href="/" class="mt-12 inline-block font-medium text-foreground underline-offset-4 hover:underline">
+      <a href="/" class="pill pill-grey mt-12">
         ← Retour à l'accueil
       </a>
     </div>

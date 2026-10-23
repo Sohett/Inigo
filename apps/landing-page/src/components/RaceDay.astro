@@ -1,0 +1,61 @@
+---
+import { raceDay } from "@/content/copy";
+
+const legTones = { swim: "bg-swim-soft rounded-l-[2px]", bike: "bg-z3-soft", run: "bg-z2-soft rounded-r-[2px]" } as const;
+---
+
+<section class="band py-22" id="jourj">
+  <div class="mx-auto grid max-w-wrap items-center gap-[30px] tablet:grid-cols-12">
+    <div class="reveal flex flex-col gap-5 tablet:col-span-5">
+      <span class="mono">{raceDay.eyebrow}</span>
+      <h2 class="display-2">{raceDay.title}</h2>
+      <p class="text-lg leading-[1.55] text-ink/75">{raceDay.body}</p>
+    </div>
+    <div class="reveal tablet:col-span-6 tablet:col-start-7" style="--delay:100ms">
+      <div class="card flex flex-col gap-[22px] p-7">
+        <div class="flex flex-wrap items-baseline justify-between gap-3">
+          <span class="mono text-ink">{raceDay.caption}</span>
+          <span class="text-[32px] font-medium tracking-[-0.02em] text-effort">{raceDay.total}</span>
+        </div>
+        <div class="flex flex-col gap-2">
+          <div class="flex h-11 gap-0.5">
+            {
+              raceDay.legs.map((leg, index) => (
+                <>
+                  {index > 0 && <div class="w-[1.5%] bg-sand-150" aria-hidden="true" />}
+                  <div
+                    class:list={[
+                      "flex flex-col justify-center overflow-hidden pl-1 font-mono text-[9px] whitespace-nowrap sm:pl-2 sm:text-[10.5px]",
+                      legTones[leg.tone],
+                    ]}
+                    style={`width:${leg.width}%`}
+                  >
+                    {leg.name}
+                    <br />
+                    {leg.detail}
+                  </div>
+                </>
+              ))
+            }
+          </div>
+          <div class="flex flex-wrap justify-between gap-3">
+            {raceDay.distances.map((distance) => <span class="mono text-[10px]">{distance}</span>)}
+          </div>
+        </div>
+        <div class="grid gap-px overflow-hidden rounded-sm border border-ink/10 bg-ink/10 sm:grid-cols-3">
+          {
+            raceDay.stats.map((stat) => (
+              <div class="grid gap-1.5 bg-paper p-[18px]">
+                <span class="mono">{stat.label}</span>
+                <b class="text-[26px] leading-none font-medium tracking-[-0.02em]">
+                  {stat.value}
+                  <small class="mono ml-1">{stat.unit}</small>
+                </b>
+              </div>
+            ))
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

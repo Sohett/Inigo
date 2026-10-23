@@ -23,8 +23,8 @@ Réponds en coach, en deux ou trois phrases, sans liste technique :
    - appeler `get_intervals_connect_link` et lui envoyer le lien tel quel, avec une phrase : il
      ouvre une page Inigo, puis Intervals.icu lui demande d'autoriser l'accès ; il doit laisser
      **toutes les cases cochées** et cliquer sur autoriser ;
-   - le lien est personnel et vaut 72 heures. S'il a expiré ou si l'athlète a fermé la page,
-     redemande simplement un lien ;
+   - le lien est personnel, vaut une heure et ne sert qu'une fois. S'il a expiré ou si l'athlète
+     a fermé la page, redemande simplement un lien ;
    - quand c'est fait, tu reçois un tour `evenement: intervals_connecte` avec un `message` vide :
      l'athlète n'a rien écrit, c'est la connexion qui te prévient. Confirme en une phrase sur
      WhatsApp et enchaîne sur ce qui manque ;

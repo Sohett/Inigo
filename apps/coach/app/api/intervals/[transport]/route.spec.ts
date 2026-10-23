@@ -7,11 +7,11 @@ beforeAll(() => {
   process.env["DB_ENCRYPTION_KEY"] = Buffer.alloc(32).toString("base64");
   process.env["MCP_BEARER_TOKEN"] = "a-very-long-mcp-bearer-token";
   process.env["WHATSAPP_WEBHOOK_SECRET"] = "a-very-long-webhook-secret";
-  // Deliberately UNUSABLE admin credentials (a too-short password, the state that broke
-  // production): the MCP endpoints must not depend on the admin. When these lived in the
-  // shared config schema, this value turned a valid bearer into a 401.
-  process.env["ADMIN_USER"] = "x";
-  process.env["ADMIN_PASSWORD"] = "short";
+  // Deliberately UNUSABLE sign in (a too-short secret, no Google client): the MCP endpoints must
+  // not depend on the admin. When the admin's credentials lived in the shared config schema, a
+  // too-short password turned a valid bearer into a 401 (INI-85 kept the rule for Better Auth).
+  process.env["BETTER_AUTH_SECRET"] = "short";
+  delete process.env["GOOGLE_CLIENT_ID"];
 });
 
 describe("intervals MCP route", () => {

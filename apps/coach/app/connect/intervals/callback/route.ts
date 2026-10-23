@@ -10,6 +10,7 @@ import { clearConnectionFlowCookie, readConnectionFlow } from "../_components/co
 import { createDrizzleOnboardingFactsReader } from "../../../../src/repositories/drizzleOnboardingFactsReader";
 import { createAssessOnboarding } from "../../../../src/use-cases/assessOnboarding";
 import { createCompleteIntervalsConnection } from "../../../../src/use-cases/completeIntervalsConnection";
+import { whoIsSignedIn } from "../../../../src/identity/sessions";
 
 // The OAuth callback is per request and must never be cached.
 export const dynamic = "force-dynamic";
@@ -19,13 +20,17 @@ export const maxDuration = 30;
 /**
  * Where Intervals.icu sends the athlete back (INI-69): `?code&state`, or `?error=access_denied`.
  * Thin: the use-case decides, this only redirects to the result page. An outage (Intervals.icu,
- * Neon) is logged and shown as a failure the athlete can retry from their link.
+ * Neon) is logged and shown as a failure the athlete can retry from their link. Who connects is
+ * the athlete this browser is signed in as (INI-85).
  */
 export async function GET(request: Request): Promise<Response> {
-  const callback = { query: new URL(request.url).searchParams, flow: readConnectionFlow(request) };
-
   let result: ConnectionResult;
   try {
+    const callback = {
+      query: new URL(request.url).searchParams,
+      flow: readConnectionFlow(request),
+      signedIn: await whoIsSignedIn(request.headers)
+    };
     const deps = getDeps();
     const completeConnection = createCompleteIntervalsConnection({
       oauth: intervalsOAuth(),

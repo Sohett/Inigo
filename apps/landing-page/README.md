@@ -1,18 +1,18 @@
 # landing-page
 
-Landing page **one-page** d'Inigo (FR) : présente le coach, sa méthode, et emmène l'athlète
-sur **WhatsApp** avec le code d'accès prérempli (QR sur desktop). Direction artistique **claire & épurée**, accent encre
-(noir profond) ; la couleur « aube alpine » est réservée au visuel signature du hero (dégradé
-+ grain + courbe de puissance). C'est un service du monorepo Inigo (voir le
-[README racine](../../README.md)).
+Landing page **one-page** d'Inigo (FR) : une démo interactive (choisis un imprévu, regarde
+le coach réajuster ta semaine et ton plan jusqu'au jour J), l'analyse, la science, le jour J,
+les tarifs bêta, puis **WhatsApp** avec le code d'accès prérempli (QR sur desktop). Direction
+artistique : **design system Inigo v3** (papier, encre, IBM Plex). C'est un service du monorepo
+Inigo (voir le [README racine](../../README.md)).
 
 ## Stack
 
-- **Astro 7**, site 100 % statique (SSG), sans framework d'îlots
-- **Tailwind CSS v4** (config CSS-first via `@theme` dans `src/styles/global.css`,
+- **Astro 7**, site 100 % statique (SSG), sans framework d'îlots ; un script TS pour la démo
+- **Tailwind CSS v4** (config CSS-first : tokens du DS Inigo dans `@theme`, `src/styles/global.css`,
   `@tailwindcss/vite`)
-- **Polices self-hostées** via `@fontsource-variable` (Schibsted Grotesk, Hanken Grotesk, Geist Mono)
-- **`qrcode`** : QR WhatsApp généré au build (SVG), zéro JS côté client
+- **Polices self-hostées** via `@fontsource` (IBM Plex Sans, IBM Plex Mono)
+- **`qrcode`** : QR WhatsApp généré au build (SVG)
 - **Adapter `@astrojs/vercel`**
 
 Aucune variable d'environnement : le numéro WhatsApp et le code d'accès vivent dans

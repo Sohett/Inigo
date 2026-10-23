@@ -23,8 +23,8 @@ const bodySchema = z.object({
  * WhatsApp session, because they change too often for the environment.
  */
 export async function POST(request: Request): Promise<Response> {
-  const unauthorized = requireAdmin(request);
-  if (unauthorized) return unauthorized;
+  const { denied } = await requireAdmin(request);
+  if (denied) return denied;
 
   let payload: unknown;
   try {

@@ -16,6 +16,16 @@ export type Sport = "bike" | "run" | "swim";
  * `blocked`: the coach caught a hijack attempt or an off-coaching request (INI-66); like `ended`, nothing is routed.
  */
 export type AthleteStatus = "onboarding" | "active" | "paused" | "ended" | "blocked";
+/**
+ * A Better Auth user's `role` (INI-87), as its admin plugin stores it: comma separated when a
+ * staff member has both roles. `athlete`: signed in from WhatsApp; the others are staff.
+ */
+export type AuthRole = "athlete" | "admin" | "coach" | "admin,coach";
+/**
+ * What a staff member does (INI-85), one or both: `admin` runs the backoffice, `coach` coaches
+ * athletes. Recorded, not enforced yet: today every staff member has the same access.
+ */
+export type StaffRole = "admin" | "coach";
 export type ThresholdSource = "test" | "estimated" | "manual";
 /**
  * How the athlete's bike FTP was settled during onboarding: confirmed (and written on

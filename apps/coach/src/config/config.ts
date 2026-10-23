@@ -52,12 +52,13 @@ export const configSchema = z.object({
 });
 
 /**
- * `ADMIN_USER` / `ADMIN_PASSWORD` are deliberately NOT in this schema.
+ * Sign in's variables (`BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `GOOGLE_CLIENT_*`) are deliberately
+ * NOT in this schema.
  *
  * This schema is validated on every request path, so any rule about the admin — missing,
  * or merely too short — would take the WhatsApp webhook and both MCP endpoints down with
  * it. The admin must never be able to break the coach. They are read and validated where
- * they are used instead: `adminCredentials()` in `src/auth.ts`, which fails closed.
+ * they are used instead: `authEnv()` in `src/identity/authEnv.ts`, which fails closed.
  */
 
 export type Config = z.infer<typeof configSchema>;

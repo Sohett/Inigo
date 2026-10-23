@@ -56,9 +56,9 @@ export const ConnectionResult = {
   Denied: "denied",
   /** The athlete unticked scopes the coach needs: nothing stored, try again. */
   MissingScopes: "missing_scopes",
-  /** The link is past its expiry: ask the coach for a new one. */
+  /** The magic link could not sign in: past its hour, or already used. Ask the coach for a new one. */
   ExpiredLink: "expired_link",
-  /** The link or state was tampered with, truncated, or names no athlete. */
+  /** No athlete signed in on this browser (no link opened), or one who cannot be coached anymore. */
   InvalidLink: "invalid_link",
   /**
    * The callback came back to another browser than the one that opened the link (no matching

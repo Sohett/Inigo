@@ -19,7 +19,7 @@ export const RESULT_COPY: Record<ConnectionResult, { title: string; body: string
   },
   [ConnectionResult.ExpiredLink]: {
     title: "Ce lien a expiré",
-    body: "Pour ta sécurité, un lien de connexion ne reste valable que 72 heures. Demande un nouveau lien à Inigo sur WhatsApp."
+    body: "Pour ta sécurité, un lien ne reste valable qu'une heure et ne sert qu'une fois. Demande un nouveau lien à Inigo sur WhatsApp."
   },
   [ConnectionResult.InvalidLink]: {
     title: "Ce lien ne fonctionne pas",
