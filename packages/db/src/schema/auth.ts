@@ -2,21 +2,24 @@ import { sql } from "drizzle-orm";
 import { boolean, check, index, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { athlete } from "./athlete";
 import { timestamps } from "./columns";
-import type { AuthRole, StaffRole } from "./types";
+import type { AuthRole } from "./types";
 
 /**
- * Better Auth's tables (INI-85): who can sign in to the coach app, and their sessions.
+ * Who can sign in to the coach app, and their sessions (INI-85, INI-87).
  *
- * The shape is Better Auth's (its core `user`, `session`, `account` and `verification` models,
- * mapped onto these tables by its Drizzle adapter); only the names, `role` and `athlete_id` are ours. Prefixed
- * `auth_` so they never read as coaching data, and so `auth_session` is never mistaken for
- * `athlete_session` (a Managed Agent session).
+ * Better Auth's tables: its core `user`, `session`, `account` and `verification` models plus its
+ * `admin` plugin's columns (`role`, `banned`, `ban_reason`, `ban_expires`, `impersonated_by`),
+ * mapped onto these tables by its Drizzle adapter. `athlete_id` and `invited_by` are ours.
+ * Prefixed `auth_` so they never read as coaching data, and so `auth_session` is never mistaken
+ * for `athlete_session` (a Managed Agent session).
  *
- * Two kinds of users, told apart by `role`:
- * - `athlete`: created on the first magic link sent on WhatsApp, tied to their `athlete` row by
- *   `athlete_id`. Their email is synthetic (derived from `athlete.id`): Better Auth requires one,
- *   and an athlete has none;
- * - `staff`: signs in to the backoffice with Google, only once invited (`staff_member`).
+ * **A user is never created by signing in.** Our use-cases create them with the admin plugin
+ * (`createAthleteLink`, `inviteStaffMember`); signing in only authenticates an existing user:
+ * - `role = 'athlete'`: tied to their athlete by `athlete_id`, signs in with the magic link sent
+ *   on WhatsApp. Their email is synthetic (Better Auth requires one, an athlete has none);
+ * - `role` `admin`, `coach` or `admin,coach`: the backoffice staff, invited by email. Their Google
+ *   account is linked to this user on their first sign in, which also verifies their email:
+ *   `email_verified` false means still invited.
  */
 export const authUser = pgTable(
   "auth_user",
@@ -26,17 +29,22 @@ export const authUser = pgTable(
     email: text("email").notNull().unique(),
     emailVerified: boolean("email_verified").notNull().default(false),
     image: text("image"),
-    /** Set by the server when the user is created, never by a request. */
     role: text("role").$type<AuthRole>().notNull(),
-    /** The athlete this user is; set for an athlete, null for staff. Deleting the athlete deletes their user. */
+    banned: boolean("banned").default(false),
+    banReason: text("ban_reason"),
+    banExpires: timestamp("ban_expires", { withTimezone: true }),
+    /** The athlete this user is: set for an athlete, null for staff. Deleting the athlete deletes their user. */
     athleteId: uuid("athlete_id")
       .unique()
       .references(() => athlete.id, { onDelete: "cascade" }),
+    /** The staff member who invited this one; null for the first, and for athletes. */
+    invitedBy: text("invited_by"),
     ...timestamps()
   },
   (t) => [
-    check("auth_user_role_check", sql`${t.role} in ('athlete', 'staff')`),
-    check("auth_user_athlete_check", sql`(${t.role} = 'athlete') = (${t.athleteId} is not null)`)
+    check("auth_user_role_check", sql`${t.role} in ('athlete', 'admin', 'coach', 'admin,coach')`),
+    check("auth_user_athlete_check", sql`(${t.role} = 'athlete') = (${t.athleteId} is not null)`),
+    check("auth_user_email_lowercase_check", sql`${t.email} = lower(${t.email})`)
   ]
 );
 
@@ -48,6 +56,8 @@ export const authSession = pgTable(
     token: text("token").notNull().unique(),
     ipAddress: text("ip_address"),
     userAgent: text("user_agent"),
+    /** Better Auth's admin plugin; impersonation is disabled, so always null. */
+    impersonatedBy: text("impersonated_by"),
     userId: text("user_id")
       .notNull()
       .references(() => authUser.id, { onDelete: "cascade" }),
@@ -56,7 +66,10 @@ export const authSession = pgTable(
   (t) => [index("auth_session_user_id_idx").on(t.userId)]
 );
 
-/** How a user signs in: the Google account of a staff member. Athletes have none (magic link only). */
+/**
+ * How a user signs in: the Google account of a staff member, linked by Better Auth to their
+ * existing user on their first sign in. Athletes have none (magic link only).
+ */
 export const authAccount = pgTable(
   "auth_account",
   {
@@ -89,30 +102,4 @@ export const authVerification = pgTable(
     ...timestamps()
   },
   (t) => [index("auth_verification_identifier_idx").on(t.identifier)]
-);
-
-/**
- * The backoffice team (INI-85): who may sign in with Google, and as what. Invitation only: a
- * Google account whose email is not here is refused when Better Auth tries to create its user.
- * A member is invited until their first sign in (no `auth_user` yet), then active. Removing a
- * member removes this row and their user, so they can neither stay signed in nor sign up again.
- */
-export const staffMember = pgTable(
-  "staff_member",
-  {
-    /** Lower-cased, as Better Auth stores user emails. */
-    email: text("email").primaryKey(),
-    /** `admin`, `coach`, or both; at least one. */
-    roles: text("roles").array().$type<StaffRole[]>().notNull(),
-    /** The member who invited them; null for the first one, seeded by the migration. */
-    invitedBy: text("invited_by"),
-    invitedAt: timestamp("invited_at", { withTimezone: true }).notNull().defaultNow()
-  },
-  (t) => [
-    check("staff_member_email_lowercase_check", sql`${t.email} = lower(${t.email})`),
-    check(
-      "staff_member_roles_check",
-      sql`cardinality(${t.roles}) > 0 and ${t.roles} <@ array['admin', 'coach']::text[]`
-    )
-  ]
 );

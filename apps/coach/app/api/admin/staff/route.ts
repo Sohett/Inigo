@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { json, requireAdmin } from "../../../../src/admin/guard";
-import { getDeps } from "../../../../src/deps";
+import { staffOnDeployment } from "../../../../src/identity/accounts";
 import { StaffRole } from "../../../../src/domain/staff";
 import { createInviteStaffMember } from "../../../../src/use-cases/inviteStaffMember";
 import { createRemoveStaffMember } from "../../../../src/use-cases/removeStaffMember";
@@ -24,7 +24,10 @@ async function readBody<T>(request: Request, schema: z.ZodType<T>, invalid: stri
   return parsed.success ? parsed.data : json({ ok: false, error: invalid }, 400);
 }
 
-/** Invite someone to the backoffice (INI-85), as admin, coach or both: they sign in with the Google account of this email. */
+/**
+ * Invite someone to the backoffice (INI-85, INI-87), as admin, coach or both: their user is
+ * created, and they sign in with the Google account of this email.
+ */
 export async function POST(request: Request): Promise<Response> {
   const { staff, denied } = await requireAdmin(request);
   if (denied) return denied;
@@ -32,7 +35,9 @@ export async function POST(request: Request): Promise<Response> {
   if (body instanceof Response) return body;
 
   try {
-    const outcome = await createInviteStaffMember({ staff: getDeps().staff }).execute(body.email, body.roles, staff.email);
+    const team = staffOnDeployment(request.headers);
+    if (!team) return json({ ok: false, error: "admin_not_configured" }, 503);
+    const outcome = await createInviteStaffMember({ staff: team }).execute(body.email, body.roles, staff.email);
     switch (outcome.status) {
       case "invited":
         console.info("[coach] staff member invited");
@@ -56,7 +61,9 @@ export async function DELETE(request: Request): Promise<Response> {
   if (body instanceof Response) return body;
 
   try {
-    const outcome = await createRemoveStaffMember({ staff: getDeps().staff }).execute(body.email, staff.email);
+    const team = staffOnDeployment(request.headers);
+    if (!team) return json({ ok: false, error: "admin_not_configured" }, 503);
+    const outcome = await createRemoveStaffMember({ staff: team }).execute(body.email, staff.email);
     switch (outcome.status) {
       case "removed":
         console.info("[coach] staff member removed");

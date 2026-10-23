@@ -128,8 +128,10 @@ bouton remplace la manœuvre d'avant (commande locale, puis `UPDATE` SQL à la m
 - **Une limite assumée** : une session montant un `github_repository` ne peut pas être clonée,
   parce que la création exige un `authorization_token` que l'API ne renvoie jamais. Le cas est
   refusé bruyamment plutôt que d'ouvrir une session amputée de son credential.
-- **Auth** (INI-85) : connexion Google du staff, **sur invitation** (`/admin/team`, rôles admin
-  et/ou coach, qui n'autorisent encore rien de plus), via Better Auth. `proxy.ts` relit la session
+- **Auth** (INI-85, INI-87) : connexion Google du staff, **sur invitation** (`/admin/team` : inviter
+  crée le user, puis « Copier le lien » de connexion ; rôles admin et/ou coach, qui n'autorisent
+  encore rien de plus), via Better Auth et son plugin `admin`. Personne n'est créé en se connectant
+  (voir « Identité » dans `AGENTS.md`). `proxy.ts` relit la session
   et ne laisse passer que le staff (sinon `/login`, ou 401/403 sur `/api/admin/*`) ; le layout et
   chaque route admin revérifient. Le webhook OpenWA et les MCP gardent leurs propres credentials.
   Premier membre : `sohet.thomas@gmail.com` (admin + coach), invité par la migration.
@@ -216,7 +218,7 @@ puis, côté OpenWA, abonner le webhook du coach à `session.status`, `session.d
 Pour utiliser l'admin et les liens athlètes, poser `BETTER_AUTH_SECRET` (min 32 car.),
 `BETTER_AUTH_URL=http://localhost:3000` et le client OAuth Google **local** (`GOOGLE_CLIENT_ID`,
 `GOOGLE_CLIENT_SECRET`, redirect URI `http://localhost:3000/api/auth/callback/google`), puis
-appliquer les migrations (tables `auth_*` et `staff_member`). Absentes ou trop courtes, seuls
+appliquer les migrations (tables `auth_*`). Absentes ou trop courtes, seuls
 l'admin et les liens sont indisponibles (503, avec un log qui dit quoi corriger) : le webhook et
 les MCP continuent de tourner. Pas de connexion Google sur les previews Vercel (Google n'accepte
 pas d'URL joker).

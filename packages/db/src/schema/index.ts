@@ -19,6 +19,6 @@ export { weeklyProposition } from "./proposition";
 export { adaptationLog } from "./adaptationLog";
 export { whatsappGateway } from "./whatsappGateway";
 export { onboardingSettings } from "./onboardingSettings";
-export { authUser, authSession, authAccount, authVerification, staffMember } from "./auth";
+export { authUser, authSession, authAccount, authVerification } from "./auth";
 
 export * from "./types";

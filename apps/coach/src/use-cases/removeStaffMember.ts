@@ -12,8 +12,9 @@ export interface RemoveStaffMember {
 }
 
 /**
- * Take the backoffice away from a member, or withdraw an invitation (INI-85). Their membership and
- * their account go together, so their sessions end at once and they cannot sign in again.
+ * Take the backoffice away from a member, or withdraw an invitation (INI-85, INI-87): their user is
+ * deleted, with their sessions and Google account, so they are signed out at once and can never
+ * sign in again.
  */
 export function createRemoveStaffMember(deps: { staff: Pick<StaffRepository, "remove"> }): RemoveStaffMember {
   return {

@@ -6,30 +6,30 @@ import { createRemoveStaffMember } from "./removeStaffMember";
 
 describe("inviteStaffMember", () => {
   it("invites the email lower-cased and trimmed, with its roles, recording who invited", async () => {
-    const invite = vi.fn(async () => true);
-    const outcome = await createInviteStaffMember({ staff: { invite } }).execute(
+    const create = vi.fn(async () => true);
+    const outcome = await createInviteStaffMember({ staff: { create } }).execute(
       "  New.Coach@Example.com ",
       ["coach"],
       "Sohet.Thomas@gmail.com"
     );
-    expect(invite).toHaveBeenCalledWith("new.coach@example.com", ["coach"], "sohet.thomas@gmail.com");
+    expect(create).toHaveBeenCalledWith({ email: "new.coach@example.com", roles: ["coach"], invitedBy: "sohet.thomas@gmail.com" });
     expect(outcome).toEqual({ status: "invited", email: "new.coach@example.com" });
   });
 
   it("keeps each role once, in a stable order", async () => {
-    const invite = vi.fn(async () => true);
-    await createInviteStaffMember({ staff: { invite } }).execute("a@b.co", ["coach", "admin", "coach"], "c@d.co");
-    expect(invite).toHaveBeenCalledWith("a@b.co", ["admin", "coach"], "c@d.co");
+    const create = vi.fn(async () => true);
+    await createInviteStaffMember({ staff: { create } }).execute("a@b.co", ["coach", "admin", "coach"], "c@d.co");
+    expect(create).toHaveBeenCalledWith({ email: "a@b.co", roles: ["admin", "coach"], invitedBy: "c@d.co" });
   });
 
   it("refuses a member without a role, inviting nothing", async () => {
-    const invite = vi.fn(async () => true);
-    expect(await createInviteStaffMember({ staff: { invite } }).execute("a@b.co", [], "c@d.co")).toEqual({ status: "no_role" });
-    expect(invite).not.toHaveBeenCalled();
+    const create = vi.fn(async () => true);
+    expect(await createInviteStaffMember({ staff: { create } }).execute("a@b.co", [], "c@d.co")).toEqual({ status: "no_role" });
+    expect(create).not.toHaveBeenCalled();
   });
 
   it("says when the email already is a member", async () => {
-    const outcome = await createInviteStaffMember({ staff: { invite: vi.fn(async () => false) } }).execute("a@b.co", ["admin"], "c@d.co");
+    const outcome = await createInviteStaffMember({ staff: { create: vi.fn(async () => false) } }).execute("a@b.co", ["admin"], "c@d.co");
     expect(outcome.status).toBe("already_member");
   });
 });

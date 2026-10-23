@@ -28,7 +28,3 @@ export async function whoIsSignedIn(headers: Headers): Promise<SignedIn> {
       return { state: SignInState.SignedOut };
   }
 }
-
-export function magicLinkIssuer() {
-  return null;
-}
