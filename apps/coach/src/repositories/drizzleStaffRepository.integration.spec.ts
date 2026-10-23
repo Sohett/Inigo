@@ -64,7 +64,7 @@ describe.skipIf(!databaseUrl)("drizzleStaffRepository (integration)", () => {
     expect(await staff.remove(ACTIVE)).toBe(false);
   });
 
-  it("refuses a staff user tied to an athlete, and an athlete user tied to none", async () => {
+  it("refuses an athlete user tied to no athlete", async () => {
     await expect(
       db.insert(authUser).values({ id: "staff-integration-bad", name: "", email: ACTIVE, emailVerified: true, role: "athlete" })
     ).rejects.toThrow();
