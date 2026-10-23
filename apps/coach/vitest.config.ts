@@ -7,7 +7,7 @@ export default defineConfig({
   oxc: { jsx: { runtime: "automatic" } },
   test: {
     environment: "node",
-    include: ["src/**/*.spec.ts", "app/**/*.spec.ts", "app/**/*.spec.tsx"],
+    include: ["proxy.spec.ts", "src/**/*.spec.ts", "app/**/*.spec.ts", "app/**/*.spec.tsx"],
     coverage: {
       provider: "v8",
       include: ["src/**/*.ts", "app/**/*.ts", "app/**/*.tsx"]
