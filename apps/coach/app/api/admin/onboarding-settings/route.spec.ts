@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { AS_ATHLETE, AS_COACH } from "../../../../src/identity/sessions.fake";
+import { AS_ATHLETE, AS_STAFF } from "../../../../src/identity/sessions.fake";
 
 const set = vi.fn();
 
@@ -8,7 +8,7 @@ vi.mock("../../../../src/deps", () => ({
   getDeps: () => ({ onboardingSettings: { set } })
 }));
 
-function post(body: unknown, headers: Record<string, string> = { ...AS_COACH }) {
+function post(body: unknown, headers: Record<string, string> = { ...AS_STAFF }) {
   return new Request("http://localhost/api/admin/onboarding-settings", {
     method: "POST",
     headers: { "content-type": "application/json", ...headers },

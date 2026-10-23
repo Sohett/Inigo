@@ -156,7 +156,7 @@ async function notifyAgent(
 
 /**
  * The athlete a callback connects: the one this browser is signed in as, by the magic link that
- * opened the page (INI-85). Anyone else (signed out, a coach) connects nobody. Sign in that is
+ * opened the page (INI-85). Anyone else (signed out, staff) connects nobody. Sign in that is
  * not configured never reaches here: the link could not have been made.
  */
 function connectingAthlete(signedIn: SignedIn): string | null {
@@ -165,7 +165,7 @@ function connectingAthlete(signedIn: SignedIn): string | null {
       return signedIn.athleteId;
     case SignInState.Unavailable:
     case SignInState.SignedOut:
-    case SignInState.Coach:
+    case SignInState.Staff:
       return null;
   }
 }

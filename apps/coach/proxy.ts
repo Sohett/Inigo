@@ -5,7 +5,7 @@ import { authEnv } from "./src/identity/authEnv";
 import { whoIsSignedIn } from "./src/identity/sessions";
 
 /**
- * The gate on the admin surface (INI-85): only a signed in coach gets through, on every request,
+ * The gate on the admin surface (INI-85): only a signed in staff member gets through, on every request,
  * page or API, client navigation included. An athlete's session is a valid session too (any
  * magic link opens one), so checking that a cookie exists is not enough, and neither is the admin
  * layout alone: Next does not render a layout again on client navigation, so a page segment can
@@ -27,7 +27,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
 
   const signedIn = await whoIsSignedIn(request.headers);
   switch (signedIn.state) {
-    case SignInState.Coach:
+    case SignInState.Staff:
       return NextResponse.next();
     case SignInState.Unavailable:
       return notConfigured();

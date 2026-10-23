@@ -18,11 +18,11 @@ import {
 
 const ITEMS = [
   { href: "/admin/athletes", label: "Athlètes", icon: Users },
-  { href: "/admin/coaches", label: "Coachs", icon: ShieldCheck },
+  { href: "/admin/team", label: "Équipe", icon: ShieldCheck },
   { href: "/admin/settings", label: "Réglages", icon: Settings }
 ] as const;
 
-export function AdminSidebar({ coach }: { coach: { email: string; name: string | null } }) {
+export function AdminSidebar({ member }: { member: { email: string; name: string | null } }) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -56,8 +56,8 @@ export function AdminSidebar({ coach }: { coach: { email: string; name: string |
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <p className="truncate px-2 text-xs text-muted-foreground" title={coach.email}>
-              {coach.name ?? coach.email}
+            <p className="truncate px-2 text-xs text-muted-foreground" title={member.email}>
+              {member.name ?? member.email}
             </p>
           </SidebarMenuItem>
           <SidebarMenuItem>

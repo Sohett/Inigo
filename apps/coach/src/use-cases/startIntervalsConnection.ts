@@ -80,7 +80,7 @@ function visitingAthlete(
     case SignInState.Unavailable:
       return { refused: ConnectionResult.Unavailable };
     case SignInState.SignedOut:
-    case SignInState.Coach:
+    case SignInState.Staff:
       return { refused: visit.linkFailed ? ConnectionResult.ExpiredLink : ConnectionResult.InvalidLink };
   }
 }

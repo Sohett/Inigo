@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import type { Athlete } from "../../../../../../src/domain/athlete";
 import type { RunningSession } from "../../../../../../src/domain/brain";
-import { AS_ATHLETE, AS_COACH, AS_UNCONFIGURED } from "../../../../../../src/identity/sessions.fake";
+import { AS_ATHLETE, AS_STAFF, AS_UNCONFIGURED } from "../../../../../../src/identity/sessions.fake";
 
 const athlete: Athlete = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -93,7 +93,7 @@ describe("POST /api/admin/athletes/[athleteId]/session", () => {
   it("rejects a non-UUID athlete id (400)", async () => {
     const { POST } = await import("./route");
     const response = await POST(
-      post("not-a-uuid", { ...AS_COACH }),
+      post("not-a-uuid", { ...AS_STAFF }),
       params("not-a-uuid")
     );
 
@@ -105,7 +105,7 @@ describe("POST /api/admin/athletes/[athleteId]/session", () => {
   it("clones the running session and returns the new id (200)", async () => {
     const { POST } = await import("./route");
     const response = await POST(
-      post(athlete.id, { ...AS_COACH }),
+      post(athlete.id, { ...AS_STAFF }),
       params(athlete.id)
     );
 
@@ -125,7 +125,7 @@ describe("POST /api/admin/athletes/[athleteId]/session", () => {
     fake.findById.mockResolvedValue(null);
     const { POST } = await import("./route");
     const response = await POST(
-      post(athlete.id, { ...AS_COACH }),
+      post(athlete.id, { ...AS_STAFF }),
       params(athlete.id)
     );
 
@@ -137,7 +137,7 @@ describe("POST /api/admin/athletes/[athleteId]/session", () => {
     fake.findById.mockResolvedValue({ ...athlete, status: "blocked" });
     const { POST } = await import("./route");
     const response = await POST(
-      post(athlete.id, { ...AS_COACH }),
+      post(athlete.id, { ...AS_STAFF }),
       params(athlete.id)
     );
 
@@ -150,7 +150,7 @@ describe("POST /api/admin/athletes/[athleteId]/session", () => {
     fake.findById.mockResolvedValue({ ...athlete, activeSession: null });
     const { POST } = await import("./route");
     const response = await POST(
-      post(athlete.id, { ...AS_COACH }),
+      post(athlete.id, { ...AS_STAFF }),
       params(athlete.id)
     );
 
@@ -164,7 +164,7 @@ describe("POST /api/admin/athletes/[athleteId]/session", () => {
     const response = await POST(
       post(
         athlete.id,
-        { ...AS_COACH, "content-type": "application/json" },
+        { ...AS_STAFF, "content-type": "application/json" },
         JSON.stringify({ agentId: "agent_coord", environmentId: "env_1", vaultIds: ["vlt_1"] })
       ),
       params(athlete.id)
@@ -181,7 +181,7 @@ describe("POST /api/admin/athletes/[athleteId]/session", () => {
     const response = await POST(
       post(
         athlete.id,
-        { ...AS_COACH, "content-type": "application/json" },
+        { ...AS_STAFF, "content-type": "application/json" },
         JSON.stringify({ agentId: "nope", environmentId: "env_1" })
       ),
       params(athlete.id)
@@ -198,7 +198,7 @@ describe("POST /api/admin/athletes/[athleteId]/session", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const { POST } = await import("./route");
     const response = await POST(
-      post(athlete.id, { ...AS_COACH }),
+      post(athlete.id, { ...AS_STAFF }),
       params(athlete.id)
     );
 

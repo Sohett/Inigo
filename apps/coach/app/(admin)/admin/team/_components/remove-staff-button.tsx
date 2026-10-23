@@ -8,12 +8,12 @@ import { Button } from "@/components/ui/button";
 const ERROR_COPY: Record<string, string> = {
   unauthorized: "Session expirée.",
   cannot_remove_yourself: "Impossible de te retirer de l'équipe.",
-  not_invited: "Déjà retiré.",
-  coach_remove_failed: "La base a refusé. Voir les logs."
+  not_member: "Déjà retiré.",
+  staff_remove_failed: "La base a refusé. Voir les logs."
 };
 
 /** Two clicks, no browser dialog: "Retirer", then "Confirmer". */
-export function RemoveCoachButton({ email }: { email: string }) {
+export function RemoveStaffButton({ email }: { email: string }) {
   const [confirming, setConfirming] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -23,7 +23,7 @@ export function RemoveCoachButton({ email }: { email: string }) {
     setMessage(null);
     let response: Response;
     try {
-      response = await fetch("/api/admin/coaches", {
+      response = await fetch("/api/admin/staff", {
         method: "DELETE",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ email })

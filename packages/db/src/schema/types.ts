@@ -16,8 +16,13 @@ export type Sport = "bike" | "run" | "swim";
  * `blocked`: the coach caught a hijack attempt or an off-coaching request (INI-66); like `ended`, nothing is routed.
  */
 export type AthleteStatus = "onboarding" | "active" | "paused" | "ended" | "blocked";
-/** Who a Better Auth user is (INI-85): an athlete signed in from WhatsApp, or an invited coach. */
-export type AuthRole = "athlete" | "coach";
+/** Who a Better Auth user is (INI-85): an athlete signed in from WhatsApp, or an invited staff member. */
+export type AuthRole = "athlete" | "staff";
+/**
+ * What a staff member does (INI-85), one or both: `admin` runs the backoffice, `coach` coaches
+ * athletes. Recorded, not enforced yet: today every staff member has the same access.
+ */
+export type StaffRole = "admin" | "coach";
 export type ThresholdSource = "test" | "estimated" | "manual";
 /**
  * How the athlete's bike FTP was settled during onboarding: confirmed (and written on

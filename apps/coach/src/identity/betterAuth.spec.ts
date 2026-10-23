@@ -6,7 +6,7 @@ import { captureMagicLink } from "./magicLinkCapture";
 
 const BASE_URL = "http://localhost:3000";
 const ATHLETE_ID = "6f1c2a4e-8b3d-4c5e-9f70-1a2b3c4d5e6f";
-const INVITED = "coach@example.com";
+const INVITED = "staff@example.com";
 
 function makeAuth() {
   return createInigoAuth({
@@ -17,7 +17,7 @@ function makeAuth() {
       googleClientSecret: "google-secret"
     },
     database: memoryAdapter({ user: [], session: [], account: [], verification: [] }),
-    isInvitedCoach: async (email) => email === INVITED
+    isStaffMember: async (email) => email === INVITED
   });
 }
 
@@ -65,6 +65,7 @@ describe("magic links (athletes)", () => {
     const session = await auth.api.getSession({ headers: new Headers({ cookie: sessionCookie(response) }) });
     expect(session?.user.email).toBe(athleteEmail(ATHLETE_ID));
     expect(session?.user.role).toBe("athlete");
+    expect(session?.user.athleteId).toBe(ATHLETE_ID);
     expect(session?.user.name).toBe("Thomas");
   });
 
@@ -117,9 +118,10 @@ describe("user creation (roles)", () => {
     );
   }
 
-  it("makes an invited email a coach", async () => {
+  it("makes an invited email staff, tied to no athlete", async () => {
     const user = await createUser(makeAuth(), INVITED);
-    expect(user.role).toBe("coach");
+    expect(user.role).toBe("staff");
+    expect(user.athleteId).toBeNull();
   });
 
   it("refuses an account that was not invited", async () => {
@@ -130,9 +132,10 @@ describe("user creation (roles)", () => {
     const auth = makeAuth();
     const context = await auth.$context;
     const user = await context.internalAdapter.createUser(
-      { email: INVITED, name: "Coach", emailVerified: true, role: "athlete" },
+      { email: INVITED, name: "Coach", emailVerified: true, role: "athlete", athleteId: ATHLETE_ID },
       { method: "oauth", oauth: { providerId: "google" } }
     );
-    expect(user.role).toBe("coach");
+    expect(user.role).toBe("staff");
+    expect(user.athleteId).toBeNull();
   });
 });

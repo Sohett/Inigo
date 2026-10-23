@@ -17,7 +17,7 @@ function makeAuth() {
       googleClientSecret: "google-secret"
     },
     database: memoryAdapter({ user: [], session: [], account: [], verification: [] }),
-    isInvitedCoach: async (email) => email === "coach@example.com"
+    isStaffMember: async (email) => email === "coach@example.com"
   });
 }
 
@@ -58,17 +58,22 @@ describe("whoIsSignedIn", () => {
   });
 
   /** An auth whose session belongs to this user: the mapping is ours, the session Better Auth's. */
-  const authWith = (user: { email: string; name: string; role: string }) =>
+  const authWith = (user: { email: string; name: string; role: string; athleteId?: string | null }) =>
     ({ api: { getSession: async () => ({ user, session: {} }) } }) as unknown as InigoAuth;
 
-  it("reads a coach's session as a coach", async () => {
-    const auth = authWith({ email: "coach@example.com", name: "Coach", role: "coach" });
-    expect(await whoIsSignedIn(new Headers(), auth)).toEqual({ state: SignInState.Coach, email: "coach@example.com", name: "Coach" });
+  it("reads a staff session as staff", async () => {
+    const auth = authWith({ email: "staff@example.com", name: "Thomas", role: "staff", athleteId: null });
+    expect(await whoIsSignedIn(new Headers(), auth)).toEqual({ state: SignInState.Staff, email: "staff@example.com", name: "Thomas" });
   });
 
-  it("never reads a coach as an athlete, nor an athlete user without an athlete email", async () => {
-    const coachWithAthleteRole = authWith({ email: "coach@example.com", name: "Coach", role: "athlete" });
-    expect(await whoIsSignedIn(new Headers(), coachWithAthleteRole)).toEqual({ state: SignInState.SignedOut });
+  it("reads the athlete from the foreign key, not from the email", async () => {
+    const auth = authWith({ email: athleteEmail("11111111-1111-4111-8111-111111111111"), name: "", role: "athlete", athleteId: ATHLETE.id });
+    expect(await whoIsSignedIn(new Headers(), auth)).toEqual({ state: SignInState.Athlete, athleteId: ATHLETE.id });
+  });
+
+  it("reads an athlete user without an athlete as signed out", async () => {
+    const auth = authWith({ email: athleteEmail(ATHLETE.id), name: "", role: "athlete", athleteId: null });
+    expect(await whoIsSignedIn(new Headers(), auth)).toEqual({ state: SignInState.SignedOut });
   });
 
   it("reads an unknown role as signed out", async () => {

@@ -78,7 +78,7 @@ Validées au boot par `src/config/config.ts`. Copie `.env.example` → `.env` **
 | `OPENWA_API_KEY` | Clé API OpenWA (rôle OPERATOR), server-side |
 | `BETTER_AUTH_SECRET` | Signe les cookies de session (Better Auth), min 32 car., un par environnement |
 | `BETTER_AUTH_URL` | Origine publique de l'app (`https://app.inigo-coach.com`) : magic links et redirect URI Google |
-| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Client OAuth Google (Web) de la connexion des coachs, redirect URI `<BETTER_AUTH_URL>/api/auth/callback/google` |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Client OAuth Google (Web) de la connexion du staff (backoffice), redirect URI `<BETTER_AUTH_URL>/api/auth/callback/google` |
 | `SLACK_ALERT_WEBHOOK_URL` | Optionnel : Incoming Webhook Slack des alertes de session WhatsApp (absente → log seul) |
 | `CRON_SECRET` | Secret du cron watchdog (`/api/cron/whatsapp-watchdog`) ; Vercel l'envoie en Bearer. Absente → le watchdog refuse de tourner |
 
@@ -128,11 +128,11 @@ bouton remplace la manœuvre d'avant (commande locale, puis `UPDATE` SQL à la m
 - **Une limite assumée** : une session montant un `github_repository` ne peut pas être clonée,
   parce que la création exige un `authorization_token` que l'API ne renvoie jamais. Le cas est
   refusé bruyamment plutôt que d'ouvrir une session amputée de son credential.
-- **Auth** (INI-85) : connexion Google des coachs, **sur invitation** (`/admin/coaches`), via
-  Better Auth. `proxy.ts` renvoie vers `/login` (ou 401 sur `/api/admin/*`) sans cookie de
-  session ; le layout admin et chaque route admin relisent la session et n'acceptent qu'un
-  coach (une session d'athlète reçoit 403). Le webhook OpenWA et les MCP gardent leurs propres
-  credentials. Premier coach : `sohet.thomas@gmail.com`, invité par la migration.
+- **Auth** (INI-85) : connexion Google du staff, **sur invitation** (`/admin/team`, rôles admin
+  et/ou coach, qui n'autorisent encore rien de plus), via Better Auth. `proxy.ts` relit la session
+  et ne laisse passer que le staff (sinon `/login`, ou 401/403 sur `/api/admin/*`) ; le layout et
+  chaque route admin revérifient. Le webhook OpenWA et les MCP gardent leurs propres credentials.
+  Premier membre : `sohet.thomas@gmail.com` (admin + coach), invité par la migration.
 - **L'admin ne peut pas casser le coach** : ses variables ne sont pas dans le schéma d'env
   partagé. Mal réglées, l'admin répond 503 et le log dit quoi corriger ; le webhook et les MCP
   continuent de tourner.
@@ -216,7 +216,7 @@ puis, côté OpenWA, abonner le webhook du coach à `session.status`, `session.d
 Pour utiliser l'admin et les liens athlètes, poser `BETTER_AUTH_SECRET` (min 32 car.),
 `BETTER_AUTH_URL=http://localhost:3000` et le client OAuth Google **local** (`GOOGLE_CLIENT_ID`,
 `GOOGLE_CLIENT_SECRET`, redirect URI `http://localhost:3000/api/auth/callback/google`), puis
-appliquer les migrations (tables `auth_*` et `coach_invitation`). Absentes ou trop courtes, seuls
+appliquer les migrations (tables `auth_*` et `staff_member`). Absentes ou trop courtes, seuls
 l'admin et les liens sont indisponibles (503, avec un log qui dit quoi corriger) : le webhook et
 les MCP continuent de tourner. Pas de connexion Google sur les previews Vercel (Google n'accepte
 pas d'URL joker).

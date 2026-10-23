@@ -11,7 +11,7 @@ import { deliverMagicLink } from "./magicLinkCapture";
  *
  * - **Athletes** sign in with a magic link that the agent sends on WhatsApp, the only proof of who
  *   they are. Never by request: the public endpoint is disabled and the link is captured, not sent.
- * - **Coaches** sign in with Google, on invitation only.
+ * - **Staff** (the backoffice team: admins, coaches) sign in with Google, on invitation only.
  *
  * Built by a factory so the specs run it on Better Auth's memory adapter; `inigoAuth()` in
  * `./auth` builds the real one on Neon.
@@ -27,8 +27,8 @@ export interface InigoAuthDeps {
   env: Pick<AuthEnv, "secret" | "baseUrl" | "googleClientId" | "googleClientSecret">;
   /** Better Auth's database adapter: Drizzle on Neon, or memory in the specs. */
   database: Parameters<typeof betterAuth>[0]["database"];
-  /** Whether this (lower-cased) email has been invited to coach. */
-  isInvitedCoach: (email: string) => Promise<boolean>;
+  /** Whether this (lower-cased) email is a member of the backoffice team. */
+  isStaffMember: (email: string) => Promise<boolean>;
 }
 
 export function createInigoAuth(deps: InigoAuthDeps) {
@@ -40,7 +40,9 @@ export function createInigoAuth(deps: InigoAuthDeps) {
     // Better Auth's own names are kept in code; the tables are `auth_*` (see `@inigo/db`).
     user: {
       additionalFields: {
-        role: { type: "string", required: true, input: false }
+        role: { type: "string", required: true, input: false },
+        /** The athlete this user is (foreign key to `athlete`); null for staff. */
+        athleteId: { type: "string", required: false, input: false }
       }
     },
     socialProviders: {
@@ -64,10 +66,12 @@ export function createInigoAuth(deps: InigoAuthDeps) {
     databaseHooks: {
       user: {
         create: {
-          // Who a new user is decides their role, once, here: never anything a request sent.
+          // Who a new user is decides their role, once, here: never anything a request sent. An
+          // athlete user is tied to their athlete by a foreign key, so it can only exist for one.
           before: async (user) => {
-            if (athleteIdOf(user.email) !== null) return { data: { ...user, role: "athlete" } };
-            if (await deps.isInvitedCoach(user.email.toLowerCase())) return { data: { ...user, role: "coach" } };
+            const athleteId = athleteIdOf(user.email);
+            if (athleteId !== null) return { data: { ...user, role: "athlete", athleteId } };
+            if (await deps.isStaffMember(user.email.toLowerCase())) return { data: { ...user, role: "staff", athleteId: null } };
             throw new APIError("FORBIDDEN", { message: "This account has not been invited." });
           }
         }

@@ -75,7 +75,7 @@ describe("startIntervalsConnection", () => {
   it.each([
     ["a link that could not sign in (used or past its hour)", { state: SignInState.SignedOut }, true, ConnectionResult.ExpiredLink],
     ["a visit with no link and no session", { state: SignInState.SignedOut }, false, ConnectionResult.InvalidLink],
-    ["a coach's session", { state: SignInState.Coach, email: "coach@example.com", name: null }, false, ConnectionResult.InvalidLink],
+    ["a staff member's session", { state: SignInState.Staff, email: "staff@example.com", name: null }, false, ConnectionResult.InvalidLink],
     ["a deployment without sign in", { state: SignInState.Unavailable }, false, ConnectionResult.Unavailable]
   ] as const)("refuses %s, starting no flow", async (_label, signedIn, linkFailed, status) => {
     const oauth = fakeOAuth();
@@ -186,8 +186,8 @@ describe("completeIntervalsConnection", () => {
     ["this browser did not start the flow", async () => callback(null), {}, ConnectionResult.SessionMismatch],
     ["this browser is not signed in", async () => callback(undefined, { state: SignInState.SignedOut }), {}, ConnectionResult.InvalidLink],
     [
-      "this browser is a coach's",
-      async () => callback(undefined, { state: SignInState.Coach, email: "coach@example.com", name: null }),
+      "this browser is a staff member's",
+      async () => callback(undefined, { state: SignInState.Staff, email: "staff@example.com", name: null }),
       {},
       ConnectionResult.InvalidLink
     ],

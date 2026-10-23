@@ -20,8 +20,8 @@ import type { WhatsappGatewayRepository } from "./repositories/whatsappGatewayRe
 import { createDrizzleOnboardingSettingsRepository } from "./repositories/drizzleOnboardingSettingsRepository";
 import type { OnboardingSettingsRepository } from "./repositories/onboardingSettingsRepository";
 import type { GatewayAlerter } from "./alerts/gatewayAlerter";
-import { createDrizzleCoachRepository } from "./repositories/drizzleCoachRepository";
-import type { CoachRepository } from "./repositories/coachRepository";
+import { createDrizzleStaffRepository } from "./repositories/drizzleStaffRepository";
+import type { StaffRepository } from "./repositories/staffRepository";
 import { createLogAndSlackAlerter, slackWebhookUrlFromEnv } from "./alerts/logAndSlackAlerter";
 
 export interface Deps {
@@ -46,8 +46,8 @@ export interface Deps {
   onboardingSettings: OnboardingSettingsRepository;
   /** Tells a human the WhatsApp gateway session is down or back (log, plus Slack when set). */
   alerter: GatewayAlerter;
-  /** The coaches invited to the admin (INI-85). */
-  coaches: CoachRepository;
+  /** The backoffice team (INI-85). */
+  staff: StaffRepository;
 }
 
 let cached: Deps | null = null;
@@ -80,7 +80,7 @@ export function getDeps(): Deps {
       whatsappGateway: createDrizzleWhatsappGatewayRepository(db),
       onboardingSettings: createDrizzleOnboardingSettingsRepository(db),
       alerter: createLogAndSlackAlerter({ slackWebhookUrl: slackWebhookUrlFromEnv() }),
-      coaches: createDrizzleCoachRepository(db)
+      staff: createDrizzleStaffRepository(db)
     };
   }
   return cached;

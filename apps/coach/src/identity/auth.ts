@@ -1,6 +1,6 @@
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { authAccount, authSession, authUser, authVerification, createDb } from "@inigo/db";
-import { createDrizzleCoachRepository } from "../repositories/drizzleCoachRepository";
+import { createDrizzleStaffRepository } from "../repositories/drizzleStaffRepository";
 import { authEnv } from "./authEnv";
 import { createInigoAuth, type InigoAuth } from "./betterAuth";
 
@@ -18,7 +18,7 @@ export function inigoAuth(): InigoAuth | null {
   const env = authEnv();
   if (!env) return null;
   const db = createDb(env.databaseUrl);
-  const coaches = createDrizzleCoachRepository(db);
+  const staff = createDrizzleStaffRepository(db);
   cached = createInigoAuth({
     env,
     // `neon-http` has no interactive transaction; Better Auth needs none on Postgres.
@@ -27,7 +27,7 @@ export function inigoAuth(): InigoAuth | null {
       transaction: false,
       schema: { user: authUser, session: authSession, account: authAccount, verification: authVerification }
     }),
-    isInvitedCoach: (email) => coaches.isInvited(email)
+    isStaffMember: (email) => staff.isMember(email)
   });
   return cached;
 }

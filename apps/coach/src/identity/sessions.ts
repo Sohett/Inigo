@@ -1,6 +1,6 @@
 import { SignInState, type SignedIn } from "../domain/signedIn";
 import type { AthleteLinkIssuer } from "../use-cases/createAthleteLink";
-import { athleteEmail, athleteIdOf } from "./athleteEmail";
+import { athleteEmail } from "./athleteEmail";
 import { inigoAuth } from "./auth";
 import { MAGIC_LINK_TTL_SECONDS, type InigoAuth } from "./betterAuth";
 import { captureMagicLink } from "./magicLinkCapture";
@@ -15,12 +15,11 @@ export async function whoIsSignedIn(headers: Headers, auth: InigoAuth | null = i
   if (!session) return { state: SignInState.SignedOut };
   const { user } = session;
   switch (user.role) {
-    case "athlete": {
-      const athleteId = athleteIdOf(user.email);
-      return athleteId ? { state: SignInState.Athlete, athleteId } : { state: SignInState.SignedOut };
-    }
-    case "coach":
-      return { state: SignInState.Coach, email: user.email, name: user.name === "" ? null : user.name };
+    // The athlete comes from the foreign key, never from parsing the email.
+    case "athlete":
+      return user.athleteId ? { state: SignInState.Athlete, athleteId: user.athleteId } : { state: SignInState.SignedOut };
+    case "staff":
+      return { state: SignInState.Staff, email: user.email, name: user.name === "" ? null : user.name };
     default:
       return { state: SignInState.SignedOut };
   }

@@ -13,14 +13,14 @@ export const metadata: Metadata = {
 };
 
 /**
- * The admin's sign in (INI-85): Google only, and only for an invited coach. A coach already
- * signed in goes straight to the admin. Better Auth sends a refused sign in back here with
+ * The backoffice sign in (INI-85): Google only, and only for an invited staff member. A member
+ * already signed in goes straight to the admin. Better Auth sends a refused sign in back here with
  * `?error=`.
  */
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string | string[] }> }) {
   const { error } = await searchParams;
   const signedIn = await whoIsSignedIn(await headers());
-  if (signedIn.state === SignInState.Coach) redirect("/admin");
+  if (signedIn.state === SignInState.Staff) redirect("/admin");
 
   return (
     <main className="flex min-h-dvh items-center justify-center bg-background px-4 py-10">
@@ -28,7 +28,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         <p className="text-center text-sm font-semibold tracking-[0.2em] text-muted-foreground uppercase">Inigo</p>
         <section className="grid gap-4 rounded-xl border bg-card p-6 text-card-foreground shadow-sm">
           <h1 className="text-xl font-semibold tracking-tight">Admin Inigo</h1>
-          <p className="text-sm text-muted-foreground">Réservé aux coachs invités, avec leur compte Google.</p>
+          <p className="text-sm text-muted-foreground">Réservé à l'équipe Inigo, sur invitation, avec un compte Google.</p>
           {signedIn.state === SignInState.Unavailable ? (
             <p className="text-sm text-destructive">La connexion n'est pas configurée sur ce serveur.</p>
           ) : (
@@ -36,11 +36,11 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           )}
           {error !== undefined ? (
             <p className="text-sm text-destructive">
-              Connexion refusée. Seul un compte Google invité par un coach peut entrer. Demande une invitation.
+              Connexion refusée. Seul un compte Google invité par l'équipe peut entrer. Demande une invitation.
             </p>
           ) : null}
           {signedIn.state === SignInState.Athlete ? (
-            <p className="text-sm text-muted-foreground">Ce navigateur est connecté comme athlète : l'admin est réservé aux coachs.</p>
+            <p className="text-sm text-muted-foreground">Ce navigateur est connecté comme athlète : l'admin est réservé à l'équipe.</p>
           ) : null}
         </section>
       </div>

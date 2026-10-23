@@ -1,5 +1,5 @@
 {
-  "id": "542f2783-2adb-40de-a596-895f50c73343",
+  "id": "a0906da3-dd2a-45a0-a6ad-08af807256f0",
   "prevId": "30d92b54-e0a2-498e-8da9-45d5b5af6a4a",
   "version": "7",
   "dialect": "postgresql",
@@ -1141,6 +1141,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "athlete_id": {
+          "name": "athlete_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -1157,7 +1163,21 @@
         }
       },
       "indexes": {},
-      "foreignKeys": {},
+      "foreignKeys": {
+        "auth_user_athlete_id_athlete_id_fk": {
+          "name": "auth_user_athlete_id_athlete_id_fk",
+          "tableFrom": "auth_user",
+          "tableTo": "athlete",
+          "columnsFrom": [
+            "athlete_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "auth_user_email_unique": {
@@ -1166,13 +1186,24 @@
           "columns": [
             "email"
           ]
+        },
+        "auth_user_athlete_id_unique": {
+          "name": "auth_user_athlete_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "athlete_id"
+          ]
         }
       },
       "policies": {},
       "checkConstraints": {
         "auth_user_role_check": {
           "name": "auth_user_role_check",
-          "value": "\"auth_user\".\"role\" in ('athlete', 'coach')"
+          "value": "\"auth_user\".\"role\" in ('athlete', 'staff')"
+        },
+        "auth_user_athlete_check": {
+          "name": "auth_user_athlete_check",
+          "value": "(\"auth_user\".\"role\" = 'athlete') = (\"auth_user\".\"athlete_id\" is not null)"
         }
       },
       "isRLSEnabled": false
@@ -1242,43 +1273,6 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.coach_invitation": {
-      "name": "coach_invitation",
-      "schema": "",
-      "columns": {
-        "email": {
-          "name": "email",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "invited_by": {
-          "name": "invited_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "coach_invitation_email_lowercase_check": {
-          "name": "coach_invitation_email_lowercase_check",
-          "value": "\"coach_invitation\".\"email\" = lower(\"coach_invitation\".\"email\")"
-        }
-      },
       "isRLSEnabled": false
     },
     "public.goal": {
@@ -1579,6 +1573,53 @@
         "plan_block_dates_check": {
           "name": "plan_block_dates_check",
           "value": "\"plan_block\".\"end_date\" >= \"plan_block\".\"start_date\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.staff_member": {
+      "name": "staff_member",
+      "schema": "",
+      "columns": {
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "roles": {
+          "name": "roles",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "invited_by": {
+          "name": "invited_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "invited_at": {
+          "name": "invited_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "staff_member_email_lowercase_check": {
+          "name": "staff_member_email_lowercase_check",
+          "value": "\"staff_member\".\"email\" = lower(\"staff_member\".\"email\")"
+        },
+        "staff_member_roles_check": {
+          "name": "staff_member_roles_check",
+          "value": "cardinality(\"staff_member\".\"roles\") > 0 and \"staff_member\".\"roles\" <@ array['admin', 'coach']::text[]"
         }
       },
       "isRLSEnabled": false

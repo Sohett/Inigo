@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { AS_ATHLETE, AS_COACH } from "../../../../src/identity/sessions.fake";
+import { AS_ATHLETE, AS_STAFF } from "../../../../src/identity/sessions.fake";
 
 const setWhatsappNumber = vi.fn();
 
@@ -8,7 +8,7 @@ vi.mock("../../../../src/deps", () => ({
   getDeps: () => ({ whatsappGateway: { setWhatsappNumber } })
 }));
 
-function post(body: unknown, headers: Record<string, string> = { ...AS_COACH }) {
+function post(body: unknown, headers: Record<string, string> = { ...AS_STAFF }) {
   return new Request("http://localhost/api/admin/whatsapp-number", {
     method: "POST",
     headers: { "content-type": "application/json", ...headers },
