@@ -16,6 +16,8 @@ vi.mock("../../../../src/intervals/oauth/intervalsOAuth", () => ({ intervalsOAut
 vi.mock("../../../../src/use-cases/completeIntervalsConnection", () => ({
   createCompleteIntervalsConnection: () => ({ execute })
 }));
+const SIGNED_IN = { state: "athlete", athleteId: "550e8400-e29b-41d4-a716-446655440000" };
+vi.mock("../../../../src/identity/sessions", () => ({ whoIsSignedIn: async () => SIGNED_IN }));
 
 beforeEach(() => {
   execute.mockReset();
@@ -34,10 +36,10 @@ describe("GET /connect/intervals/callback", () => {
     execute.mockResolvedValue({ result: "connected", agent: "notified" });
     const { GET } = await import("./route");
 
-    const flow = { state: "s.t~n", codeVerifier: "v" };
-    const response = await GET(callback("code=abc&state=s.t~n", connectionFlowCookie(flow).split(";")[0]));
+    const flow = { state: "random-state", codeVerifier: "v" };
+    const response = await GET(callback("code=abc&state=random-state", connectionFlowCookie(flow).split(";")[0]));
 
-    expect(execute).toHaveBeenCalledWith({ query: new URLSearchParams("code=abc&state=s.t~n"), flow });
+    expect(execute).toHaveBeenCalledWith({ query: new URLSearchParams("code=abc&state=random-state"), flow, signedIn: SIGNED_IN });
     expect(response.status).toBe(303);
     expect(response.headers.get("location")).toBe("https://app.inigo-coach.com/connect/intervals/done?result=connected");
     expect(response.headers.get("cache-control")).toBe("no-store");
@@ -49,9 +51,13 @@ describe("GET /connect/intervals/callback", () => {
     execute.mockResolvedValue({ result: "denied" });
     const { GET } = await import("./route");
 
-    const response = await GET(callback("error=access_denied&state=s.t"));
+    const response = await GET(callback("error=access_denied&state=random-state"));
 
-    expect(execute).toHaveBeenCalledWith({ query: new URLSearchParams("error=access_denied&state=s.t"), flow: undefined });
+    expect(execute).toHaveBeenCalledWith({
+      query: new URLSearchParams("error=access_denied&state=random-state"),
+      flow: undefined,
+      signedIn: SIGNED_IN
+    });
     expect(response.headers.get("location")).toContain("result=denied");
   });
 

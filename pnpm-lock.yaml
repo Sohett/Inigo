@@ -71,9 +71,6 @@ importers:
       drizzle-orm:
         specifier: ^0.45.4
         version: 0.45.4(@neondatabase/serverless@1.1.0)(kysely@0.29.7)
-      jose:
-        specifier: ^6.2.12
-        version: 6.2.12
       lucide-react:
         specifier: ^1.21.0
         version: 1.21.0(react@19.2.7)

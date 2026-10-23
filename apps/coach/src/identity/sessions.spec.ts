@@ -1,0 +1,78 @@
+import { describe, expect, it } from "vitest";
+import { memoryAdapter } from "better-auth/adapters/memory";
+import { SignInState } from "../domain/signedIn";
+import { athleteEmail } from "./athleteEmail";
+import { createInigoAuth, type InigoAuth } from "./betterAuth";
+import { magicLinkIssuer, whoIsSignedIn } from "./sessions";
+
+const ATHLETE = { id: "6f1c2a4e-8b3d-4c5e-9f70-1a2b3c4d5e6f", displayName: "Thomas" };
+const NOW = new Date("2026-10-15T10:00:00Z");
+
+function makeAuth() {
+  return createInigoAuth({
+    env: {
+      secret: "a-test-secret-that-is-long-enough-123456",
+      baseUrl: "http://localhost:3000",
+      googleClientId: "google-client",
+      googleClientSecret: "google-secret"
+    },
+    database: memoryAdapter({ user: [], session: [], account: [], verification: [] }),
+    isInvitedCoach: async (email) => email === "coach@example.com"
+  });
+}
+
+async function cookieOf(response: Response): Promise<Headers> {
+  return new Headers({ cookie: response.headers.getSetCookie().map((entry) => entry.split(";")[0]).join("; ") });
+}
+
+describe("magicLinkIssuer", () => {
+  it("is null when sign in is not configured", () => {
+    expect(magicLinkIssuer(null)).toBeNull();
+  });
+
+  it("makes a link that signs the athlete in and lands on the page, also on error, valid one hour", async () => {
+    const auth = makeAuth();
+    const { url, expiresAt } = await magicLinkIssuer(auth, () => NOW)!.issue(ATHLETE, "/connect/intervals");
+
+    const params = new URL(url).searchParams;
+    expect(params.get("callbackURL")).toBe("/connect/intervals");
+    expect(params.get("errorCallbackURL")).toBe("/connect/intervals");
+    expect(expiresAt.toISOString()).toBe("2026-10-15T11:00:00.000Z");
+
+    const signedIn = await whoIsSignedIn(await cookieOf(await auth.handler(new Request(url))), auth);
+    expect(signedIn).toEqual({ state: SignInState.Athlete, athleteId: ATHLETE.id });
+  });
+});
+
+describe("whoIsSignedIn", () => {
+  it("reads unavailable when sign in is not configured", async () => {
+    expect(await whoIsSignedIn(new Headers(), null)).toEqual({ state: SignInState.Unavailable });
+  });
+
+  it("reads signed out without a session cookie, or with a forged one", async () => {
+    const auth = makeAuth();
+    expect(await whoIsSignedIn(new Headers(), auth)).toEqual({ state: SignInState.SignedOut });
+    expect(await whoIsSignedIn(new Headers({ cookie: "better-auth.session_token=forged" }), auth)).toEqual({
+      state: SignInState.SignedOut
+    });
+  });
+
+  /** An auth whose session belongs to this user: the mapping is ours, the session Better Auth's. */
+  const authWith = (user: { email: string; name: string; role: string }) =>
+    ({ api: { getSession: async () => ({ user, session: {} }) } }) as unknown as InigoAuth;
+
+  it("reads a coach's session as a coach", async () => {
+    const auth = authWith({ email: "coach@example.com", name: "Coach", role: "coach" });
+    expect(await whoIsSignedIn(new Headers(), auth)).toEqual({ state: SignInState.Coach, email: "coach@example.com", name: "Coach" });
+  });
+
+  it("never reads a coach as an athlete, nor an athlete user without an athlete email", async () => {
+    const coachWithAthleteRole = authWith({ email: "coach@example.com", name: "Coach", role: "athlete" });
+    expect(await whoIsSignedIn(new Headers(), coachWithAthleteRole)).toEqual({ state: SignInState.SignedOut });
+  });
+
+  it("reads an unknown role as signed out", async () => {
+    const auth = authWith({ email: athleteEmail(ATHLETE.id), name: "", role: "admin" });
+    expect(await whoIsSignedIn(new Headers(), auth)).toEqual({ state: SignInState.SignedOut });
+  });
+});

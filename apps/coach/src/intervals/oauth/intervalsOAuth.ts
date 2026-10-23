@@ -21,20 +21,14 @@ const AUTHORIZATION_SERVER: oauth.AuthorizationServer = {
 
 /**
  * What the browser that starts a flow keeps (in an HttpOnly cookie) until Intervals.icu sends it
- * back: the `state` sent, `<link token>~<random>`, and the PKCE verifier. The callback only
- * accepts the `state` this browser holds, and only this browser's verifier redeems the code: a
- * flow started elsewhere, or a stolen code, connects nothing (OAuth login CSRF, code injection).
+ * back: the random `state` sent, and the PKCE verifier. The callback only accepts the `state`
+ * this browser holds, and only this browser's verifier redeems the code: a flow started
+ * elsewhere, or a stolen code, connects nothing (OAuth login CSRF, code injection). Which athlete
+ * connects comes from their session (INI-85), not from the flow.
  */
 export interface ConnectionFlow {
   state: string;
   codeVerifier: string;
-}
-
-/** The link token inside a flow's `state`, or null when the state is not one of ours. */
-export function linkTokenOf(state: string): string | null {
-  const [token, random, extra] = state.split("~");
-  if (!token || !random || extra !== undefined) return null;
-  return token;
 }
 
 /** What a successful exchange gives. Never logged: it carries the token. */
@@ -62,8 +56,8 @@ export type CallbackOutcome =
 
 /** Port: the two ends of the flow. Outages throw; everything else is an outcome. */
 export interface IntervalsOAuthClient {
-  /** Intervals.icu's consent page for this link, and the flow to keep in the browser. */
-  begin(linkToken: string): Promise<{ authorizeUrl: string; flow: ConnectionFlow }>;
+  /** Intervals.icu's consent page, and the flow to keep in the browser. */
+  begin(): Promise<{ authorizeUrl: string; flow: ConnectionFlow }>;
   /** Check the callback against the browser's flow, then trade the code for a token. */
   complete(callback: URLSearchParams, flow: ConnectionFlow): Promise<CallbackOutcome>;
 }
@@ -107,9 +101,9 @@ export function createIntervalsOAuthClient(
   const timeoutMs = options.timeoutMs ?? 15_000;
 
   return {
-    async begin(linkToken) {
+    async begin() {
       const flow: ConnectionFlow = {
-        state: `${linkToken}~${oauth.generateRandomState()}`,
+        state: oauth.generateRandomState(),
         codeVerifier: oauth.generateRandomCodeVerifier()
       };
       const url = new URL(AUTHORIZATION_SERVER.authorization_endpoint ?? "");

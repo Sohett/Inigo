@@ -1,12 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Athlete } from "../domain/athlete";
 import { ConnectionResult } from "../domain/intervalsConnection";
-import { signConnectLinkToken } from "../intervals/oauth/connectLinkToken";
+import { SignInState, type SignedIn } from "../domain/signedIn";
 import type { IntervalsOAuthConfig } from "../intervals/oauth/credentials";
 import type { CallbackOutcome, ConnectionFlow, IntervalsOAuth } from "../intervals/oauth/intervalsOAuth";
 import { AssessStatus, type AssessOnboardingOutcome } from "./assessOnboarding";
 import { AgentNotice, createCompleteIntervalsConnection, type ConnectionCallback } from "./completeIntervalsConnection";
-import { createCreateIntervalsConnectLink } from "./createIntervalsConnectLink";
 import { createStartIntervalsConnection } from "./startIntervalsConnection";
 
 const NOW = new Date("2026-10-15T10:00:00Z");
@@ -32,19 +31,16 @@ const EXCHANGED: CallbackOutcome = {
   token: { accessToken: "token-123", scopes: ALL_SCOPES, intervalsAthleteId: "i42", athleteName: "Thomas" }
 };
 
-/** The link token, as in the link sent on WhatsApp. */
-const link = async (now = NOW) => (await signConnectLinkToken(ATHLETE.id, CONFIG.clientSecret, now)).token;
-/** The flow this browser keeps in its cookie: the link in the `state`, and a PKCE verifier. */
-const flowFor = async (now = NOW): Promise<ConnectionFlow> => ({ state: `${await link(now)}~random`, codeVerifier: "verifier" });
+/** This browser, signed in as the athlete by the magic link they opened (INI-85). */
+const SIGNED_IN: SignedIn = { state: SignInState.Athlete, athleteId: ATHLETE.id };
+/** The flow this browser keeps in its cookie: a random `state` and a PKCE verifier. */
+const FLOW: ConnectionFlow = { state: "random-state", codeVerifier: "verifier" };
 const CALLBACK = new URLSearchParams("code=code-1&state=whatever");
 
-/** An OAuth client whose `complete` answers `outcome`; `begin` echoes the link it was given. */
+/** An OAuth client whose `complete` answers `outcome`, and whose `begin` draws `FLOW`. */
 function fakeOAuth(outcome: CallbackOutcome = EXCHANGED) {
   const client = {
-    begin: vi.fn(async (linkToken: string) => ({
-      authorizeUrl: `https://intervals.icu/oauth/authorize?state=${linkToken}~random`,
-      flow: { state: `${linkToken}~random`, codeVerifier: "verifier" }
-    })),
+    begin: vi.fn(async () => ({ authorizeUrl: `https://intervals.icu/oauth/authorize?state=${FLOW.state}`, flow: FLOW })),
     complete: vi.fn(async () => outcome)
   };
   return { config: CONFIG, client } satisfies IntervalsOAuth;
@@ -57,66 +53,47 @@ beforeEach(() => {
 });
 afterEach(() => vi.restoreAllMocks());
 
-describe("createIntervalsConnectLink", () => {
-  const findById = vi.fn(async (id: string) => (id === ATHLETE.id ? ATHLETE : null));
-
-  it("gives a signed link to our page, valid 72 hours", async () => {
-    const useCase = createCreateIntervalsConnectLink({ oauth: CONFIG, repo: { findById }, now: () => NOW });
-    const outcome = await useCase.execute(ATHLETE.id);
-    const expected = await link();
-
-    expect(outcome).toEqual({ status: "link", url: expect.any(String), expiresAt: "2026-10-18T10:00:00.000Z" });
-    const url = new URL(outcome.status === "link" ? outcome.url : "");
-    expect(`${url.origin}${url.pathname}`).toBe("https://app.inigo-coach.com/connect/intervals");
-    expect(url.searchParams.get("t")).toBe(expected);
-  });
-
-  it("says the connection is unavailable when the OAuth app is not configured", async () => {
-    const outcome = await createCreateIntervalsConnectLink({ oauth: null, repo: { findById } }).execute(ATHLETE.id);
-    expect(outcome.status).toBe("oauth_unavailable");
-  });
-
-  it("refuses an athlete that does not exist", async () => {
-    const useCase = createCreateIntervalsConnectLink({ oauth: CONFIG, repo: { findById } });
-    expect((await useCase.execute("11111111-1111-4111-8111-111111111111")).status).toBe("unknown_athlete");
-  });
-});
-
 describe("startIntervalsConnection", () => {
   const start = (oauth: IntervalsOAuth | null = fakeOAuth(), athlete: Athlete | null = ATHLETE) =>
-    createStartIntervalsConnection({ oauth, repo: { findById: vi.fn(async () => athlete) }, now: () => NOW });
+    createStartIntervalsConnection({ oauth, repo: { findById: vi.fn(async () => athlete) } });
 
-  it("says whose account the link connects, and starts a flow for this link", async () => {
+  it("says whose account the page connects, and starts a flow for the signed in athlete", async () => {
     const oauth = fakeOAuth();
-    const token = await link();
-    const outcome = await start(oauth).execute(token);
+    const outcome = await start(oauth).execute({ signedIn: SIGNED_IN, linkFailed: false });
     if (outcome.status !== "ready") throw new Error(`expected ready, got ${outcome.status}`);
 
     expect(outcome.holder).toEqual({ displayName: "Thomas", phoneHint: "01" });
-    expect(oauth.client.begin).toHaveBeenCalledWith(token);
-    expect(outcome.flow).toEqual({ state: `${token}~random`, codeVerifier: "verifier" });
-    expect(outcome.authorizeUrl).toContain(`state=${token}~random`);
+    expect(oauth.client.begin).toHaveBeenCalled();
+    expect(outcome.flow).toEqual(FLOW);
+  });
+
+  it("still shows the page on a second click of a used link, from the browser it signed in", async () => {
+    const outcome = await start().execute({ signedIn: SIGNED_IN, linkFailed: true });
+    expect(outcome.status).toBe("ready");
   });
 
   it.each([
-    ["an expired link", async () => link(new Date("2026-10-10T10:00:00Z")), ConnectionResult.ExpiredLink],
-    ["a forged link", async () => `${await link()}x`, ConnectionResult.InvalidLink],
-    ["no link at all", async () => undefined, ConnectionResult.InvalidLink]
-  ])("refuses %s, starting no flow", async (_label, token, status) => {
+    ["a link that could not sign in (used or past its hour)", { state: SignInState.SignedOut }, true, ConnectionResult.ExpiredLink],
+    ["a visit with no link and no session", { state: SignInState.SignedOut }, false, ConnectionResult.InvalidLink],
+    ["a coach's session", { state: SignInState.Coach, email: "coach@example.com", name: null }, false, ConnectionResult.InvalidLink],
+    ["a deployment without sign in", { state: SignInState.Unavailable }, false, ConnectionResult.Unavailable]
+  ] as const)("refuses %s, starting no flow", async (_label, signedIn, linkFailed, status) => {
     const oauth = fakeOAuth();
-    expect(await start(oauth).execute(await token())).toEqual({ status });
+    expect(await start(oauth).execute({ signedIn, linkFailed })).toEqual({ status });
     expect(oauth.client.begin).not.toHaveBeenCalled();
   });
 
   it.each([
     ["is gone", null],
     ["is blocked", { ...ATHLETE, status: "blocked" as const }]
-  ])("refuses a link whose athlete %s", async (_label, athlete) => {
-    expect(await start(fakeOAuth(), athlete).execute(await link())).toEqual({ status: ConnectionResult.InvalidLink });
+  ])("refuses an athlete who %s", async (_label, athlete) => {
+    expect(await start(fakeOAuth(), athlete).execute({ signedIn: SIGNED_IN, linkFailed: false })).toEqual({
+      status: ConnectionResult.InvalidLink
+    });
   });
 
   it("says when OAuth is not configured", async () => {
-    expect(await start(null).execute(await link())).toEqual({ status: ConnectionResult.Unavailable });
+    expect(await start(null).execute({ signedIn: SIGNED_IN, linkFailed: false })).toEqual({ status: ConnectionResult.Unavailable });
   });
 });
 
@@ -153,16 +130,17 @@ describe("completeIntervalsConnection", () => {
   }
 
   /** The callback as it reaches the route, from the browser that started the flow. */
-  const callback = async (flow?: ConnectionFlow | null): Promise<ConnectionCallback> => ({
+  const callback = async (flow?: ConnectionFlow | null, signedIn: SignedIn = SIGNED_IN): Promise<ConnectionCallback> => ({
     query: CALLBACK,
-    flow: flow === null ? undefined : (flow ?? (await flowFor()))
+    flow: flow === null ? undefined : (flow ?? FLOW),
+    signedIn
   });
 
   it("checks the callback against this browser's flow, stores the token, then wakes the onboarding agent", async () => {
     const { useCase, oauth, save, appendUserMessage, calls } = setup();
-    const flow = await flowFor();
+    const flow = FLOW;
 
-    expect(await useCase.execute({ query: CALLBACK, flow })).toEqual({
+    expect(await useCase.execute({ query: CALLBACK, flow, signedIn: SIGNED_IN })).toEqual({
       result: ConnectionResult.Connected,
       agent: AgentNotice.Notified
     });
@@ -206,9 +184,13 @@ describe("completeIntervalsConnection", () => {
     ["Intervals.icu sent another error", async () => callback(), { outcome: { status: "error" } }, ConnectionResult.Failed],
     ["the response is not this browser's flow", async () => callback(), { outcome: { status: "state_mismatch" } }, ConnectionResult.SessionMismatch],
     ["this browser did not start the flow", async () => callback(null), {}, ConnectionResult.SessionMismatch],
-    ["the flow's state is forged", async () => callback({ state: "forged.state~random", codeVerifier: "v" }), {}, ConnectionResult.InvalidLink],
-    ["the flow's state carries no link", async () => callback({ state: await link(), codeVerifier: "v" }), {}, ConnectionResult.InvalidLink],
-    ["the link expired", async () => callback(await flowFor(new Date("2026-10-01T10:00:00Z"))), {}, ConnectionResult.ExpiredLink],
+    ["this browser is not signed in", async () => callback(undefined, { state: SignInState.SignedOut }), {}, ConnectionResult.InvalidLink],
+    [
+      "this browser is a coach's",
+      async () => callback(undefined, { state: SignInState.Coach, email: "coach@example.com", name: null }),
+      {},
+      ConnectionResult.InvalidLink
+    ],
     ["another Intervals.icu account is already connected", async () => callback(), { connectedTo: "i99" }, ConnectionResult.OtherAccount],
     ["the athlete is gone", async () => callback(), { athlete: null }, ConnectionResult.InvalidLink],
     ["the athlete is blocked", async () => callback(), { athlete: { ...ATHLETE, status: "blocked" as const } }, ConnectionResult.InvalidLink],
@@ -230,15 +212,15 @@ describe("completeIntervalsConnection", () => {
   it("says denied for a refusal even without the cookie or the state echoed back, storing nothing", async () => {
     const { useCase, oauth, save } = setup();
     const query = new URLSearchParams("error=access_denied");
-    expect(await useCase.execute({ query, flow: undefined })).toEqual({ result: ConnectionResult.Denied });
-    expect(await useCase.execute({ query, flow: await flowFor() })).toEqual({ result: ConnectionResult.Denied });
+    expect(await useCase.execute({ query, flow: undefined, signedIn: SIGNED_IN })).toEqual({ result: ConnectionResult.Denied });
+    expect(await useCase.execute({ query, flow: FLOW, signedIn: SIGNED_IN })).toEqual({ result: ConnectionResult.Denied });
     expect(oauth.client.complete).not.toHaveBeenCalled();
     expect(save).not.toHaveBeenCalled();
   });
 
-  it("never reaches Intervals.icu for a link it cannot trust", async () => {
+  it("never reaches Intervals.icu for a browser no athlete is signed in on", async () => {
     const { useCase, oauth } = setup();
-    await useCase.execute(await callback({ state: "forged.state~random", codeVerifier: "v" }));
+    await useCase.execute(await callback(undefined, { state: SignInState.SignedOut }));
     expect(oauth.client.complete).not.toHaveBeenCalled();
   });
 

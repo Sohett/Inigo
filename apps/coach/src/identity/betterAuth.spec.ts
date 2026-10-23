@@ -111,7 +111,10 @@ describe("magic links (athletes)", () => {
 describe("user creation (roles)", () => {
   async function createUser(auth: Auth, email: string) {
     const context = await auth.$context;
-    return context.internalAdapter.createUser({ email, name: "Coach", emailVerified: true });
+    return context.internalAdapter.createUser(
+      { email, name: "Coach", emailVerified: true },
+      { method: "oauth", oauth: { providerId: "google" } }
+    );
   }
 
   it("makes an invited email a coach", async () => {
@@ -126,12 +129,10 @@ describe("user creation (roles)", () => {
   it("decides the role from the email, never from what is passed", async () => {
     const auth = makeAuth();
     const context = await auth.$context;
-    const user = await context.internalAdapter.createUser({
-      email: INVITED,
-      name: "Coach",
-      emailVerified: true,
-      role: "athlete"
-    });
+    const user = await context.internalAdapter.createUser(
+      { email: INVITED, name: "Coach", emailVerified: true, role: "athlete" },
+      { method: "oauth", oauth: { providerId: "google" } }
+    );
     expect(user.role).toBe("coach");
   });
 });

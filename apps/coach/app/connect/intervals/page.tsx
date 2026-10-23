@@ -1,33 +1,35 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { getDeps } from "@/deps";
 import { ConnectionResult } from "@/domain/intervalsConnection";
 import { intervalsOAuth } from "@/intervals/oauth/intervalsOAuth";
+import { whoIsSignedIn } from "@/identity/sessions";
 import { createStartIntervalsConnection, type StartConnectionOutcome } from "@/use-cases/startIntervalsConnection";
 import { ActionLink, BackToWhatsapp, ConnectShell } from "./_components/connect-shell";
 import { RESULT_COPY } from "./_components/result-copy";
 import { loadWhatsappNumber } from "./_components/whatsapp-number";
 
-// Every visit verifies its own link: never cached.
+// Every visit reads its own session: never cached.
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Connecter Intervals.icu · Inigo",
   robots: { index: false, follow: false },
-  // The link token is in this page's URL: never hand it to another site as a referrer. Same origin
-  // only, so `/connect/intervals/start` can tell the click came from here.
+  // Same origin only, so `/connect/intervals/start` can tell the click came from here, and no
+  // other site ever learns where the athlete came from.
   referrer: "same-origin"
 };
 
 /**
- * The page a connection link opens (INI-69): whose Inigo account the link connects, what Inigo
- * will do with Intervals.icu, and the button to grant it there. A link that cannot be used says
- * why instead. The button goes through `/connect/intervals/start`, which binds the flow to this
+ * The page a connection link lands on (INI-69): whose Inigo account it connects, what Inigo will
+ * do with Intervals.icu, and the button to grant it there. The link is a magic link that signed
+ * the athlete in on the way (INI-85); one that could not comes back here with `?error=`, and the
+ * page says why. The button goes through `/connect/intervals/start`, which binds the flow to this
  * browser before leaving for Intervals.icu.
  */
-export default async function ConnectIntervalsPage({ searchParams }: { searchParams: Promise<{ t?: string | string[] }> }) {
-  const { t } = await searchParams;
-  const token = typeof t === "string" ? t : undefined;
-  const outcome = await startOutcome(token);
+export default async function ConnectIntervalsPage({ searchParams }: { searchParams: Promise<{ error?: string | string[] }> }) {
+  const { error } = await searchParams;
+  const outcome = await startOutcome(error !== undefined);
 
   if (outcome.status !== "ready") {
     const copy = RESULT_COPY[outcome.status];
@@ -55,7 +57,7 @@ export default async function ConnectIntervalsPage({ searchParams }: { searchPar
         {outcome.holder.phoneHint ? <>, WhatsApp finissant par {outcome.holder.phoneHint}</> : null}. Si ce n&apos;est
         pas toi, ne va pas plus loin.
       </p>
-      <ActionLink href={`/connect/intervals/start?t=${encodeURIComponent(token ?? "")}`}>Connecter Intervals.icu</ActionLink>
+      <ActionLink href="/connect/intervals/start">Connecter Intervals.icu</ActionLink>
       <p className="text-xs text-muted-foreground">
         Tu peux retirer cet accès à tout moment depuis Intervals.icu, dans Settings, Apps.
       </p>
@@ -64,11 +66,12 @@ export default async function ConnectIntervalsPage({ searchParams }: { searchPar
 }
 
 /** A page about a link must never be a 500: an unreadable database reads as a failed attempt. */
-async function startOutcome(token: string | undefined): Promise<StartConnectionOutcome | { status: typeof ConnectionResult.Failed }> {
+async function startOutcome(linkFailed: boolean): Promise<StartConnectionOutcome | { status: typeof ConnectionResult.Failed }> {
   try {
-    return await createStartIntervalsConnection({ oauth: intervalsOAuth(), repo: getDeps().repo }).execute(token);
+    const signedIn = await whoIsSignedIn(await headers());
+    return await createStartIntervalsConnection({ oauth: intervalsOAuth(), repo: getDeps().repo }).execute({ signedIn, linkFailed });
   } catch (error) {
-    console.error("[coach] could not read the Intervals.icu connection link", error);
+    console.error("[coach] could not open the Intervals.icu connection page", error);
     return { status: ConnectionResult.Failed };
   }
 }

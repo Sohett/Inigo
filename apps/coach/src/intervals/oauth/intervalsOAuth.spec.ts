@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import { intervalsOAuthConfig, type IntervalsOAuthConfig } from "./credentials";
-import { createIntervalsOAuthClient, linkTokenOf, normaliseIntervalsAthleteId } from "./intervalsOAuth";
+import { createIntervalsOAuthClient, normaliseIntervalsAthleteId } from "./intervalsOAuth";
 
 const CONFIG: IntervalsOAuthConfig = {
   clientId: "inigo",
@@ -53,7 +53,7 @@ const TOKEN_BODY = {
 describe("createIntervalsOAuthClient", () => {
   describe("begin", () => {
     it("asks Intervals.icu for the coach's scopes, back to our callback, with the state and a PKCE challenge", async () => {
-      const { authorizeUrl, flow } = await createIntervalsOAuthClient(CONFIG).begin("link.token.sig");
+      const { authorizeUrl, flow } = await createIntervalsOAuthClient(CONFIG).begin();
       const url = new URL(authorizeUrl);
 
       expect(`${url.origin}${url.pathname}`).toBe("https://intervals.icu/oauth/authorize");
@@ -65,20 +65,20 @@ describe("createIntervalsOAuthClient", () => {
         code_challenge: createHash("sha256").update(flow.codeVerifier).digest("base64url"),
         code_challenge_method: "S256"
       });
-      expect(linkTokenOf(flow.state)).toBe("link.token.sig");
+      expect(flow.state).toMatch(/^[\w-]{43,}$/);
       expect(flow.codeVerifier).toMatch(/^[\w-]{43,}$/);
     });
 
     it("draws a fresh state and verifier for every flow", async () => {
       const client = createIntervalsOAuthClient(CONFIG);
-      const [a, b] = await Promise.all([client.begin("t"), client.begin("t")]);
+      const [a, b] = await Promise.all([client.begin(), client.begin()]);
       expect(a.flow.state).not.toBe(b.flow.state);
       expect(a.flow.codeVerifier).not.toBe(b.flow.codeVerifier);
     });
   });
 
   describe("complete", () => {
-    const FLOW = { state: "link.token.sig~random-state", codeVerifier: "verifier-0123456789-0123456789-0123456789-xyz" };
+    const FLOW = { state: "random-state", codeVerifier: "verifier-0123456789-0123456789-0123456789-xyz" };
     const query = (params: Record<string, string>) => new URLSearchParams(params);
 
     it("posts the code with this browser's verifier, and reads the token, scopes and athlete", async () => {
