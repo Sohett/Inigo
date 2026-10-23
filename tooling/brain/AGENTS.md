@@ -35,7 +35,8 @@ Outillage dev local pour opérer le brain (Claude Managed Agents). Complète l'`
   versions dans le roster `multiagent` du coordinateur (sinon il délègue aux versions figées), puis
   crée une **nouvelle session** : une session fige la config de l'agent à sa création (seuls
   `tools`/`mcp_servers` changent ensuite), donc une nouvelle version n'a d'effet runtime qu'en
-  (re)créant une session. Lancer `brain:pull` avant (le snapshot est poussé comme état désiré).
+  (re)créant une session. Les athlètes déjà actifs migrent seuls, à leur prochain message (coach,
+  INI-27). Lancer `brain:pull` avant (le snapshot est poussé comme état désiré).
 - **Résilience de lecture** : `snapshot`/`memoryAudit` capturent les erreurs par ressource
   (`errors[]`) et les affichent, plutôt que d'avorter — jamais de silence.
 - **TS strict, pas de `any`.** Imports relatifs sans extension. zod sur l'env.

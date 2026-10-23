@@ -23,6 +23,12 @@ export interface AthleteRepository {
    * agent id alongside so the history always says which agent each session runs.
    */
   setSession(athleteId: string, sessionId: string, agentId: string): Promise<void>;
+  /**
+   * Like `setSession`, but only if `previousSessionId` is still the live session (INI-27): two
+   * messages refreshing the same outdated session at once must not both repoint the athlete. False
+   * when another write got there first, in which case nothing changed.
+   */
+  replaceSession(athleteId: string, previousSessionId: string, sessionId: string, agentId: string): Promise<boolean>;
   /** Every session the athlete has been routed to, newest first, the live one included. */
   listSessions(athleteId: string): Promise<AthleteSession[]>;
   /**

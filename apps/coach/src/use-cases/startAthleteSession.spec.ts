@@ -63,13 +63,17 @@ function makeDeps(
       setSession,
       listSessions: vi.fn(),
       registerOnboardingAthlete: vi.fn(),
+      replaceSession: vi.fn(),
       completeOnboarding: vi.fn()
     },
     brain: {
       appendUserMessage: vi.fn(),
       readSession,
       createSession,
-      listInventory: vi.fn()
+      listInventory: vi.fn(),
+      latestAgentVersion: vi.fn(),
+      readExchanges: vi.fn(),
+      archiveSession: vi.fn()
     },
     settings: {
       get: () =>

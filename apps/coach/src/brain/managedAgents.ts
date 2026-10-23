@@ -3,11 +3,22 @@ import type {
   BrainInventory,
   RunningSession,
   SessionElements,
+  SessionExchange,
   SessionResource
 } from "../domain/brain";
 
 type SessionCreateParams = Parameters<Anthropic["beta"]["sessions"]["create"]>[0];
 type SessionResourceParams = NonNullable<SessionCreateParams["resources"]>[number];
+type SessionEvent = Awaited<ReturnType<Anthropic["beta"]["sessions"]["events"]["list"]>>["data"][number];
+
+/** The MCP tool the agents reply with (`/api/whatsapp/mcp`): its `text` is what the athlete reads. */
+const SEND_WHATSAPP_TOOL = "send_whatsapp_message";
+
+/**
+ * How many recent events `readExchanges` scans. The coordinator calls many other MCP tools between
+ * two WhatsApp messages, so this is sized for a dozen exchanges, not a dozen events.
+ */
+const EXCHANGE_SCAN_LIMIT = 100;
 
 export interface CreateSessionInput extends SessionElements {
   title?: string;
@@ -56,6 +67,19 @@ export interface ManagedAgentBrain {
    * athlete who has none to clone; an athlete with a session never consults this.
    */
   listInventory(): Promise<BrainInventory>;
+
+  /** The agent's latest version: the one a session created now would freeze. */
+  latestAgentVersion(agentId: string): Promise<number>;
+
+  /**
+   * The recent WhatsApp exchanges a session recorded, oldest first: the turns the backend appended
+   * and the messages the agent sent with `send_whatsapp_message`. Nothing else (no reasoning, no
+   * other tool call), so a new session can pick up the thread without inheriting the old context.
+   */
+  readExchanges(sessionId: string): Promise<SessionExchange[]>;
+
+  /** Archive a session the athlete no longer talks to: it stays readable, nothing runs on it again. */
+  archiveSession(sessionId: string): Promise<void>;
 }
 
 /**
@@ -110,6 +134,24 @@ function toResourceParams(resource: SessionResource): SessionResourceParams {
     file_id: resource.fileId,
     ...(resource.mountPath === null ? {} : { mount_path: resource.mountPath })
   } as SessionResourceParams;
+}
+
+/**
+ * One recorded event as a WhatsApp exchange, or null when it is not one: a turn the backend
+ * appended (`user.message`) or a reply the agent sent (`send_whatsapp_message`). Exported for tests.
+ */
+export function toSessionExchange(event: SessionEvent): SessionExchange | null {
+  if (!event.processed_at) return null;
+  const at = new Date(event.processed_at);
+  if (event.type === "user.message") {
+    const text = event.content.flatMap((block) => (block.type === "text" ? [block.text] : [])).join("\n");
+    return { author: "athlete", text, at };
+  }
+  if (event.type === "agent.mcp_tool_use" && event.name === SEND_WHATSAPP_TOOL) {
+    const { text } = event.input;
+    return typeof text === "string" ? { author: "coach", text, at } : null;
+  }
+  return null;
 }
 
 /**
@@ -169,6 +211,28 @@ export function createManagedAgentBrain(anthropic: Anthropic): ManagedAgentBrain
         vaults: vaults.data.map((vault) => ({ id: vault.id, name: vault.display_name })),
         memoryStores: memoryStores.data.map((store) => ({ id: store.id, name: store.name }))
       };
+    },
+
+    async latestAgentVersion(agentId: string): Promise<number> {
+      const agent = await anthropic.beta.agents.retrieve(agentId);
+      return agent.version;
+    },
+
+    async readExchanges(sessionId: string): Promise<SessionExchange[]> {
+      // One page, newest first: only the end of the conversation matters.
+      const page = await anthropic.beta.sessions.events.list(sessionId, {
+        types: ["user.message", "agent.mcp_tool_use"],
+        order: "desc",
+        limit: EXCHANGE_SCAN_LIMIT
+      });
+      return page.data
+        .map(toSessionExchange)
+        .filter((exchange) => exchange !== null)
+        .reverse();
+    },
+
+    async archiveSession(sessionId: string): Promise<void> {
+      await anthropic.beta.sessions.archive(sessionId);
     }
   };
 }

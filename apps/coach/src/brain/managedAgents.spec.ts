@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import type Anthropic from "@anthropic-ai/sdk";
-import { createManagedAgentBrain, toSessionResource } from "./managedAgents";
+import { createManagedAgentBrain, toSessionExchange, toSessionResource } from "./managedAgents";
 
 describe("createManagedAgentBrain", () => {
   it("sends a user.message event to the given session", async () => {
@@ -168,5 +168,60 @@ describe("toSessionResource", () => {
 
   it("refuses an unknown resource type rather than dropping it silently", () => {
     expect(() => toSessionResource({ type: "something_new" })).toThrow(/Unsupported/);
+  });
+});
+
+describe("session exchanges (INI-27)", () => {
+  const AT = "2026-10-20T18:04:00Z";
+
+  it("reads the latest agent version", async () => {
+    const retrieve = vi.fn(() => Promise.resolve({ id: "agent_coord", version: 30 }));
+    const anthropic = { beta: { agents: { retrieve } } } as unknown as Anthropic;
+
+    await expect(createManagedAgentBrain(anthropic).latestAgentVersion("agent_coord")).resolves.toBe(30);
+    expect(retrieve).toHaveBeenCalledWith("agent_coord");
+  });
+
+  it("keeps the turns and the WhatsApp replies, oldest first, from one page of recent events", async () => {
+    const list = vi.fn(() =>
+      Promise.resolve({
+        data: [
+          { type: "agent.mcp_tool_use", name: "send_whatsapp_message", input: { athleteId: "a-1", text: "top" }, processed_at: AT },
+          { type: "agent.mcp_tool_use", name: "get_profile", input: { athleteId: "a-1" }, processed_at: AT },
+          { type: "user.message", content: [{ type: "text", text: 'message: "go"' }], processed_at: "2026-10-20T18:03:00Z" }
+        ]
+      })
+    );
+    const anthropic = { beta: { sessions: { events: { list } } } } as unknown as Anthropic;
+
+    const exchanges = await createManagedAgentBrain(anthropic).readExchanges("sesn_old");
+
+    expect(list).toHaveBeenCalledWith("sesn_old", {
+      types: ["user.message", "agent.mcp_tool_use"],
+      order: "desc",
+      limit: 100
+    });
+    expect(exchanges).toEqual([
+      { author: "athlete", text: 'message: "go"', at: new Date("2026-10-20T18:03:00Z") },
+      { author: "coach", text: "top", at: new Date(AT) }
+    ]);
+  });
+
+  it("drops events that are no exchange", () => {
+    const toExchange = (event: unknown) => toSessionExchange(event as Parameters<typeof toSessionExchange>[0]);
+    // Not processed yet, so not part of the conversation.
+    expect(toExchange({ type: "user.message", content: [{ type: "text", text: "x" }], processed_at: null })).toBeNull();
+    // A send without text.
+    expect(toExchange({ type: "agent.mcp_tool_use", name: "send_whatsapp_message", input: {}, processed_at: AT })).toBeNull();
+    expect(toExchange({ type: "agent.message", content: [], processed_at: AT })).toBeNull();
+  });
+
+  it("archives a session", async () => {
+    const archive = vi.fn(() => Promise.resolve({}));
+    const anthropic = { beta: { sessions: { archive } } } as unknown as Anthropic;
+
+    await createManagedAgentBrain(anthropic).archiveSession("sesn_old");
+
+    expect(archive).toHaveBeenCalledWith("sesn_old");
   });
 });

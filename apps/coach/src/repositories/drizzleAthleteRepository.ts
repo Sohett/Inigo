@@ -108,6 +108,24 @@ export function createDrizzleAthleteRepository(db: Db): AthleteRepository {
         db.insert(athleteSession).values({ athleteId, anthropicSessionId: sessionId, managedAgentId: agentId })
       ]);
     },
+    async replaceSession(athleteId: string, previousSessionId: string, sessionId: string, agentId: string): Promise<boolean> {
+      // Same swap as `setSession`, closing the previous session only if it is still the live one.
+      // If another write already replaced it, the close matches nothing and the insert hits the
+      // one-live-session index: the batch rolls back whole and the caller learns it lost the race.
+      try {
+        await db.batch([
+          db
+            .update(athleteSession)
+            .set({ endedAt: sql`now()` })
+            .where(and(isLiveSessionOf(athleteId), eq(athleteSession.anthropicSessionId, previousSessionId))),
+          db.insert(athleteSession).values({ athleteId, anthropicSessionId: sessionId, managedAgentId: agentId })
+        ]);
+      } catch (error) {
+        if (isUniqueViolation(error)) return false;
+        throw error;
+      }
+      return true;
+    },
     async completeOnboarding(athleteId: string, sessionId: string, agentId: string): Promise<void> {
       // Same swap as `setSession`, with the status change in the same transaction: an athlete is
       // never `active` while still routed to their onboarding session, nor the reverse.

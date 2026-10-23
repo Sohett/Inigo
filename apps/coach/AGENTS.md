@@ -92,6 +92,7 @@ src/
     assessOnboarding.ts            # use-case : état d'onboarding calculé (jamais stocké) ; PORTS OnboardingFactsReader + IntervalsAthleteReader
     blockAthlete.ts                # use-case : statut blocked + log de la raison (outil block_athlete, INI-66)
     handOffToCoordinator.ts        # use-case : onboarding complet → session du coordinateur + statut active, en un db.batch (INI-49)
+    refreshAthleteSession.ts       # use-case SPÉCIFIQUE Managed Agents (INI-27) : implémente TurnSessionResolver ; session sur une version d'agent dépassée → clone + reprise du fil
   alerts/
     gatewayAlerter.ts              # PORT GatewayAlerter (notify ne throw jamais)
     logAndSlackAlerter.ts          # ADAPTER : log structuré [coach][alert] + Slack si SLACK_ALERT_WEBHOOK_URL
@@ -100,7 +101,7 @@ src/
   mappers/
     sessionElements.ts             # sessionElementsFrom : agent + l'environnement, le vault et la knowledge base (read_only) uniques de l'inventaire
     whatsappPayload.ts             # schémas zod + normalisation du payload OpenWA + senderPhone
-  brain/managedAgents.ts           # FRONTIÈRE cerveau : appendUserMessage + readSession + createSession + listInventory
+  brain/managedAgents.ts           # FRONTIÈRE cerveau : appendUserMessage + readSession + createSession + listInventory + latestAgentVersion + readExchanges + archiveSession
   mcp/
     repository/athleteDataRepository.ts  # accès Neon scopé par athlete (createDb → forAthlete(id)), mappe rows→modèles (domain/coaching) ; seul autre layer @inigo/db-aware
     tools/{index,result,profile,thresholds,goals,plan,adaptationLog,constraints,block}.ts  # tools MCP fins (reads + writes gated)
@@ -149,7 +150,10 @@ src/
    (`onboarding_settings.coordinator_agent_id`), puis statut `active` + bascule de session en **un**
    `db.batch` (`completeOnboarding`), et le message part à la nouvelle session via `formatHandoffTurn`
    (ligne `passation:`, ce tour seulement) → `handed_off`. Sans coordinateur utilisable → le message
-   reste à la session d'onboarding (`handoff_not_configured`, warning). Le tour est résolu avant tout
+   reste à la session d'onboarding (`handoff_not_configured`, warning). Un tour qui reste avec
+   l'athlète demande sa session au port `TurnSessionResolver` (session, contexte à porter, puis
+   `delivered()` après l'append) ; aujourd'hui `refreshAthleteSession` (voir « Migration lazy des
+   sessions »). Le tour est résolu avant tout
    autre effet de bord (la passation est le seul, atomique). Puis enregistre ce que le message apprend
    (alias manquant ou changé, `chat_id`) en une écriture (`repo.rememberSender`) et **append** l'enveloppe à **sa** session via `brain.appendUserMessage` (dernier effet de bord → pas de doublon sur
    retry OpenWA). `inigo_athlete_id` = l'`athlete.id` interne (Neon), que l'agent repasse en
@@ -168,6 +172,7 @@ inigo_athlete_id: <uuid>                  # athlete.id, la clé de tous les outi
 athlete_display_name: Thomas              # athlete.display_name, vide tant qu'inconnu
 locale: fr                                # athlete.locale (fr par défaut)
 <lignes propres au tour>                  # onboarding_fait / onboarding_manquant, ou passation:
+reprise_conversation: [{"de":…}]          # premier tour d'une session qui en remplace une périmée (INI-27), sinon absente
 message: "texte de l'athlète"             # JSON.stringify : toujours la dernière ligne
 ```
 
@@ -177,6 +182,54 @@ un faux `inigo_athlete_id:`). Le contrat est décrit dans le prompt du coordinat
 d'onboarding (« Contrat WhatsApp ») : toute modification de l'enveloppe se déploie avec ces deux
 prompts. Le coordinateur reporte la date dans ses task-envelopes sous `date_du_jour`, que lisent les
 spécialistes.
+
+## Migration lazy des sessions (INI-27)
+
+> **Spécifique à Claude Managed Agents.** Tout ce qui suit existe parce qu'une session y fige sa
+> version d'agent. Le routing n'en sait rien : il ne dépend que du port `TurnSessionResolver`
+> (`routeInboundMessage.ts`), dont `refreshAthleteSession` est l'implémentation Managed Agents.
+
+Une session Managed Agents garde **la version d'agent de sa création** : un `brain:agent:apply`
+n'atteint un athlète déjà actif qu'à travers une nouvelle session. `refreshAthleteSession` la
+crée au routing, quand son message arrive (athlète `active`, `paused` ou `onboarding` ; jamais sur
+une passation, qui ouvre déjà une session neuve).
+
+- **Versions lues en direct, jamais stockées** : `sessions.retrieve` (version et statut de la
+  session) et `agents.retrieve` (dernière version de son agent), en parallèle, à chaque message
+  routé. Appels gratuits (pas de tokens). Aucune colonne : une copie pourrait dériver du control plane.
+- **Quand** (switch sur le statut de la session) : `idle` ou `terminated` → migration ;
+  `running` ou `rescheduling` → `busy`, le message part à l'ancienne session et la migration se
+  fera au message suivant (archiver une session qui travaille couperait la réponse en cours).
+- **Comment** : clone de l'ancienne session (même agent, environnement, vaults, ressources), puis
+  `repo.replaceSession` : repointage **conditionnel**, seulement si l'ancienne est toujours la
+  session live. Deux messages d'une même rafale qui migrent en même temps : le second perd (index
+  « une session live par athlète », batch annulé), archive sa session inutilisée et suit celle du
+  premier. La conversation ne se scinde jamais. L'ancienne session est archivée (`retire`, best
+  effort) **après** l'append du premier tour à la nouvelle : un tour qui n'arrive pas la laisse intacte.
+- **Reprise du fil** : le premier tour de la nouvelle session porte `reprise_conversation:`, les
+  **12 derniers messages WhatsApp** (500 caractères max chacun), lus dans les events de l'ancienne
+  session : la ligne `message:` des tours appendés (les tours sans texte, comme
+  `evenement: intervals_connecte`, sont ignorés) et le `text` des `send_whatsapp_message` (ce que
+  l'athlète a lu). Ni raisonnement, ni autres tool calls : les faits durables sont en Neon et sur
+  Intervals.icu, que l'agent relit via MCP. Environ 1 000 tokens, une fois par athlète et par
+  déploiement, contre un contexte d'ancienne session relu à chaque tour.
+- **Jamais un message perdu** : toute panne avant le repointage (lecture des versions, des events,
+  création, écriture Neon) → `failed`, warning loggé, le message part à la session actuelle (pas
+  de 502). Résidu assumé : création acceptée puis append refusé dans la foulée → 502 et retry
+  OpenWA vers la nouvelle session, sans la reprise (on ne la rejoue pas, ce serait un état de plus).
+- **Ordre de déploiement** : un prompt qui change l'enveloppe (ici `reprise_conversation`) est
+  appliqué (`brain:agent:apply`) **avant** le deploy du coach, pour que chaque athlète migre vers
+  un agent qui la connaît.
+
+**Quitter Managed Agents (ou un brain qui garde son propre historique)** : remplacer, dans
+`app/api/webhooks/whatsapp/route.ts`, `turnSession: createRefreshAthleteSession(…)` par un resolver
+qui rend la session de l'athlète, `carryOver: []` et un `delivered` vide. Puis supprimer :
+`use-cases/refreshAthleteSession.ts` (+ spec) ; dans `brain/managedAgents.ts`, `latestAgentVersion`,
+`readExchanges`, `archiveSession`, `toSessionExchange` ; `AthleteRepository.replaceSession` ;
+`turnMessage` (`brain/taskEnvelope.ts`) ; `SessionStatus` (`domain/brain.ts`). Le routing ne change
+pas. Le `carryOver` du port et la ligne `reprise_conversation` sont neutres (un contexte qu'une
+session n'a pas) : à garder si le nouveau brain en a l'usage, sinon à retirer avec leur puce dans
+les prompts.
 
 ## Identification d'un athlète (WhatsApp)
 

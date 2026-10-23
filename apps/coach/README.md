@@ -96,6 +96,8 @@ indisponibles, rien d'autre ne bouge.
    (les précédentes restent dans l'historique) : c'est ce que le routing résout. Rien n'est stocké de la config de session : l'admin lit la
    session que l'athlète fait déjà tourner et la recrée à l'identique. Un nouvel
    athlète arrivé avec le code d'accès a, lui, sa session d'onboarding ouverte automatiquement.
+   Après un déploiement d'agent, pas besoin de ce bouton : le routing ouvre une session sur la
+   nouvelle version au prochain message de chaque athlète, avec la fin de la conversation (INI-27).
    > Les *deployments* Managed servent uniquement aux runs planifiés (cron) ; ici on n'en utilise pas : le coach pousse les messages à une session existante via l'API (`POST /v1/sessions/:id/events`).
 3. **Prompt système de l'agent** : « tu reçois des messages WhatsApp au format
    `date_time: …\ninigo_athlete_id: …\nathlete_display_name: …\nlocale: …\nmessage: "…"`. `inigo_athlete_id` est l'id athlète Inigo

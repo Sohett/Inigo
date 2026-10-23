@@ -4,6 +4,7 @@ import type { Athlete, SenderIdentity } from "../domain/athlete";
 import { ONBOARDING_ITEMS, type OnboardingState } from "../domain/onboarding";
 import type { AthleteRepository } from "../repositories/athleteRepository";
 import type { HandOffOutcome } from "./handOffToCoordinator";
+import type { TurnSession } from "./routeInboundMessage";
 
 // A fixed instant so the `date_time` the envelope carries is deterministic. In the test
 // athlete's timezone (Europe/Brussels) this is Thursday 2026-07-09, 11:05.
@@ -35,6 +36,7 @@ const unusedRepoMethods = () => ({
   setSession: vi.fn(() => Promise.resolve()),
   listSessions: vi.fn(() => Promise.resolve([])),
   registerOnboardingAthlete: vi.fn(() => Promise.resolve(null)),
+  replaceSession: vi.fn(() => Promise.resolve(true)),
   completeOnboarding: vi.fn(() => Promise.resolve())
 });
 const ONBOARDING_STATE: OnboardingState = {
@@ -56,10 +58,13 @@ const fakeHandOff = () => ({
     (): Promise<HandOffOutcome> => Promise.resolve({ status: "handed_off", sessionId: "sesn_coordinator" })
   )
 });
-const unusedBrainMethods = () => ({
-  createSession: vi.fn(() => Promise.resolve({ sessionId: "sesn_unused", agentVersion: 1 })),
-  readSession: vi.fn(),
-  listInventory: vi.fn()
+/** Where a turn goes, tested with `refreshAthleteSession`: by default the athlete's own session. */
+const delivered = vi.fn(() => Promise.resolve());
+const fakeTurnSession = () => ({
+  resolve: vi.fn(
+    (_athlete: Athlete, session: { sessionId: string }): Promise<TurnSession> =>
+      Promise.resolve({ sessionId: session.sessionId, carryOver: [], delivered })
+  )
 });
 
 function makeDeps(athlete: Athlete | null) {
@@ -70,11 +75,13 @@ function makeDeps(athlete: Athlete | null) {
   const register = fakeRegister();
   const assessOnboarding = fakeAssess();
   const handOff = fakeHandOff();
+  const turnSession = fakeTurnSession();
   return {
-    deps: { repo, brain: { appendUserMessage, ...unusedBrainMethods() }, register, assessOnboarding, handOff },
+    deps: { repo, brain: { appendUserMessage }, register, assessOnboarding, handOff, turnSession },
     register,
     assessOnboarding,
     handOff,
+    turnSession,
     appendUserMessage,
     findBySender,
     rememberSender
@@ -261,6 +268,76 @@ describe("routeInboundMessage", () => {
     });
   });
 
+  describe("turn session (INI-27)", () => {
+    const retire = vi.fn(() => Promise.resolve());
+    const MOVED: TurnSession = {
+      sessionId: "sesn_new",
+      carryOver: [{ author: "coach", text: "on garde jeudi ?", at: new Date("2026-07-08T17:00:00Z") }],
+      delivered: retire
+    };
+    const CARRY_OVER_LINE =
+      'reprise_conversation: [{"de":"coach","quand":"2026-07-08 19:00 (mercredi)","texte":"on garde jeudi ?"}]';
+    beforeEach(() => {
+      retire.mockClear();
+      delivered.mockClear();
+    });
+
+    it("sends an active athlete's turn where the resolver says, with what it carries, then reports delivery", async () => {
+      const { deps, appendUserMessage, turnSession } = makeDeps(makeAthlete());
+      turnSession.resolve.mockResolvedValueOnce(MOVED);
+      const outcome = await createRouteInboundMessage(deps).execute(inbound);
+
+      expect(turnSession.resolve).toHaveBeenCalledWith(makeAthlete(), { sessionId: "sesn_abc", agentId: "agent_abc" });
+      expect(appendUserMessage).toHaveBeenCalledWith(
+        "sesn_new",
+        `${DATE_LINE}\ninigo_athlete_id: a-1\nathlete_display_name: Thomas\nlocale: fr\n${CARRY_OVER_LINE}\nmessage: "salut"`
+      );
+      expect(outcome).toMatchObject({ status: "forwarded", sessionId: "sesn_new" });
+      expect(retire).toHaveBeenCalledOnce();
+      expect(appendUserMessage.mock.invocationCallOrder[0]).toBeLessThan(retire.mock.invocationCallOrder[0] ?? 0);
+    });
+
+    it("does not report delivery when the turn does not reach its session", async () => {
+      const { deps, appendUserMessage, turnSession } = makeDeps(makeAthlete());
+      turnSession.resolve.mockResolvedValueOnce(MOVED);
+      appendUserMessage.mockRejectedValueOnce(new Error("anthropic down"));
+
+      await expect(createRouteInboundMessage(deps).execute(inbound)).rejects.toThrow("anthropic down");
+      expect(retire).not.toHaveBeenCalled();
+    });
+
+    it("carries the conversation in an onboarding turn too, after the checklist", async () => {
+      const { deps, appendUserMessage, turnSession } = makeDeps(makeAthlete({ status: "onboarding" }));
+      turnSession.resolve.mockResolvedValueOnce(MOVED);
+      await createRouteInboundMessage(deps).execute(inbound);
+
+      expect(appendUserMessage).toHaveBeenCalledWith(
+        "sesn_new",
+        expect.stringContaining(`onboarding_manquant: goal\n${CARRY_OVER_LINE}\nmessage: "salut"`)
+      );
+    });
+
+    it("never asks for a session the hand-off replaces anyway", async () => {
+      const { deps, assessOnboarding, turnSession } = makeDeps(makeAthlete({ status: "onboarding" }));
+      assessOnboarding.execute.mockResolvedValueOnce({
+        status: "assessed",
+        state: { done: [...ONBOARDING_ITEMS], missing: [], complete: true }
+      });
+      await createRouteInboundMessage(deps).execute(inbound);
+
+      expect(turnSession.resolve).not.toHaveBeenCalled();
+    });
+
+    it("asks nothing for an ended or blocked athlete", async () => {
+      for (const status of ["ended", "blocked"] as const) {
+        const { deps, turnSession } = makeDeps(makeAthlete({ status }));
+        await createRouteInboundMessage(deps).execute(inbound);
+
+        expect(turnSession.resolve).not.toHaveBeenCalled();
+      }
+    });
+  });
+
   it("forwards nothing when the hand-off fails (infra → 502 upstream)", async () => {
     const { deps, appendUserMessage, assessOnboarding, handOff } = makeDeps(makeAthlete({ status: "onboarding" }));
     assessOnboarding.execute.mockResolvedValueOnce({
@@ -362,10 +439,11 @@ describe("routeInboundMessage", () => {
     const appendUserMessage = vi.fn(() => Promise.resolve());
     const deps = {
       repo: { findBySender, rememberSender: vi.fn(() => Promise.resolve()), ...unusedRepoMethods() },
-      brain: { appendUserMessage, ...unusedBrainMethods() },
+      brain: { appendUserMessage },
       register: fakeRegister(),
       assessOnboarding: fakeAssess(),
-      handOff: fakeHandOff()
+      handOff: fakeHandOff(),
+      turnSession: fakeTurnSession()
     };
     await expect(createRouteInboundMessage(deps).execute(inbound)).rejects.toThrow("neon down");
     expect(appendUserMessage).not.toHaveBeenCalled();
@@ -380,10 +458,11 @@ describe("routeInboundMessage", () => {
         rememberSender,
         ...unusedRepoMethods()
       },
-      brain: { appendUserMessage, ...unusedBrainMethods() },
+      brain: { appendUserMessage },
       register: fakeRegister(),
       assessOnboarding: fakeAssess(),
-      handOff: fakeHandOff()
+      handOff: fakeHandOff(),
+      turnSession: fakeTurnSession()
     };
     await expect(createRouteInboundMessage(deps).execute(inbound)).rejects.toThrow("neon down");
     expect(appendUserMessage).not.toHaveBeenCalled();
@@ -397,10 +476,11 @@ describe("routeInboundMessage", () => {
         rememberSender: vi.fn(() => Promise.resolve()),
         ...unusedRepoMethods()
       },
-      brain: { appendUserMessage, ...unusedBrainMethods() },
+      brain: { appendUserMessage },
       register: fakeRegister(),
       assessOnboarding: fakeAssess(),
-      handOff: fakeHandOff()
+      handOff: fakeHandOff(),
+      turnSession: fakeTurnSession()
     };
     await expect(createRouteInboundMessage(deps).execute(inbound)).rejects.toThrow("anthropic 500");
   });

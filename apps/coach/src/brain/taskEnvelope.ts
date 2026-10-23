@@ -1,4 +1,5 @@
 import type { Athlete } from "../domain/athlete";
+import type { SessionExchange } from "../domain/brain";
 import type { OnboardingState } from "../domain/onboarding";
 
 /** What the envelope says about the athlete: who they are, and where and how they live. */
@@ -48,29 +49,76 @@ function formatEnvelope(athlete: EnvelopeAthlete, turnLines: string[], text: str
     `athlete_display_name: ${athlete.displayName ?? ""}`,
     `locale: ${athlete.locale}`,
     ...turnLines,
-    `message: ${JSON.stringify(text)}`
+    `${MESSAGE_PREFIX}${JSON.stringify(text)}`
   ].join("\n");
 }
 
-/** A turn for the coordinator: the envelope and the message, nothing else. */
-export function formatTurn(athlete: EnvelopeAthlete, text: string, now: Date = new Date()): string {
-  return formatEnvelope(athlete, [], text, now);
+const MESSAGE_PREFIX = "message: ";
+
+/**
+ * The athlete's text a recorded turn carried, or null when there is none (an event turn such as
+ * `evenement: intervals_connecte`, or text that is not an envelope). The reverse of the `message`
+ * line: always the last one, JSON-encoded.
+ */
+export function turnMessage(envelope: string): string | null {
+  const lastLine = envelope.slice(envelope.lastIndexOf("\n") + 1);
+  if (!lastLine.startsWith(MESSAGE_PREFIX)) return null;
+  try {
+    const text: unknown = JSON.parse(lastLine.slice(MESSAGE_PREFIX.length));
+    return typeof text === "string" && text !== "" ? text : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The line that hands a new session the end of the WhatsApp conversation (INI-27), oldest first,
+ * each message dated in the athlete's timezone. JSON on one line, like `message`, so nothing the
+ * athlete or the coach wrote can pass for an envelope line. No line at all when there is nothing.
+ */
+function carryOverLines(carryOver: readonly SessionExchange[], timeZone: string): string[] {
+  if (carryOver.length === 0) return [];
+  const exchanges = carryOver.map(({ author, text, at }) => ({
+    de: author,
+    quand: formatDateTime(at, timeZone),
+    texte: text
+  }));
+  return [`reprise_conversation: ${JSON.stringify(exchanges)}`];
+}
+
+/**
+ * A turn for the coordinator: the envelope and the message. The first turn of a session that
+ * replaced an outdated one also carries the end of the previous conversation (`carryOver`).
+ */
+export function formatTurn(
+  athlete: EnvelopeAthlete,
+  text: string,
+  now: Date = new Date(),
+  carryOver: readonly SessionExchange[] = []
+): string {
+  return formatEnvelope(athlete, carryOverLines(carryOver, athlete.timezone), text, now);
 }
 
 /**
  * A turn for the onboarding agent (INI-46): the envelope plus where the athlete stands in the
  * onboarding checklist, so the agent asks only what is still missing and picks up where the
- * athlete left off. An empty list stays an empty line, never omitted.
+ * athlete left off. An empty list stays an empty line, never omitted. Like `formatTurn`, the first
+ * turn of a replacing session carries the end of the previous conversation.
  */
 export function formatOnboardingTurn(
   athlete: EnvelopeAthlete,
   state: OnboardingState,
   text: string,
-  now: Date = new Date()
+  now: Date = new Date(),
+  carryOver: readonly SessionExchange[] = []
 ): string {
   return formatEnvelope(
     athlete,
-    [`onboarding_fait: ${state.done.join(", ")}`, `onboarding_manquant: ${state.missing.join(", ")}`],
+    [
+      `onboarding_fait: ${state.done.join(", ")}`,
+      `onboarding_manquant: ${state.missing.join(", ")}`,
+      ...carryOverLines(carryOver, athlete.timezone)
+    ],
     text,
     now
   );
