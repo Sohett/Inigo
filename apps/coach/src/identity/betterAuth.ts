@@ -86,7 +86,9 @@ export function createInigoAuth(deps: InigoAuthDeps) {
         // Google account (which verifies it) must link to it on their first sign in. The check
         // this relaxes guards against someone signing up first with another's email, which no one
         // can do here: nobody signs up.
-        requireLocalEmailVerified: false
+        requireLocalEmailVerified: false,
+        // The invited user has no name yet: take their Google name (and picture) when it links.
+        updateUserInfoOnLink: true
       }
     },
     socialProviders: {

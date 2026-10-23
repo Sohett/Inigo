@@ -4,6 +4,7 @@ import { SignInState } from "@/domain/signedIn";
 import { staffOnDeployment } from "@/identity/accounts";
 import { whoIsSignedIn } from "@/identity/sessions";
 import { createListStaff } from "@/use-cases/listStaff";
+import { settle } from "@/use-cases/settle";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -32,7 +33,7 @@ export default async function TeamPage() {
   const requestHeaders = await headers();
   const team = staffOnDeployment(requestHeaders);
   const [members, signedIn] = await Promise.all([
-    team ? createListStaff({ staff: team }).execute() : Promise.resolve([]),
+    settle(team ? createListStaff({ staff: team }).execute() : Promise.resolve([])),
     whoIsSignedIn(requestHeaders)
   ]);
   const me = signedIn.state === SignInState.Staff ? signedIn.email : null;
@@ -63,49 +64,53 @@ export default async function TeamPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Membre</TableHead>
-                <TableHead>Rôles</TableHead>
-                <TableHead>Statut</TableHead>
-                <TableHead>Invité le</TableHead>
-                <TableHead className="text-right" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {members.map((member) => (
-                <TableRow key={member.email}>
-                  <TableCell>
-                    <div className="grid">
-                      <span>{member.name ?? member.email}</span>
-                      {member.name ? <span className="text-xs text-muted-foreground">{member.email}</span> : null}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      {member.roles.map((role) => (
-                        <Badge key={role} variant="secondary">
-                          {ROLE_LABEL[role]}
-                        </Badge>
-                      ))}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {member.status === StaffStatus.Active ? <Badge>Actif</Badge> : <Badge variant="outline">Invité</Badge>}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{DATE.format(member.invitedAt)}</TableCell>
-                  <TableCell className="text-right">
-                    {member.email === me ? (
-                      <span className="text-xs text-muted-foreground">Toi</span>
-                    ) : (
-                      <RemoveStaffButton email={member.email} />
-                    )}
-                  </TableCell>
+          {members.error ? (
+            <p className="text-sm text-destructive">Équipe illisible : {members.error}</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Membre</TableHead>
+                  <TableHead>Rôles</TableHead>
+                  <TableHead>Statut</TableHead>
+                  <TableHead>Invité le</TableHead>
+                  <TableHead className="text-right" />
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {(members.value ?? []).map((member) => (
+                  <TableRow key={member.email}>
+                    <TableCell>
+                      <div className="grid">
+                        <span>{member.name ?? member.email}</span>
+                        {member.name ? <span className="text-xs text-muted-foreground">{member.email}</span> : null}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        {member.roles.map((role) => (
+                          <Badge key={role} variant="secondary">
+                            {ROLE_LABEL[role]}
+                          </Badge>
+                        ))}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {member.status === StaffStatus.Active ? <Badge>Actif</Badge> : <Badge variant="outline">Invité</Badge>}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{DATE.format(member.invitedAt)}</TableCell>
+                    <TableCell className="text-right">
+                      {member.email === me ? (
+                        <span className="text-xs text-muted-foreground">Toi</span>
+                      ) : (
+                        <RemoveStaffButton email={member.email} />
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </main>

@@ -1,6 +1,6 @@
 /**
- * The backoffice team (INI-85, INI-87). Invitation only: a member is a user of the coach app from
- * their invitation on, invited until they first sign in with Google, then active. Their roles say what they do (`admin`, `coach`, or
+ * The backoffice team (INI-85, INI-87). Invitation only: a member is a user of the coach app
+ * from their invitation on, invited until they first sign in with Google, then active. Their roles say what they do (`admin`, `coach`, or
  * both); they grant nothing yet: every member has the same access to the backoffice.
  */
 
@@ -16,9 +16,9 @@ export type StaffRole = (typeof StaffRole)[keyof typeof StaffRole];
 export const STAFF_ROLES: readonly StaffRole[] = Object.values(StaffRole);
 
 export const StaffStatus = {
-  /** Invited, never signed in. */
+  /** Invited (their user exists), never signed in yet. */
   Invited: "invited",
-  /** Signed in at least once: has a Better Auth user. */
+  /** Signed in with Google at least once: their account is linked, and their email verified. */
   Active: "active"
 } as const;
 

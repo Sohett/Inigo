@@ -23,21 +23,31 @@ function alreadyExists(error: unknown): boolean {
 
 /** Athletes' users, made by the server itself: creating one needs no session. */
 export function betterAuthAthleteAccounts(auth: InigoAuth): AthleteAccountRepository {
+  const create = (athlete: Parameters<AthleteAccountRepository["ensure"]>[0]) =>
+    auth.api.createUser({
+      body: {
+        email: athleteEmail(athlete.id),
+        name: athlete.displayName ?? "",
+        role: "athlete",
+        // WhatsApp proved who they are; the magic link is how they sign in.
+        data: { athleteId: athlete.id, emailVerified: true }
+      }
+    });
+
   return {
     async ensure(athlete) {
       try {
-        await auth.api.createUser({
-          body: {
-            email: athleteEmail(athlete.id),
-            name: athlete.displayName ?? "",
-            role: "athlete",
-            // WhatsApp proved who they are; the magic link is how they sign in.
-            data: { athleteId: athlete.id, emailVerified: true }
-          }
-        });
+        await create(athlete);
       } catch (error) {
-        // An earlier link, or a concurrent one, made their user already: nothing to do.
-        if (!alreadyExists(error)) throw error;
+        // An earlier link made their user already: nothing to do.
+        if (alreadyExists(error)) return;
+        // A concurrent first link may have inserted it between the plugin's check and its own
+        // insert: the database then refuses ours. Asking once more tells which it was.
+        try {
+          await create(athlete);
+        } catch (retryError) {
+          if (!alreadyExists(retryError)) throw retryError;
+        }
       }
     }
   };
@@ -47,17 +57,27 @@ export function betterAuthAthleteAccounts(auth: InigoAuth): AthleteAccountReposi
  * The backoffice team, acting as the signed in staff member whose request headers are given: the
  * admin plugin checks their session and permissions on every call.
  *
- * Known limit: the plugin's `listUsers` answers an empty list, not an error, when the database
- * fails, so the team page would show nobody rather than an outage.
+ * The plugin's `listUsers` answers an empty list, not an error, when the database fails. The
+ * acting member is a user too, so a list that cannot even see them is an outage, and throws:
+ * the team page and the removal then fail as outages, never as "nobody" or "not a member".
  */
 export function betterAuthStaff(auth: InigoAuth, actor: Headers): StaffRepository {
+  async function databaseAnswers(): Promise<void> {
+    const { users } = await auth.api.listUsers({ query: { limit: 1 }, headers: actor });
+    if (users.length === 0) throw new Error("Better Auth could not list users: the database did not answer.");
+  }
+
   async function staffUserId(email: string): Promise<string | null> {
     const { users } = await auth.api.listUsers({
       query: { filterField: "email", filterOperator: "eq", filterValue: email, limit: 1 },
       headers: actor
     });
     const [user] = users;
-    return user && staffRolesOf(user.role).length > 0 ? user.id : null;
+    if (!user) {
+      await databaseAnswers();
+      return null;
+    }
+    return staffRolesOf(user.role).length > 0 ? user.id : null;
   }
 
   return {
@@ -66,6 +86,8 @@ export function betterAuthStaff(auth: InigoAuth, actor: Headers): StaffRepositor
         query: { filterField: "role", filterOperator: "ne", filterValue: "athlete", sortBy: "createdAt", limit: TEAM_PAGE },
         headers: actor
       });
+      // The acting member is on the team: an empty team is an outage.
+      if (users.length === 0) await databaseAnswers();
       return users.map(
         (user): StaffMember => ({
           email: user.email,

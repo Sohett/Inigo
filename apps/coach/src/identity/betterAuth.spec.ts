@@ -22,12 +22,20 @@ const ATHLETE = { id: "6f1c2a4e-8b3d-4c5e-9f70-1a2b3c4d5e6f", displayName: "Thom
 const THOMAS = "sohet.thomas@gmail.com";
 const THOMAS_GOOGLE = { sub: "google-thomas", email: THOMAS, name: "Thomas Sohet" };
 
-/** The Google account the next callback signs in with. */
-let googleAccount = THOMAS_GOOGLE;
+interface GoogleAccount {
+  sub: string;
+  email: string;
+  name: string;
+  /** Whether Google vouches for the email; true unless a test says otherwise. */
+  emailVerified?: boolean;
+}
 
-function unsignedJwt(claims: Record<string, unknown>): string {
+/** The Google account the next callback signs in with. */
+let googleAccount: GoogleAccount = THOMAS_GOOGLE;
+
+function unsignedJwt({ emailVerified = true, ...claims }: GoogleAccount & { aud: string }): string {
   const part = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
-  return `${part({ alg: "none", typ: "JWT" })}.${part({ ...claims, email_verified: true, iss: "https://accounts.google.com" })}.`;
+  return `${part({ alg: "none", typ: "JWT" })}.${part({ ...claims, email_verified: emailVerified, iss: "https://accounts.google.com" })}.`;
 }
 
 const server = setupServer(
@@ -69,7 +77,7 @@ function cookiesOf(response: Response): string {
 }
 
 /** The whole Google sign in, as the browser does it: start, then come back from Google. */
-async function signInWithGoogle(auth: Auth, account = THOMAS_GOOGLE): Promise<Response> {
+async function signInWithGoogle(auth: Auth, account: GoogleAccount = THOMAS_GOOGLE): Promise<Response> {
   googleAccount = account;
   const start = await auth.handler(
     new Request(`${BASE_URL}/api/auth/sign-in/social`, {
@@ -130,18 +138,37 @@ describe("staff: Google signs in an invited user, never creates one", () => {
     expect(await team.create({ email: "new.coach@example.com", roles: [StaffRole.Coach], invitedBy: THOMAS })).toBe(true);
     expect(await team.create({ email: "new.coach@example.com", roles: [StaffRole.Admin], invitedBy: THOMAS })).toBe(false);
     expect(await team.list()).toMatchObject([
-      { email: THOMAS, roles: ["admin", "coach"], status: StaffStatus.Active },
-      { email: "new.coach@example.com", roles: ["coach"], status: StaffStatus.Invited, invitedBy: THOMAS }
+      { email: THOMAS, roles: ["admin", "coach"], status: StaffStatus.Active, name: "Thomas Sohet" },
+      { email: "new.coach@example.com", roles: ["coach"], status: StaffStatus.Invited, invitedBy: THOMAS, name: null }
     ]);
 
     const coach = new Headers({ cookie: cookiesOf(await signInWithGoogle(auth, coachGoogle)) });
     expect((await whoIsSignedIn(coach, auth)).state).toBe(SignInState.Staff);
-    expect((await team.list())[1]).toMatchObject({ status: StaffStatus.Active });
+    expect((await team.list())[1]).toMatchObject({ status: StaffStatus.Active, name: "Coach" });
 
     expect(await team.remove("new.coach@example.com")).toBe(true);
     expect((await whoIsSignedIn(coach, auth)).state).toBe(SignInState.SignedOut);
     expect((await signInWithGoogle(auth, coachGoogle)).headers.get("location")).toContain("error=signup_disabled");
     expect(await team.remove("new.coach@example.com")).toBe(false);
+  });
+
+  it("refuses a Google account whose email Google does not vouch for, even if invited", async () => {
+    const auth = makeAuth();
+    await inviteThomas(auth);
+    const callback = await signInWithGoogle(auth, { ...THOMAS_GOOGLE, emailVerified: false });
+    expect(callback.headers.get("location")).toContain("error=");
+    expect(await users(auth)).toMatchObject([{ email: THOMAS, emailVerified: false }]);
+  });
+
+  it("never lists an athlete in the team, nor removes one as a member", async () => {
+    const auth = makeAuth();
+    await inviteThomas(auth);
+    await betterAuthAthleteAccounts(auth).ensure(ATHLETE);
+    const team = betterAuthStaff(auth, new Headers({ cookie: cookiesOf(await signInWithGoogle(auth)) }));
+
+    expect((await team.list()).map((member) => member.email)).toEqual([THOMAS]);
+    expect(await team.remove(athleteEmail(ATHLETE.id))).toBe(false);
+    expect(await users(auth)).toHaveLength(2);
   });
 });
 

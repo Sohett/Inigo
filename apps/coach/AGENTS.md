@@ -600,10 +600,10 @@ minuscules. Les sessions (`auth_session`) et le compte Google (`auth_account`) t
 ATHLÈTE (tout part de WhatsApp)
   agent ──get_intervals_connect_link──▶ createAthleteLink(athleteId, destination)
       1. destination → chemin (enum fermée : intervals_connect → /connect/intervals)
-      2. athletes.findById                         (AthleteRepository, Drizzle)
-      3. athleteAccounts.ensure(athlete)           (AthleteAccountRepository → auth.api.createUser,
-                                                    rôle athlete + athleteId ; idempotent)
-      4. signInLinks.issue(athleteId, chemin)      (SignInLinkIssuer → auth.api.signInMagicLink, capturé)
+      2. repo.findById(athleteId)                  (AthleteRepository, Drizzle)
+      3. accounts.ensure(athlete)                  (AthleteAccountRepository → auth.api.createUser,
+                                                    rôle athlete + athleteId ; idempotent, course comprise)
+      4. issuer.issue(athleteId, chemin)           (SignInLinkIssuer → auth.api.signInMagicLink, capturé)
   athlète clique ──▶ /api/auth/magic-link/verify ──▶ session ──▶ /connect/intervals
 
 STAFF (sur invitation, sans email)
@@ -651,8 +651,12 @@ admin et `requireAdmin` ne laissent passer que le staff. Les specs de route mock
 - **Tester par le vrai chemin** : `identity/betterAuth.spec.ts` passe par le handler HTTP (sign in
   Google + callback, token Google simulé par msw ; magic links). Un test qui crée des users par les
   internals de Better Auth saute sa validation : c'est ainsi qu'INI-85 a cassé la connexion en prod.
-- `listUsers` du plugin renvoie une liste vide (pas une erreur) si la base tombe : la page Équipe
-  s'afficherait vide.
+- `listUsers` du plugin renvoie une liste vide (pas une erreur) si la base tombe. Comme le membre
+  qui agit est lui-même un user, `betterAuthStaff` traite une liste qui ne le voit même pas comme
+  une panne : la page Équipe affiche « Équipe illisible », un retrait répond 502, jamais « personne »
+  ni « pas membre ».
+- Le nom (et la photo) Google d'un membre sont copiés sur son user quand son compte se lie
+  (`accountLinking.updateUserInfoOnLink`) : invité, il n'a pas de nom.
 - **Aperçus de lien** : la vérification d'un magic link est un `GET`. Si la passerelle ou WhatsApp
   ouvrent l'URL pour un aperçu, le jeton est consommé avant le clic : à vérifier en prod.
 - **Pas de connexion Google sur les previews Vercel** (Google refuse les URL joker) : prod et local.

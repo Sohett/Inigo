@@ -9,10 +9,10 @@ ALTER TABLE "auth_user" ADD COLUMN "banned" boolean DEFAULT false;--> statement-
 ALTER TABLE "auth_user" ADD COLUMN "ban_reason" text;--> statement-breakpoint
 ALTER TABLE "auth_user" ADD COLUMN "ban_expires" timestamp with time zone;--> statement-breakpoint
 ALTER TABLE "auth_user" ADD COLUMN "invited_by" text;--> statement-breakpoint
-UPDATE "auth_user" SET "role" = array_to_string("staff_member"."roles", ','), "invited_by" = "staff_member"."invited_by" FROM "staff_member" WHERE "auth_user"."email" = "staff_member"."email" AND "auth_user"."role" = 'staff';--> statement-breakpoint
+UPDATE "auth_user" SET "role" = array_to_string(ARRAY(SELECT r FROM unnest("staff_member"."roles") r ORDER BY r), ','), "invited_by" = "staff_member"."invited_by" FROM "staff_member" WHERE "auth_user"."email" = "staff_member"."email" AND "auth_user"."role" = 'staff';--> statement-breakpoint
 DELETE FROM "auth_user" WHERE "role" = 'staff';--> statement-breakpoint
 INSERT INTO "auth_user" ("id", "name", "email", "email_verified", "role", "invited_by", "created_at", "updated_at")
-SELECT gen_random_uuid()::text, '', "email", false, array_to_string("roles", ','), "invited_by", "invited_at", now() FROM "staff_member"
+SELECT gen_random_uuid()::text, '', "email", false, array_to_string(ARRAY(SELECT r FROM unnest("roles") r ORDER BY r), ','), "invited_by", "invited_at", now() FROM "staff_member"
 WHERE NOT EXISTS (SELECT 1 FROM "auth_user" WHERE "auth_user"."email" = "staff_member"."email");--> statement-breakpoint
 ALTER TABLE "auth_user" ADD CONSTRAINT "auth_user_email_lowercase_check" CHECK ("auth_user"."email" = lower("auth_user"."email"));--> statement-breakpoint
 ALTER TABLE "auth_user" ADD CONSTRAINT "auth_user_role_check" CHECK ("auth_user"."role" in ('athlete', 'admin', 'coach', 'admin,coach'));--> statement-breakpoint
